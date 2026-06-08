@@ -44,6 +44,7 @@ This repository is the current product foundation and technical prototype. It is
 
 - **Gomi-branded product metadata** through `product.json`.
 - **Workbench-compatible module structure** under `src/vs/workbench/contrib/gomi`.
+- **Code - OSS integration manifest** for copying branding, resources, and the Gomi workbench module into a real fork before packaging.
 - **Gomi Office panel UI** built with React.
 - **Collapsible workbench views and Office Focus mode** so the visual office can expand across the workspace.
 - **2D office simulation** built with Phaser.
@@ -165,16 +166,17 @@ The node-side patch applier parses unified diffs, verifies context lines, blocks
 The intended product path is:
 
 1. Fork Code - OSS.
-2. Replace all product metadata with Gomi branding.
-3. Replace app icons, splash/about assets, and distribution names.
-4. Configure Open VSX or a Gomi-owned extension marketplace.
-5. Register `Gomi Office` in the Activity Bar.
-6. Load the Gomi Office webview inside the workbench.
-7. Connect `gomiBridge.ts` and `gomiWorkbenchController.ts` to the workbench/webview message boundary.
-8. Run the AI runtime from the workbench/node side.
-9. Feed workspace files, open editors, selected code, terminal output, git diff, diagnostics, and logs into the project context indexer.
-10. Show generated changes through a diff-first approval flow.
-11. Package Gomi IDE for Windows, macOS, and Linux.
+2. Apply `build/gomi-code-oss.integration.json` with `scripts/apply-gomi-code-oss-integration.ps1`.
+3. Replace all product metadata with Gomi branding.
+4. Replace app icons, splash/about assets, and distribution names.
+5. Configure Open VSX or a Gomi-owned extension marketplace.
+6. Register `Gomi Office` in the Activity Bar.
+7. Load the Gomi Office webview inside the workbench.
+8. Connect `gomiBridge.ts` and `gomiWorkbenchController.ts` to the workbench/webview message boundary.
+9. Run the AI runtime from the workbench/node side.
+10. Feed workspace files, open editors, selected code, terminal output, git diff, diagnostics, and logs into the project context indexer.
+11. Show generated changes through a diff-first approval flow.
+12. Package Gomi IDE for Windows, macOS, and Linux.
 
 ## Windows Desktop Build
 
@@ -183,10 +185,23 @@ Gomi IDE should be released as a desktop artifact from a Code - OSS fork, not as
 This repository includes:
 
 - `.github/workflows/build-release.yml` for verification, artifact upload, optional Code - OSS Windows packaging, and GitHub Releases.
+- `build/gomi-code-oss.integration.json` for declaring the Gomi files and workbench import to apply to a Code - OSS checkout.
+- `scripts/apply-gomi-code-oss-integration.ps1` for applying or validating Gomi branding/module integration against a Code - OSS fork.
 - `scripts/build-gomi-code-oss-windows.ps1` for local or CI packaging against a real Code - OSS fork.
 - `docs/windows-release.md` with the Windows build and release workflow.
 
-The prototype `npm` commands remain useful for developing and testing the Gomi Office module. The product distribution path is the Code - OSS packaging path, which can produce a packaged Windows build and, when the fork exposes a compatible setup task, a setup `.exe`.
+The prototype `npm` commands remain useful for developing and testing the Gomi Office module. The product distribution path is the Code - OSS packaging path: the packaging script applies Gomi metadata and workbench files to a Code - OSS checkout, then invokes the upstream gulp packaging tasks to produce a packaged Windows build and, when the fork exposes a compatible setup task, a setup `.exe`.
+
+Local dry-run validation:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build-gomi-code-oss-windows.ps1 `
+  -CodeOssRoot D:\path\to\code-oss-fork `
+  -Platform win32-x64 `
+  -Minified `
+  -BuildSetup `
+  -DryRun
+```
 
 ## Repository Layout
 
@@ -196,6 +211,7 @@ src/vs/workbench/contrib/gomi/
 |   |-- GomiOfficeApp.tsx
 |   |-- PhaserOffice.tsx
 |   |-- gomiPatchApproval.ts
+|   |-- gomiContribution.ts
 |   |-- gomiOfficeView.ts
 |   |-- gomiAgentPanel.ts
 |   |-- gomiTaskView.ts
@@ -229,6 +245,20 @@ src/vs/workbench/contrib/gomi/
     `-- patchApplier.ts
 ```
 
+Supporting release files:
+
+```text
+build/
+`-- gomi-code-oss.integration.json
+
+scripts/
+|-- apply-gomi-code-oss-integration.ps1
+`-- build-gomi-code-oss-windows.ps1
+
+.github/workflows/
+`-- build-release.yml
+```
+
 ## Current Implementation Status
 
 Implemented in this repository:
@@ -255,6 +285,7 @@ Implemented in this repository:
 - Node workspace reader for real project metadata and content snippets.
 - Patch proposal, diff preview, approve/reject, and apply gating.
 - Safe unified-diff patch application core for approved workspace edits.
+- Code - OSS integration manifest and validation/apply script.
 - GitHub Actions build/release workflow and Windows Code - OSS packaging script.
 - Tests for runtime, planner, message bus, patch approval, patch application, workspace reader, project context indexing, shared memory, and vector memory.
 

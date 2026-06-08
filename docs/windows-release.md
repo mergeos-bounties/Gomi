@@ -19,7 +19,7 @@ The repository includes `.github/workflows/build-release.yml`.
 It has three jobs:
 
 - `verify-prototype`: installs dependencies, runs typecheck/tests, builds the current Gomi Office webview prototype, and uploads `gomi-office-webview-prototype.zip`.
-- `code-oss-windows`: optional manual job that checks out a Code - OSS fork and packages Gomi for Windows.
+- `code-oss-windows`: optional manual job that checks out a Code - OSS fork, applies the Gomi integration manifest, and packages Gomi for Windows.
 - `release`: publishes artifacts to a GitHub Release for `v*` tags or manual runs with `create_release` enabled.
 
 To run the full Windows desktop packaging workflow:
@@ -32,7 +32,17 @@ To run the full Windows desktop packaging workflow:
 6. Choose `win32-x64`, `win32-arm64`, or `win32-ia32`.
 7. Enable `build_setup_exe` when the fork has a compatible Windows setup gulp task.
 
+The Windows packaging job runs `scripts/build-gomi-code-oss-windows.ps1`. That script validates the Code - OSS checkout, applies `build/gomi-code-oss.integration.json`, copies Gomi branding/module files into the fork, appends the Gomi workbench import when needed, and then runs the Code - OSS gulp package task.
+
 ## Local Windows Packaging
+
+Validate the integration without changing the Code - OSS checkout:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\apply-gomi-code-oss-integration.ps1 `
+  -CodeOssRoot D:\path\to\code-oss-fork `
+  -ValidateOnly
+```
 
 Run from this repository:
 
@@ -51,6 +61,17 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-gomi-code-oss-windows.p
   -CodeOssRoot D:\path\to\code-oss-fork `
   -Platform win32-x64 `
   -Minified
+```
+
+Preview the full packaging command sequence without copying files or running gulp:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build-gomi-code-oss-windows.ps1 `
+  -CodeOssRoot D:\path\to\code-oss-fork `
+  -Platform win32-x64 `
+  -Minified `
+  -BuildSetup `
+  -DryRun
 ```
 
 ## Why EXE, Not NPM

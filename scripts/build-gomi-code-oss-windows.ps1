@@ -59,33 +59,6 @@ function Invoke-GomiBuildCommand {
   }
 }
 
-function Copy-GomiItem {
-  param(
-    [Parameter(Mandatory = $true)]
-    [string]$Source,
-
-    [Parameter(Mandatory = $true)]
-    [string]$Destination,
-
-    [switch]$Recurse
-  )
-
-  Write-Host "Copy $Source -> $Destination" -ForegroundColor DarkCyan
-
-  if ($DryRun) {
-    return
-  }
-
-  $parent = Split-Path -Parent $Destination
-  New-Item -ItemType Directory -Force -Path $parent | Out-Null
-
-  if ($Recurse -and (Test-Path -LiteralPath $Destination)) {
-    Remove-Item -LiteralPath $Destination -Recurse -Force
-  }
-
-  Copy-Item -LiteralPath $Source -Destination $Destination -Force -Recurse:$Recurse
-}
-
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $codeRoot = Resolve-RequiredPath -PathValue $CodeOssRoot -Description 'Code - OSS root'
 
@@ -100,9 +73,7 @@ foreach ($relativePath in $requiredCodeOssPaths) {
   Resolve-RequiredPath -PathValue (Join-Path $codeRoot $relativePath) -Description "Required Code - OSS path" | Out-Null
 }
 
-$gomiProductJson = Resolve-RequiredPath -PathValue (Join-Path $repoRoot 'product.json') -Description 'Gomi product.json'
-$gomiModuleRoot = Resolve-RequiredPath -PathValue (Join-Path $repoRoot 'src/vs/workbench/contrib/gomi') -Description 'Gomi workbench module'
-$gomiIcon = Resolve-RequiredPath -PathValue (Join-Path $repoRoot 'resources/gomi-icon.svg') -Description 'Gomi icon'
+$integrationScript = Resolve-RequiredPath -PathValue (Join-Path $repoRoot 'scripts/apply-gomi-code-oss-integration.ps1') -Description 'Gomi integration script'
 
 Write-Host "Preparing Gomi IDE Windows package from Code - OSS root: $codeRoot" -ForegroundColor Green
 Write-Host "Platform: $Platform" -ForegroundColor Green
@@ -116,9 +87,23 @@ if (-not $DryRun -and -not (Test-Path -LiteralPath $backupProductJson)) {
   Copy-Item -LiteralPath $targetProductJson -Destination $backupProductJson -Force
 }
 
-Copy-GomiItem -Source $gomiProductJson -Destination $targetProductJson
-Copy-GomiItem -Source $gomiModuleRoot -Destination (Join-Path $codeRoot 'src/vs/workbench/contrib/gomi') -Recurse
-Copy-GomiItem -Source $gomiIcon -Destination (Join-Path $codeRoot 'resources/gomi-icon.svg')
+$integrationArgs = @('-ExecutionPolicy', 'Bypass', '-File', $integrationScript, '-CodeOssRoot', $codeRoot)
+
+if ($DryRun) {
+  $integrationArgs += '-DryRun'
+}
+
+Write-Host ">> powershell $($integrationArgs -join ' ')" -ForegroundColor Cyan
+Push-Location $repoRoot
+try {
+  & powershell @integrationArgs
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "Gomi integration script failed with exit code ${LASTEXITCODE}."
+  }
+} finally {
+  Pop-Location
+}
 
 if (-not $SkipInstall) {
   Invoke-GomiBuildCommand -FilePath 'npm.cmd' -ArgumentList @('install') -WorkingDirectory $codeRoot

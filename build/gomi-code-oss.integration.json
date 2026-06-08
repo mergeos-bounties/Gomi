@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "productName": "Gomi IDE",
+  "description": "Code - OSS integration manifest for Gomi Office IDE.",
+  "productJson": {
+    "source": "product.json",
+    "target": "product.json"
+  },
+  "moduleCopies": [
+    {
+      "source": "src/vs/workbench/contrib/gomi",
+      "target": "src/vs/workbench/contrib/gomi"
+    }
+  ],
+  "resourceCopies": [
+    {
+      "source": "resources/gomi-icon.svg",
+      "target": "resources/gomi-icon.svg"
+    }
+  ],
+  "workbenchImports": [
+    {
+      "target": "src/vs/workbench/workbench.common.main.ts",
+      "import": "import 'vs/workbench/contrib/gomi/browser/gomiContribution';"
+    }
+  ],
+  "activityBar": {
+    "viewId": "workbench.view.gomiOffice",
+    "title": "Gomi Office",
+    "command": "gomi.openOffice"
+  },
+  "commands": [
+    "gomi.openOffice",
+    "gomi.runAgentTask",
+    "gomi.stopAgentTask"
+  ]
+}
