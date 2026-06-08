@@ -1,4 +1,9 @@
-import type { GomiPatchProposal, GomiWorkspaceContentSnippet, GomiWorkspaceSnapshot } from '../common/gomiTypes';
+import type {
+  GomiPatchPreviewResult,
+  GomiPatchProposal,
+  GomiWorkspaceContentSnippet,
+  GomiWorkspaceSnapshot
+} from '../common/gomiTypes';
 import { applyParsedPatchFile, parseUnifiedDiff } from '../common/gomiUnifiedDiff';
 import type { GomiBridgeMessage } from '../electron-sandbox/gomiBridge';
 import type { GomiWorkspaceSnapshotReader } from '../node/workspaceReader';
@@ -59,6 +64,7 @@ export interface GomiCodeOssWorkspaceServices {
     activeTextEditorControl?: GomiCodeOssTextEditorControl;
     visibleEditors?: readonly GomiCodeOssEditorInput[];
     editors?: readonly GomiCodeOssEditorInput[];
+    openEditor?: (editor: GomiCodeOssDiffEditorInput, group?: unknown) => Promise<unknown>;
   };
   codeEditorService?: {
     getActiveCodeEditor?: () => GomiCodeOssTextEditorControl | null;
@@ -82,6 +88,7 @@ export interface GomiCodeOssWorkspaceServices {
   dirname?: (resource: GomiCodeOssUri) => GomiCodeOssUri;
   joinPath?: (resource: GomiCodeOssUri, ...paths: string[]) => GomiCodeOssUri;
   relativePath?: (from: GomiCodeOssUri, to: GomiCodeOssUri) => string | undefined;
+  createUri?: (components: { scheme: string; path: string; query?: string }) => GomiCodeOssUri;
 }
 
 export interface GomiCodeOssWorkspaceOptions {
@@ -243,6 +250,22 @@ export function createCodeOssWorkspaceSnapshotReader(
   return async () => readCodeOssWorkspaceSnapshot(services, options);
 }
 
+interface GomiCodeOssResourceEditorInput {
+  resource: GomiCodeOssUri;
+  contents?: string;
+  languageId?: string;
+  forceUntitled?: boolean;
+  options?: unknown;
+}
+
+interface GomiCodeOssDiffEditorInput {
+  label?: string;
+  description?: string;
+  original: GomiCodeOssResourceEditorInput;
+  modified: GomiCodeOssResourceEditorInput;
+  options?: unknown;
+}
+
 export async function readCodeOssWorkspaceSnapshot(
   services: GomiCodeOssWorkspaceServices,
   options: GomiCodeOssWorkspaceOptions = {}
@@ -314,6 +337,87 @@ export async function applyCodeOssPatchMessage(
   } = {}
 ): Promise<GomiPatchApplyResult> {
   return applyCodeOssPatchProposal(message.patch, services, options);
+}
+
+export async function previewCodeOssPatchMessage(
+  message: Extract<GomiBridgeMessage, { type: 'gomi.previewPatch' }>,
+  services: GomiCodeOssWorkspaceServices
+): Promise<GomiPatchPreviewResult> {
+  return previewCodeOssPatchProposal(message.patch, services);
+}
+
+export async function previewCodeOssPatchProposal(
+  patch: GomiPatchProposal,
+  services: GomiCodeOssWorkspaceServices
+): Promise<GomiPatchPreviewResult> {
+  if (!services.editorService?.openEditor) {
+    throw new Error('Code - OSS editor service is required to preview a Gomi patch.');
+  }
+
+  if (!services.createUri) {
+    throw new Error('Code - OSS URI factory is required to preview a Gomi patch.');
+  }
+
+  const rootFolder = getPrimaryWorkspaceFolder(services);
+  const parsedFiles = parseUnifiedDiff(patch.diff);
+  const previewedFiles: string[] = [];
+  const skippedFiles: string[] = [];
+
+  if (parsedFiles.length === 0) {
+    throw new Error('Gomi patch preview requires at least one unified diff file.');
+  }
+
+  for (const parsedFile of parsedFiles) {
+    const targetPath = parsedFile.newPath ?? parsedFile.oldPath;
+
+    if (!targetPath) {
+      skippedFiles.push('<unknown>');
+      continue;
+    }
+
+    assertSafeWorkspacePath(targetPath);
+
+    try {
+      const currentResource = resolveWorkspacePatchResource(services, rootFolder, targetPath);
+      const originalContent = await readTextFileIfExists(services, currentResource);
+      const previewContent = applyParsedPatchFile(originalContent, parsedFile);
+      const previewResource = createPatchPreviewResource(services, patch.id, targetPath);
+      const languageId = languageFromPath(targetPath);
+
+      await services.editorService.openEditor({
+        label: `Gomi Preview: ${targetPath}`,
+        description: patch.summary,
+        original: {
+          resource: currentResource,
+          contents: originalContent,
+          languageId
+        },
+        modified: {
+          resource: previewResource,
+          contents: previewContent,
+          languageId
+        },
+        options: {
+          pinned: true,
+          revealIfOpened: true
+        }
+      });
+
+      previewedFiles.push(targetPath);
+    } catch {
+      skippedFiles.push(targetPath);
+    }
+  }
+
+  if (skippedFiles.length > 0) {
+    throw new Error(`Gomi could not open a patch preview for: ${skippedFiles.join(', ')}`);
+  }
+
+  return {
+    patchId: patch.id,
+    previewedFiles,
+    skippedFiles
+  };
 }
 
 export async function applyCodeOssPatchProposal(
@@ -773,6 +877,25 @@ function resolveWorkspacePatchResource(
   }
 
   throw new Error('Code - OSS joinPath service is required to resolve patch targets.');
+}
+
+function createPatchPreviewResource(
+  services: GomiCodeOssWorkspaceServices,
+  patchId: string,
+  targetPath: string
+): GomiCodeOssUri {
+  const normalizedPath = targetPath.replace(/\\/g, '/');
+  const safePatchId = patchId.replace(/[^a-z0-9_.-]/gi, '-');
+
+  if (!services.createUri) {
+    throw new Error('Code - OSS URI factory is required to create Gomi patch preview resources.');
+  }
+
+  return services.createUri({
+    scheme: 'gomi-preview',
+    path: `/${safePatchId}/${normalizedPath}`,
+    query: `target=${encodeURIComponent(normalizedPath)}`
+  });
 }
 
 function getPrimaryWorkspaceFolder(services: GomiCodeOssWorkspaceServices): GomiCodeOssWorkspaceFolder {

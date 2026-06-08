@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { GomiWorkbenchBridge, GomiBridgeMessage } from '../electron-sandbox/gomiBridge';
-import type { GomiOfficeSettings, GomiRuntimeEvent } from '../common/gomiTypes';
+import type { GomiOfficeSettings, GomiPatchPreviewResult, GomiRuntimeEvent } from '../common/gomiTypes';
 import { GomiAgentRuntime, type GomiRuntimeOptions } from './agentRuntime';
 import {
   createNodeCliGomiAgentProvider,
@@ -36,6 +36,10 @@ export interface GomiWorkbenchControllerOptions {
     workspaceRoot: string,
     options?: GomiPatchApplyOptions
   ) => Promise<GomiPatchApplyResult>;
+  previewPatch?: (
+    message: Extract<GomiBridgeMessage, { type: 'gomi.previewPatch' }>,
+    workspaceRoot: string
+  ) => Promise<GomiPatchPreviewResult>;
 }
 
 export class GomiWorkbenchController {
@@ -45,6 +49,8 @@ export class GomiWorkbenchController {
   private readonly runtimeFactory: (officeSettings?: GomiOfficeSettings) => GomiRuntimeRunner;
   private readonly patchApplyOptions?: GomiPatchApplyOptions;
   private readonly applyPatch: NonNullable<GomiWorkbenchControllerOptions['applyPatch']>;
+  private readonly previewPatch?: GomiWorkbenchControllerOptions['previewPatch'];
+  private readonly previewedPatches = new Map<string, string>();
   private unsubscribe?: () => void;
   private isRunning = false;
 
@@ -71,6 +77,7 @@ export class GomiWorkbenchController {
       options.applyPatch ??
       ((message, workspaceRoot, applyOptions) =>
         applyPatchProposalToWorkspace(message.patch, workspaceRoot, applyOptions));
+    this.previewPatch = options.previewPatch;
   }
 
   start(): void {
@@ -96,6 +103,11 @@ export class GomiWorkbenchController {
 
     if (message.type === 'gomi.applyPatch') {
       await this.applyPatchMessage(message);
+      return;
+    }
+
+    if (message.type === 'gomi.previewPatch') {
+      await this.previewPatchMessage(message);
     }
   }
 
@@ -137,6 +149,10 @@ export class GomiWorkbenchController {
     message: Extract<GomiBridgeMessage, { type: 'gomi.applyPatch' }>
   ): Promise<void> {
     try {
+      if (this.previewPatch && this.previewedPatches.get(message.patch.id) !== message.patch.diff) {
+        throw new Error('Preview the Gomi patch before applying it.');
+      }
+
       const result = await this.applyPatch(message, this.workspaceRoot, this.patchApplyOptions);
 
       this.bridge.postMessage({
@@ -149,6 +165,31 @@ export class GomiWorkbenchController {
         type: 'gomi.applyPatchResult',
         patchId: message.patch.id,
         error: error instanceof Error ? error.message : 'Unknown patch application error.'
+      });
+    }
+  }
+
+  private async previewPatchMessage(
+    message: Extract<GomiBridgeMessage, { type: 'gomi.previewPatch' }>
+  ): Promise<void> {
+    try {
+      if (!this.previewPatch) {
+        throw new Error('Patch preview is not configured for this Gomi workbench controller.');
+      }
+
+      const result = await this.previewPatch(message, this.workspaceRoot);
+      this.previewedPatches.set(message.patch.id, message.patch.diff);
+
+      this.bridge.postMessage({
+        type: 'gomi.previewPatchResult',
+        patchId: message.patch.id,
+        result
+      });
+    } catch (error) {
+      this.bridge.postMessage({
+        type: 'gomi.previewPatchResult',
+        patchId: message.patch.id,
+        error: error instanceof Error ? error.message : 'Unknown patch preview error.'
       });
     }
   }

@@ -63,6 +63,9 @@ import {
   markPatchApplied,
   markPatchApplying,
   markPatchFailed,
+  markPatchPreviewFailed,
+  markPatchPreviewOpened,
+  markPatchPreviewOpening,
   rejectPatchReview,
   type GomiPatchReviewState
 } from './gomiPatchApproval';
@@ -157,6 +160,20 @@ export function GomiOfficeApp() {
           return markPatchApplied(currentReview);
         });
       }
+
+      if (message.type === 'gomi.previewPatchResult') {
+        setPatchReview((currentReview) => {
+          if (!currentReview || currentReview.patch.id !== message.patchId) {
+            return currentReview;
+          }
+
+          if (message.error || !message.result) {
+            return markPatchPreviewFailed(currentReview, message.error ?? 'Native patch preview failed.');
+          }
+
+          return markPatchPreviewOpened(currentReview, message.result);
+        });
+      }
     });
   }, [workbenchBridge]);
 
@@ -194,9 +211,25 @@ export function GomiOfficeApp() {
   }
 
   function approvePatch() {
-    setPatchReview((currentReview) =>
-      currentReview ? approvePatchReview(currentReview) : currentReview
-    );
+    if (!patchReview) {
+      return;
+    }
+
+    const approvedReview = approvePatchReview(patchReview);
+
+    if (workbenchBridge && approvedReview.approvalStatus === 'approved') {
+      workbenchBridge.postMessage({
+        type: 'gomi.previewPatch',
+        patch: {
+          ...approvedReview.patch,
+          approvalStatus: 'approved'
+        }
+      });
+      setPatchReview(markPatchPreviewOpening(approvedReview));
+      return;
+    }
+
+    setPatchReview(approvedReview);
   }
 
   function rejectPatch() {
@@ -207,7 +240,7 @@ export function GomiOfficeApp() {
 
   function applyPatch() {
     setPatchReview((currentReview) => {
-      if (!currentReview || !canApplyPatch(currentReview)) {
+      if (!currentReview || !canApplyPatch(currentReview, { requirePreview: Boolean(workbenchBridge) })) {
         return currentReview;
       }
 
@@ -375,6 +408,7 @@ export function GomiOfficeApp() {
               onApprovePatch={approvePatch}
               onRejectPatch={rejectPatch}
               onApplyPatch={applyPatch}
+              nativePreviewRequired={Boolean(workbenchBridge)}
             />
           </section>
         </main>
@@ -693,13 +727,15 @@ function FinalReport({
   patchReview,
   onApprovePatch,
   onRejectPatch,
-  onApplyPatch
+  onApplyPatch,
+  nativePreviewRequired
 }: {
   report?: GomiFinalReport;
   patchReview?: GomiPatchReviewState;
   onApprovePatch: () => void;
   onRejectPatch: () => void;
   onApplyPatch: () => void;
+  nativePreviewRequired: boolean;
 }) {
   return (
     <div className="gomi-report">
@@ -717,6 +753,7 @@ function FinalReport({
               onApprovePatch={onApprovePatch}
               onRejectPatch={onRejectPatch}
               onApplyPatch={onApplyPatch}
+              nativePreviewRequired={nativePreviewRequired}
             />
             <div className="gomi-project-row">
               <div className="gomi-project-name">{report.summary}</div>
@@ -742,12 +779,14 @@ function PatchApprovalPanel({
   patchReview,
   onApprovePatch,
   onRejectPatch,
-  onApplyPatch
+  onApplyPatch,
+  nativePreviewRequired
 }: {
   patchReview?: GomiPatchReviewState;
   onApprovePatch: () => void;
   onRejectPatch: () => void;
   onApplyPatch: () => void;
+  nativePreviewRequired: boolean;
 }) {
   if (!patchReview) {
     return (
@@ -780,7 +819,14 @@ function PatchApprovalPanel({
         ))}
         <span className="gomi-chip">risk: {patch.riskLevel}</span>
         <span className="gomi-chip">by: {patch.createdByAgentId}</span>
+        {nativePreviewRequired ? (
+          <span className="gomi-chip">preview: {patchReview.previewStatus}</span>
+        ) : undefined}
       </div>
+
+      {patchReview.previewError ? (
+        <div className="gomi-project-detail">{patchReview.previewError}</div>
+      ) : undefined}
 
       <div className="gomi-patch-actions">
         <button
@@ -802,7 +848,7 @@ function PatchApprovalPanel({
         <button
           className="gomi-action-button is-primary"
           onClick={onApplyPatch}
-          disabled={!canApplyPatch(patchReview)}
+          disabled={!canApplyPatch(patchReview, { requirePreview: nativePreviewRequired })}
         >
           <FileDiff size={14} />
           <span>Apply</span>

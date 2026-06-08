@@ -60,7 +60,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Hybrid project memory** using lexical search plus vector-style retrieval.
 - **Persistent workspace memory storage** for lexical and vector records under `.gomi-ide/memory`.
 - **Project context indexing** for file tree, manifests, open editor snippets, selected code, terminal output, diagnostics, SCM/git diff previews, and optional error logs.
-- **Patch review workflow** with diff preview, approve/reject controls, and apply gating.
+- **Patch review workflow** with webview diff preview, native Code - OSS diff preview hook, approve/reject controls, and apply gating.
 - **Safe node-side patch application core** for approved unified diffs inside the workspace root.
 - **Runtime events** for session lifecycle, messages, task updates, agent results, patch proposals, and final reports.
 - **Workbench bridge controller** for routing webview messages to the runtime and approved patch applier.
@@ -167,13 +167,14 @@ Current patch flow:
 Agent results
 -> CEO synthesis
 -> Patch proposal
--> Diff preview
+-> Webview diff preview
+-> Native Code - OSS diff preview when the workbench host is available
 -> User approves or rejects
--> Apply remains disabled until approval
+-> Apply remains disabled until approval and required preview
 -> Approved unified diff can be applied inside the workspace root
 ```
 
-The node-side patch applier parses unified diffs, verifies context lines, blocks paths that escape the workspace, supports dry-run mode, and refuses unapproved patches by default. This keeps generated changes auditable and prevents agents from silently modifying source code.
+The node-side patch applier parses unified diffs, verifies context lines, blocks paths that escape the workspace, supports dry-run mode, and refuses unapproved patches by default. The native host bridge can require a successful patch preview before applying a patch, and it verifies that the diff being applied matches the diff that was previewed. This keeps generated changes auditable and prevents agents from silently modifying source code.
 
 ## Code - OSS Integration Path
 
@@ -309,12 +310,12 @@ Implemented in this repository:
 - Office settings for CEO and department-head CLI routing.
 - Department-head sleep mode and employee fire/restore controls.
 - Runtime event stream.
-- Workbench bridge controller for `gomi.run`, runtime event forwarding, and approved patch apply messages.
+- Workbench bridge controller for `gomi.run`, runtime event forwarding, native patch preview, and approved patch apply messages.
 - Native Code - OSS registration template for the Gomi Office Activity Bar container and webview-backed view pane.
 - Generated webview asset path for mounting the React/Phaser office bundle inside the native pane.
 - Optional webview bridge client with deterministic demo fallback when no native host is attached.
 - Native webview host bridge/controller path for run-message handling and runtime event streaming.
-- Code - OSS workspace services adapter for native workspace folders, open editors, selected code, diagnostics, terminal output, SCM/git diff previews, optional error logs, text snippets, and approved patch application.
+- Code - OSS workspace services adapter for native workspace folders, open editors, selected code, diagnostics, terminal output, SCM/git diff previews, optional error logs, text snippets, native diff preview, and approved patch application.
 - Agent provider contract with a demo provider.
 - Node-side CLI provider router with command execution, JSON/plain-text output mapping, and demo fallback.
 - Hybrid project memory with lexical and vector-style retrieval.
@@ -322,7 +323,7 @@ Implemented in this repository:
 - Project context chunking and indexing.
 - Communication policy for selective agent broadcast.
 - Node workspace reader for real project metadata and content snippets.
-- Patch proposal, diff preview, approve/reject, and apply gating.
+- Patch proposal, webview diff preview, native diff preview hook, approve/reject, and apply gating.
 - Safe unified-diff patch application core for approved workspace edits.
 - Code - OSS integration manifest and validation/apply script.
 - GitHub Actions build/release workflow and Windows Code - OSS packaging script.
@@ -331,10 +332,9 @@ Implemented in this repository:
 Not yet implemented:
 
 - Full upstream Code - OSS source integration.
-- Validating the React/Phaser webview mount inside a real Code - OSS checkout.
+- Validating the React/Phaser webview mount and native diff preview inside a real Code - OSS checkout.
 - Durable terminal scrollback capture beyond the selected/current exposed terminal text.
 - Native output-channel/log-service integration beyond the current optional error-log provider hook.
-- Real Code - OSS diff editor preview before patch apply.
 - Production LLM API provider.
 - Production local model provider.
 - Workspace trust and enterprise policy UI for enabling live CLI execution.
@@ -383,8 +383,8 @@ The current verification suite covers:
 - Task planner output.
 - Patch approval state transitions.
 - Safe patch application and workspace path containment.
-- Code - OSS workspace service adaptation, selected code capture, diagnostics capture, terminal output capture, SCM/git diff previews, optional error-log capture, and approved native patch application path.
-- Workbench bridge controller message routing.
+- Code - OSS workspace service adaptation, selected code capture, diagnostics capture, terminal output capture, SCM/git diff previews, optional error-log capture, native diff preview input creation, and approved native patch application path.
+- Workbench bridge controller message routing, preview-before-apply guard, and stale-diff rejection.
 - Persistent lexical and vector memory storage.
 - Node workspace context reading.
 - Project context indexing.
@@ -421,7 +421,7 @@ Recommended next milestones:
 3. Add provider adapters for OpenAI-compatible APIs and local model runtimes.
 4. Add persistent memory using SQLite and optional vector database support.
 5. Deepen native workspace context with durable terminal scrollback and workbench log/output-channel readers.
-6. Add workbench diff editor preview before approved patch application.
+6. Validate and polish the native diff preview inside a real Code - OSS fork.
 7. Add settings for model provider, privacy mode, memory retention, and approval policy.
 8. Add packaging, signing, update channel, and release automation.
 9. Define licensing, commercial terms, and enterprise deployment policy.

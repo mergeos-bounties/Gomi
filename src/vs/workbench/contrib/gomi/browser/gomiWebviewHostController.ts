@@ -1,4 +1,4 @@
-import type { GomiOfficeSettings, GomiRuntimeEvent } from '../common/gomiTypes';
+import type { GomiOfficeSettings, GomiPatchPreviewResult, GomiRuntimeEvent } from '../common/gomiTypes';
 import type { GomiBridgeMessage, GomiWorkbenchBridge } from '../electron-sandbox/gomiBridge';
 import { GomiAgentRuntime, type GomiRuntimeOptions } from '../node/agentRuntime';
 import type { GomiPatchApplyResult } from '../node/workspacePatchApplier';
@@ -14,12 +14,16 @@ export interface GomiWebviewHostControllerOptions {
   patchApplier?: (
     message: Extract<GomiBridgeMessage, { type: 'gomi.applyPatch' }>
   ) => Promise<GomiPatchApplyResult>;
+  patchPreviewer?: (
+    message: Extract<GomiBridgeMessage, { type: 'gomi.previewPatch' }>
+  ) => Promise<GomiPatchPreviewResult>;
   runtimeOptions?: GomiRuntimeOptions;
 }
 
 export class GomiWebviewHostController {
   private unsubscribe?: () => void;
   private running = false;
+  private readonly previewedPatches = new Map<string, string>();
 
   constructor(private readonly options: GomiWebviewHostControllerOptions) {}
 
@@ -46,6 +50,11 @@ export class GomiWebviewHostController {
 
     if (message.type === 'gomi.applyPatch') {
       await this.applyPatch(message);
+      return;
+    }
+
+    if (message.type === 'gomi.previewPatch') {
+      await this.previewPatch(message);
     }
   }
 
@@ -89,6 +98,10 @@ export class GomiWebviewHostController {
         throw new Error('Native patch application is not configured for this Gomi webview host.');
       }
 
+      if (this.options.patchPreviewer && this.previewedPatches.get(message.patch.id) !== message.patch.diff) {
+        throw new Error('Preview the Gomi patch in the native diff editor before applying it.');
+      }
+
       this.options.bridge.postMessage({
         type: 'gomi.applyPatchResult',
         patchId: message.patch.id,
@@ -99,6 +112,28 @@ export class GomiWebviewHostController {
         type: 'gomi.applyPatchResult',
         patchId: message.patch.id,
         error: error instanceof Error ? error.message : 'Unknown patch application error.'
+      });
+    }
+  }
+
+  private async previewPatch(message: Extract<GomiBridgeMessage, { type: 'gomi.previewPatch' }>): Promise<void> {
+    try {
+      if (!this.options.patchPreviewer) {
+        throw new Error('Native patch preview is not configured for this Gomi webview host.');
+      }
+
+      const result = await this.options.patchPreviewer(message);
+      this.previewedPatches.set(message.patch.id, message.patch.diff);
+      this.options.bridge.postMessage({
+        type: 'gomi.previewPatchResult',
+        patchId: message.patch.id,
+        result
+      });
+    } catch (error) {
+      this.options.bridge.postMessage({
+        type: 'gomi.previewPatchResult',
+        patchId: message.patch.id,
+        error: error instanceof Error ? error.message : 'Unknown patch preview error.'
       });
     }
   }

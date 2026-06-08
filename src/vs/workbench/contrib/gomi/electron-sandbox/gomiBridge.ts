@@ -1,4 +1,9 @@
-import type { GomiOfficeSettings, GomiPatchProposal, GomiRuntimeEvent } from '../common/gomiTypes';
+import type {
+  GomiOfficeSettings,
+  GomiPatchPreviewResult,
+  GomiPatchProposal,
+  GomiRuntimeEvent
+} from '../common/gomiTypes';
 import type { GomiPatchApplyResult } from '../node/workspacePatchApplier';
 
 export type GomiBridgeMessage =
@@ -14,6 +19,16 @@ export type GomiBridgeMessage =
   | {
       type: 'gomi.applyPatch';
       patch: GomiPatchProposal;
+    }
+  | {
+      type: 'gomi.previewPatch';
+      patch: GomiPatchProposal;
+    }
+  | {
+      type: 'gomi.previewPatchResult';
+      patchId: string;
+      result?: GomiPatchPreviewResult;
+      error?: string;
     }
   | {
       type: 'gomi.applyPatchResult';

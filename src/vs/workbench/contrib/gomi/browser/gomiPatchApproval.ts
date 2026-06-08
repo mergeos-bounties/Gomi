@@ -1,17 +1,23 @@
-import type { GomiPatchApprovalStatus, GomiPatchProposal } from '../common/gomiTypes';
+import type { GomiPatchApprovalStatus, GomiPatchPreviewResult, GomiPatchProposal } from '../common/gomiTypes';
 
 export type GomiDiffLineKind = 'addition' | 'deletion' | 'hunk' | 'meta' | 'context';
+export type GomiPatchPreviewStatus = 'idle' | 'opening' | 'opened' | 'failed';
 
 export interface GomiPatchReviewState {
   patch: GomiPatchProposal;
   approvalStatus: GomiPatchApprovalStatus;
   applyError?: string;
+  previewStatus: GomiPatchPreviewStatus;
+  previewError?: string;
+  previewedFiles: string[];
 }
 
 export function createPatchReviewState(patch: GomiPatchProposal): GomiPatchReviewState {
   return {
     patch,
-    approvalStatus: patch.approvalStatus
+    approvalStatus: patch.approvalStatus,
+    previewStatus: 'idle',
+    previewedFiles: []
   };
 }
 
@@ -23,7 +29,8 @@ export function approvePatchReview(state: GomiPatchReviewState): GomiPatchReview
   return {
     ...state,
     approvalStatus: 'approved',
-    applyError: undefined
+    applyError: undefined,
+    previewError: undefined
   };
 }
 
@@ -35,12 +42,18 @@ export function rejectPatchReview(state: GomiPatchReviewState): GomiPatchReviewS
   return {
     ...state,
     approvalStatus: 'rejected',
-    applyError: undefined
+    applyError: undefined,
+    previewError: undefined
   };
 }
 
-export function canApplyPatch(state?: GomiPatchReviewState): boolean {
-  return state?.approvalStatus === 'approved';
+export function canApplyPatch(
+  state?: GomiPatchReviewState,
+  options: {
+    requirePreview?: boolean;
+  } = {}
+): boolean {
+  return state?.approvalStatus === 'approved' && (!options.requirePreview || state.previewStatus === 'opened');
 }
 
 export function markPatchApplying(state: GomiPatchReviewState): GomiPatchReviewState {
@@ -75,6 +88,51 @@ export function markPatchFailed(
     ...state,
     approvalStatus: 'failed',
     applyError
+  };
+}
+
+export function markPatchPreviewOpening(state: GomiPatchReviewState): GomiPatchReviewState {
+  if (state.approvalStatus !== 'approved') {
+    return state;
+  }
+
+  return {
+    ...state,
+    previewStatus: 'opening',
+    previewError: undefined,
+    previewedFiles: []
+  };
+}
+
+export function markPatchPreviewOpened(
+  state: GomiPatchReviewState,
+  result: GomiPatchPreviewResult
+): GomiPatchReviewState {
+  if (state.patch.id !== result.patchId || state.approvalStatus !== 'approved') {
+    return state;
+  }
+
+  return {
+    ...state,
+    previewStatus: 'opened',
+    previewError: undefined,
+    previewedFiles: result.previewedFiles
+  };
+}
+
+export function markPatchPreviewFailed(
+  state: GomiPatchReviewState,
+  previewError: string
+): GomiPatchReviewState {
+  if (state.approvalStatus !== 'approved') {
+    return state;
+  }
+
+  return {
+    ...state,
+    previewStatus: 'failed',
+    previewError,
+    previewedFiles: []
   };
 }
 

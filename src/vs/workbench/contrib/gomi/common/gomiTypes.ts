@@ -122,6 +122,12 @@ export interface GomiPatchProposal {
   createdByAgentId: GomiAgentId;
 }
 
+export interface GomiPatchPreviewResult {
+  patchId: string;
+  previewedFiles: string[];
+  skippedFiles: string[];
+}
+
 export interface GomiWorkspaceSnapshot {
   rootName: string;
   files: string[];

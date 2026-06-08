@@ -86,6 +86,65 @@ describe('GomiWorkbenchController', () => {
     expect(content).toContain('Bridge Patch');
   });
 
+  it('can require a preview message before node-side patch application', async () => {
+    const bridge = new MemoryWorkbenchBridge();
+    let applyCount = 0;
+    const patch = createPatch({
+      id: 'patch-preview-node',
+      diff: [
+        'diff --git a/docs/preview.md b/docs/preview.md',
+        'new file mode 100644',
+        '--- /dev/null',
+        '+++ b/docs/preview.md',
+        '@@ -0,0 +1 @@',
+        '+Previewed first.'
+      ].join('\n')
+    });
+    const controller = new GomiWorkbenchController({
+      bridge,
+      workspaceRoot,
+      previewPatch: async (message) => ({
+        patchId: message.patch.id,
+        previewedFiles: message.patch.targetFiles,
+        skippedFiles: []
+      }),
+      applyPatch: async (message, root, options) => {
+        applyCount += 1;
+        const { applyPatchProposalToWorkspace } = await import('../src/vs/workbench/contrib/gomi/node/workspacePatchApplier');
+
+        return applyPatchProposalToWorkspace(message.patch, root, options);
+      }
+    });
+
+    await controller.handleMessage({
+      type: 'gomi.applyPatch',
+      patch
+    });
+    await controller.handleMessage({
+      type: 'gomi.previewPatch',
+      patch
+    });
+    await controller.handleMessage({
+      type: 'gomi.applyPatch',
+      patch
+    });
+
+    const content = await fs.readFile(path.join(workspaceRoot, 'docs', 'preview.md'), 'utf8');
+
+    expect(applyCount).toBe(1);
+    expect(content).toContain('Previewed first.');
+    expect(bridge.outbox.map((message) => message.type)).toEqual([
+      'gomi.applyPatchResult',
+      'gomi.previewPatchResult',
+      'gomi.applyPatchResult'
+    ]);
+    expect(bridge.outbox[0]).toMatchObject({
+      type: 'gomi.applyPatchResult',
+      patchId: 'patch-preview-node',
+      error: 'Preview the Gomi patch before applying it.'
+    });
+  });
+
   it('returns bridge errors for unapproved patch messages', async () => {
     const bridge = new MemoryWorkbenchBridge();
     const controller = new GomiWorkbenchController({ bridge, workspaceRoot });

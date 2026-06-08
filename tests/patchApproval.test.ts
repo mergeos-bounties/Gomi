@@ -7,6 +7,9 @@ import {
   getDiffLineKind,
   markPatchApplied,
   markPatchApplying,
+  markPatchPreviewFailed,
+  markPatchPreviewOpened,
+  markPatchPreviewOpening,
   rejectPatchReview
 } from '../src/vs/workbench/contrib/gomi/browser/gomiPatchApproval';
 
@@ -32,6 +35,32 @@ describe('gomiPatchApproval', () => {
     expect(canApplyPatch(approved)).toBe(true);
     expect(applying.approvalStatus).toBe('applying');
     expect(applied.approvalStatus).toBe('applied');
+  });
+
+  it('can require a native preview before apply', () => {
+    const approved = approvePatchReview(createPatchReviewState(patch));
+    const opening = markPatchPreviewOpening(approved);
+    const opened = markPatchPreviewOpened(opening, {
+      patchId: patch.id,
+      previewedFiles: ['docs/gomi-agent-plan.md'],
+      skippedFiles: []
+    });
+
+    expect(canApplyPatch(approved, { requirePreview: true })).toBe(false);
+    expect(opening.previewStatus).toBe('opening');
+    expect(canApplyPatch(opened, { requirePreview: true })).toBe(true);
+    expect(opened.previewedFiles).toEqual(['docs/gomi-agent-plan.md']);
+  });
+
+  it('blocks apply when native preview fails', () => {
+    const failed = markPatchPreviewFailed(
+      markPatchPreviewOpening(approvePatchReview(createPatchReviewState(patch))),
+      'Native diff editor failed.'
+    );
+
+    expect(failed.previewStatus).toBe('failed');
+    expect(failed.previewError).toBe('Native diff editor failed.');
+    expect(canApplyPatch(failed, { requirePreview: true })).toBe(false);
   });
 
   it('keeps rejected patches from being applied', () => {

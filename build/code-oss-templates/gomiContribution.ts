@@ -42,7 +42,8 @@ import { ITerminalService } from '../../terminal/browser/terminal.js';
 import { ISCMService } from '../../scm/common/scm.js';
 import {
   applyCodeOssPatchMessage,
-  createCodeOssWorkspaceSnapshotReader
+  createCodeOssWorkspaceSnapshotReader,
+  previewCodeOssPatchMessage
 } from './codeOssWorkspaceServices.js';
 import { createGomiWebviewHostBridge } from './gomiWebviewHostBridge.js';
 import { GomiWebviewHostController } from './gomiWebviewHostController.js';
@@ -166,13 +167,15 @@ class GomiOfficeViewPane extends ViewPane {
       basename,
       dirname,
       joinPath,
-      relativePath
+      relativePath,
+      createUri: URI.from
     };
     const controller = new GomiWebviewHostController({
       bridge,
       runtimeOptions: {
         workspaceReader: createCodeOssWorkspaceSnapshotReader(codeOssWorkspaceServices)
       },
+      patchPreviewer: (message) => previewCodeOssPatchMessage(message, codeOssWorkspaceServices),
       patchApplier: (message) => applyCodeOssPatchMessage(message, codeOssWorkspaceServices)
     });
     controller.start();

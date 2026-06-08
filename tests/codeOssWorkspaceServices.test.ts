@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyCodeOssPatchProposal,
+  previewCodeOssPatchProposal,
   readCodeOssWorkspaceSnapshot,
   type GomiCodeOssFileStat,
   type GomiCodeOssUri,
@@ -234,6 +235,37 @@ describe('Code - OSS workspace services adapter', () => {
     expect(services.readFileMap().get('/workspace/src/login.ts')).toBe('export const ok = true;\n');
   });
 
+  it('opens a native diff preview before writing approved unified diffs', async () => {
+    const services = createFakeCodeOssServices({
+      'src/login.ts': 'export const ok = false;\n'
+    });
+    const openedEditors: unknown[] = [];
+    services.editorService = {
+      ...services.editorService,
+      openEditor: async (editor) => {
+        openedEditors.push(editor);
+      }
+    };
+
+    const result = await previewCodeOssPatchProposal(createPatch(), services);
+    const openedEditor = openedEditors[0] as {
+      label?: string;
+      original?: { contents?: string; resource?: GomiCodeOssUri };
+      modified?: { contents?: string; resource?: GomiCodeOssUri };
+    };
+
+    expect(result).toEqual({
+      patchId: 'patch-1',
+      previewedFiles: ['src/login.ts'],
+      skippedFiles: []
+    });
+    expect(services.readFileMap().get('/workspace/src/login.ts')).toBe('export const ok = false;\n');
+    expect(openedEditor.label).toBe('Gomi Preview: src/login.ts');
+    expect(openedEditor.original?.contents).toBe('export const ok = false;\n');
+    expect(openedEditor.modified?.contents).toBe('export const ok = true;\n');
+    expect(openedEditor.modified?.resource?.scheme).toBe('gomi-preview');
+  });
+
   it('creates new files from approved unified diffs', async () => {
     const services = createFakeCodeOssServices({});
 
@@ -298,16 +330,14 @@ interface FakeCodeOssWorkspaceServices extends GomiCodeOssWorkspaceServices {
 }
 
 class FakeUri implements GomiCodeOssUri {
-  readonly scheme = 'file';
-
-  constructor(readonly path: string) {}
+  constructor(readonly path: string, readonly scheme = 'file') {}
 
   get fsPath(): string {
     return this.path;
   }
 
   toString(): string {
-    return `file://${this.path}`;
+    return `${this.scheme}://${this.path}`;
   }
 }
 
@@ -372,6 +402,7 @@ function createFakeCodeOssServices(files: Record<string, string>): FakeCodeOssWo
     basename: (resource) => resource.path?.split('/').pop() ?? '',
     dirname: (resource) => new FakeUri((resource.path ?? '').split('/').slice(0, -1).join('/')),
     joinPath,
+    createUri: (components) => new FakeUri(components.path, components.scheme),
     relativePath: (from, to) => {
       const fromPath = from.path ?? '';
       const toPath = to.path ?? '';
