@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { GomiBridgeMessage, GomiWorkbenchBridge } from '../src/vs/workbench/contrib/gomi/electron-sandbox/gomiBridge';
 import type { GomiPatchProposal } from '../src/vs/workbench/contrib/gomi/common/gomiTypes';
 import { GomiAgentRuntime } from '../src/vs/workbench/contrib/gomi/node/agentRuntime';
+import type { GomiCliCommandInvocation } from '../src/vs/workbench/contrib/gomi/node/cliAgentProvider';
 import { GomiWorkbenchController } from '../src/vs/workbench/contrib/gomi/node/gomiWorkbenchController';
 
 let workspaceRoot: string;
@@ -169,6 +170,53 @@ describe('GomiWorkbenchController', () => {
     expect(lexicalMemory).toContain('Review workspace memory');
     expect(lexicalMemory).toContain('workspace:files');
     expect(vectorMemory).toContain('workspace:files');
+  });
+
+  it('can enable node-side CLI agent execution for the default workbench runtime', async () => {
+    const bridge = new MemoryWorkbenchBridge();
+    const invocations: GomiCliCommandInvocation[] = [];
+    await fs.writeFile(
+      path.join(workspaceRoot, 'package.json'),
+      JSON.stringify({ name: 'cli-workspace', scripts: { test: 'vitest' } }),
+      'utf8'
+    );
+    const controller = new GomiWorkbenchController({
+      bridge,
+      workspaceRoot,
+      enableCliAgentExecution: true,
+      cliAgentCommandRunner: async (invocation) => {
+        invocations.push(invocation);
+
+        return {
+          stdout: JSON.stringify({
+            summary: `${invocation.agentId} via ${invocation.providerLabel}`,
+            findings: [`Executed ${invocation.executable}`],
+            recommendations: ['Keep patch approval enabled.'],
+            proposedFiles: [],
+            confidence: 0.8
+          }),
+          stderr: '',
+          exitCode: 0
+        };
+      },
+      runtimeOptions: {
+        delayMs: 0
+      }
+    });
+
+    await controller.handleMessage({
+      type: 'gomi.run',
+      request: 'Review build package path'
+    });
+
+    const resultSummaries = bridge.outbox
+      .filter((message): message is Extract<GomiBridgeMessage, { type: 'gomi.event' }> => message.type === 'gomi.event')
+      .filter((message) => message.event.type === 'agent_result')
+      .map((message) => (message.event.type === 'agent_result' ? message.event.result.summary : ''));
+
+    expect(invocations.length).toBeGreaterThan(0);
+    expect(invocations[0].executable).toBe('codex');
+    expect(resultSummaries.some((summary) => summary.includes('via Codex CLI'))).toBe(true);
   });
 });
 

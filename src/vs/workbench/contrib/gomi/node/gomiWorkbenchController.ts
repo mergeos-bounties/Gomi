@@ -3,6 +3,10 @@ import type { GomiWorkbenchBridge, GomiBridgeMessage } from '../electron-sandbox
 import type { GomiRuntimeEvent } from '../common/gomiTypes';
 import { GomiAgentRuntime, type GomiRuntimeOptions } from './agentRuntime';
 import {
+  createNodeCliGomiAgentProvider,
+  type GomiCliCommandRunner
+} from './cliAgentProvider';
+import {
   createFileBackedGomiMemoryStore,
   createFileBackedVectorMemoryStore
 } from './persistentProjectMemory';
@@ -23,6 +27,9 @@ export interface GomiWorkbenchControllerOptions {
   runtime?: GomiRuntimeRunner;
   memoryDirectory?: string;
   runtimeOptions?: GomiRuntimeOptions;
+  enableCliAgentExecution?: boolean;
+  cliAgentCommandRunner?: GomiCliCommandRunner;
+  cliAgentTimeoutMs?: number;
   patchApplyOptions?: GomiPatchApplyOptions;
   applyPatch?: (
     message: Extract<GomiBridgeMessage, { type: 'gomi.applyPatch' }>,
@@ -45,7 +52,11 @@ export class GomiWorkbenchController {
     this.workspaceRoot = options.workspaceRoot;
     this.runtime =
       options.runtime ??
-      createWorkbenchRuntime(options.workspaceRoot, options.memoryDirectory, options.runtimeOptions);
+      createWorkbenchRuntime(options.workspaceRoot, options.memoryDirectory, options.runtimeOptions, {
+        enableCliAgentExecution: options.enableCliAgentExecution,
+        cliAgentCommandRunner: options.cliAgentCommandRunner,
+        cliAgentTimeoutMs: options.cliAgentTimeoutMs
+      });
     this.patchApplyOptions = options.patchApplyOptions;
     this.applyPatch =
       options.applyPatch ??
@@ -135,7 +146,11 @@ export class GomiWorkbenchController {
 function createWorkbenchRuntime(
   workspaceRoot: string,
   memoryDirectory?: string,
-  runtimeOptions: GomiRuntimeOptions = {}
+  runtimeOptions: GomiRuntimeOptions = {},
+  cliOptions: Pick<
+    GomiWorkbenchControllerOptions,
+    'enableCliAgentExecution' | 'cliAgentCommandRunner' | 'cliAgentTimeoutMs'
+  > = {}
 ): GomiRuntimeRunner {
   const projectMemoryDirectory = memoryDirectory ?? path.join(workspaceRoot, '.gomi-ide', 'memory');
 
@@ -147,8 +162,14 @@ function createWorkbenchRuntime(
       createFileBackedGomiMemoryStore(path.join(projectMemoryDirectory, 'lexical-memory.json')),
     vectorMemoryStore:
       runtimeOptions.vectorMemoryStore ??
-      createFileBackedVectorMemoryStore(
-      path.join(projectMemoryDirectory, 'vector-memory.json')
-    )
+      createFileBackedVectorMemoryStore(path.join(projectMemoryDirectory, 'vector-memory.json')),
+    agentProvider:
+      runtimeOptions.agentProvider ??
+      createNodeCliGomiAgentProvider({
+        enabled: cliOptions.enableCliAgentExecution ?? false,
+        commandRunner: cliOptions.cliAgentCommandRunner,
+        timeoutMs: cliOptions.cliAgentTimeoutMs,
+        cwd: workspaceRoot
+      })
   });
 }

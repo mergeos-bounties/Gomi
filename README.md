@@ -62,6 +62,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Safe node-side patch application core** for approved unified diffs inside the workspace root.
 - **Runtime events** for session lifecycle, messages, task updates, agent results, patch proposals, and final reports.
 - **Workbench bridge controller** for routing webview messages to the runtime and approved patch applier.
+- **Node-side CLI agent router** for executing selected CEO and department-head CLI providers when enabled in the workbench runtime.
 - **GitHub Actions release workflow** for verification, artifacts, and optional Windows Code - OSS packaging.
 - **Open VSX Registry metadata** instead of Microsoft Visual Studio Marketplace metadata.
 
@@ -142,6 +143,14 @@ The current implementation uses hybrid retrieval:
 - **Communication policy** so low-importance findings are stored silently while high-importance findings become visible messages and chat bubbles.
 
 For the MVP, vector retrieval uses a local hashing embedding provider. It does not require an API key and keeps tests deterministic. The workbench controller persists lexical and vector memory records in workspace storage so future sessions can reuse project context. In a production build, this storage can be replaced by SQLite, a local vector database, OpenAI embeddings, a local embedding model, or an enterprise embedding service without changing the runtime contract.
+
+## Agent CLI Routing
+
+Gomi separates office organization from agent execution.
+
+The Office Settings view lets the user assign CLI providers to the CEO and each department head. The node-side workbench runtime includes a CLI agent router that can execute the selected command, pass a structured prompt through stdin, and map JSON or plain-text output back into `GomiAgentResult`.
+
+CLI execution is disabled by default in the prototype for safety and deterministic tests. A real Code - OSS workbench integration can enable it through `GomiWorkbenchController` once provider commands, workspace trust, approval policy, and enterprise controls are configured. When disabled, the same route metadata still flows through the runtime and the demo provider remains the fallback.
 
 ## Patch Review And Safety
 
@@ -229,6 +238,7 @@ src/vs/workbench/contrib/gomi/
     |-- agentRuntime.ts
     |-- gomiWorkbenchController.ts
     |-- agentProvider.ts
+    |-- cliAgentProvider.ts
     |-- taskPlanner.ts
     |-- messageBus.ts
     |-- memoryStore.ts
@@ -278,6 +288,7 @@ Implemented in this repository:
 - Runtime event stream.
 - Workbench bridge controller for `gomi.run`, runtime event forwarding, and approved patch apply messages.
 - Agent provider contract with a demo provider.
+- Node-side CLI provider router with command execution, JSON/plain-text output mapping, and demo fallback.
 - Hybrid project memory with lexical and vector-style retrieval.
 - File-backed persistent project memory for workbench sessions.
 - Project context chunking and indexing.
@@ -287,7 +298,7 @@ Implemented in this repository:
 - Safe unified-diff patch application core for approved workspace edits.
 - Code - OSS integration manifest and validation/apply script.
 - GitHub Actions build/release workflow and Windows Code - OSS packaging script.
-- Tests for runtime, planner, message bus, patch approval, patch application, workspace reader, project context indexing, shared memory, and vector memory.
+- Tests for runtime, CLI routing, planner, message bus, patch approval, patch application, workspace reader, project context indexing, shared memory, and vector memory.
 
 Not yet implemented:
 
@@ -295,6 +306,7 @@ Not yet implemented:
 - Native workbench contribution registration in a complete Code - OSS tree.
 - Production LLM API provider.
 - Production local model provider.
+- Workspace trust and enterprise policy UI for enabling live CLI execution.
 - Persistent database-backed memory.
 - Workbench-integrated patch application through Code - OSS editor and file service APIs.
 - Signed desktop packaging assets and production release signing.

@@ -8,7 +8,7 @@ import type {
 } from '../common/gomiTypes';
 import type { GomiMemoryHit } from './memoryStore';
 
-export type GomiAgentProviderKind = 'cloud' | 'local' | 'demo';
+export type GomiAgentProviderKind = 'cloud' | 'local' | 'cli' | 'demo';
 
 export interface GomiAgentProviderCapabilities {
   streaming: boolean;
