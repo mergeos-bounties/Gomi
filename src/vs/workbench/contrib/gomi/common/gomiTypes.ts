@@ -17,6 +17,14 @@ export type GomiAgentStatus =
   | 'blocked';
 
 export type GomiTaskStatus = 'queued' | 'running' | 'done' | 'blocked';
+export type GomiPatchApprovalStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'applying'
+  | 'applied'
+  | 'failed';
+export type GomiPatchRiskLevel = 'low' | 'medium' | 'high';
 
 export interface GomiAgent {
   id: GomiAgentId;
@@ -60,8 +68,12 @@ export interface GomiFinalReport {
 export interface GomiPatchProposal {
   id: string;
   filePath: string;
+  targetFiles: string[];
   summary: string;
   diff: string;
+  approvalStatus: GomiPatchApprovalStatus;
+  riskLevel: GomiPatchRiskLevel;
+  createdByAgentId: GomiAgentId;
 }
 
 export interface GomiWorkspaceSnapshot {

@@ -15,4 +15,26 @@ describe('GomiAgentRuntime', () => {
     expect(eventTypes).toContain('report');
     expect(eventTypes.at(-1)).toBe('session_completed');
   });
+
+  it('uses an injected workspace reader for project context', async () => {
+    const runtime = new GomiAgentRuntime({
+      delayMs: 0,
+      workspaceReader: () => ({
+        rootName: 'InjectedWorkspace',
+        files: ['package.json', 'src/server.ts'],
+        openEditors: ['src/server.ts'],
+        gitSummary: 'Git branch feature/gomi, 0 changed files.',
+        terminalSummary: 'package.json injected-workspace.'
+      })
+    });
+    const rootNames: string[] = [];
+
+    for await (const event of runtime.run('Review injected project')) {
+      if (event.type === 'session_started') {
+        rootNames.push(event.workspace.rootName);
+      }
+    }
+
+    expect(rootNames).toEqual(['InjectedWorkspace']);
+  });
 });

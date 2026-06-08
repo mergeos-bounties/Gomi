@@ -147,7 +147,7 @@ button {
 
 .gomi-main {
   display: grid;
-  grid-template-rows: auto auto minmax(260px, 1fr) minmax(170px, 26vh);
+  grid-template-rows: auto auto minmax(260px, 1fr) minmax(250px, 34vh);
   min-width: 0;
   min-height: 0;
   background: #0b0f14;
@@ -345,6 +345,24 @@ button {
   color: #fb7185;
 }
 
+.gomi-status[data-status="pending"],
+.gomi-status[data-status="applying"] {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fbbf24;
+}
+
+.gomi-status[data-status="approved"],
+.gomi-status[data-status="applied"] {
+  background: rgba(34, 197, 94, 0.14);
+  color: #86efac;
+}
+
+.gomi-status[data-status="rejected"],
+.gomi-status[data-status="failed"] {
+  background: rgba(244, 63, 94, 0.14);
+  color: #fb7185;
+}
+
 .gomi-task-row {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -387,6 +405,99 @@ button {
   height: 100%;
   color: #64748b;
   font-size: 12px;
+}
+
+.gomi-patch-review {
+  gap: 10px;
+}
+
+.gomi-patch-review__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.gomi-patch-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.gomi-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #172033;
+  color: #d1d5db;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.gomi-action-button:hover:not(:disabled) {
+  border-color: #2dd4bf;
+  color: #f9fafb;
+}
+
+.gomi-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.gomi-action-button.is-primary {
+  background: #0f766e;
+  border-color: #14b8a6;
+  color: #ecfeff;
+}
+
+.gomi-action-button.is-danger {
+  border-color: #7f1d1d;
+  color: #fecaca;
+}
+
+.gomi-diff-view {
+  display: grid;
+  max-height: 150px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid #253247;
+  border-radius: 6px;
+  background: #020617;
+  color: #cbd5e1;
+  padding: 8px 0;
+  font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.gomi-diff-view code {
+  display: block;
+  min-width: max-content;
+  padding: 0 10px;
+  white-space: pre;
+}
+
+.gomi-diff-view code[data-kind="addition"] {
+  background: rgba(34, 197, 94, 0.12);
+  color: #bbf7d0;
+}
+
+.gomi-diff-view code[data-kind="deletion"] {
+  background: rgba(244, 63, 94, 0.12);
+  color: #fecdd3;
+}
+
+.gomi-diff-view code[data-kind="hunk"] {
+  color: #93c5fd;
+}
+
+.gomi-diff-view code[data-kind="meta"] {
+  color: #fbbf24;
 }
 
 .gomi-chip-row {

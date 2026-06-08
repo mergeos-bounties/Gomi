@@ -10,19 +10,25 @@ import type {
 import { GomiMessageBus } from './messageBus';
 import { createPatchProposal } from './patchApplier';
 import { GomiTaskPlanner } from './taskPlanner';
-import { createDemoWorkspaceSnapshot } from './workspaceReader';
+import {
+  createDemoWorkspaceSnapshotReader,
+  type GomiWorkspaceSnapshotReader
+} from './workspaceReader';
 
 interface GomiRuntimeOptions {
   delayMs?: number;
+  workspaceReader?: GomiWorkspaceSnapshotReader;
 }
 
 export class GomiAgentRuntime {
   private readonly planner = new GomiTaskPlanner();
   private readonly bus = new GomiMessageBus<GomiRuntimeEvent>();
   private readonly delayMs: number;
+  private readonly workspaceReader: GomiWorkspaceSnapshotReader;
 
   constructor(options: GomiRuntimeOptions = {}) {
     this.delayMs = options.delayMs ?? 280;
+    this.workspaceReader = options.workspaceReader ?? createDemoWorkspaceSnapshotReader();
   }
 
   subscribe(type: GomiRuntimeEvent['type'], listener: (event: GomiRuntimeEvent) => void): () => void {
@@ -31,7 +37,7 @@ export class GomiAgentRuntime {
 
   async *run(request: string): AsyncGenerator<GomiRuntimeEvent> {
     const sessionId = `gomi-${Date.now()}`;
-    const workspace = createDemoWorkspaceSnapshot();
+    const workspace = await this.workspaceReader();
     const tasks = this.planner.createPlan(request, workspace);
 
     yield* this.emit({

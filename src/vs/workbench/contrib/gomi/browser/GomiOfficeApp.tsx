@@ -6,15 +6,18 @@ import {
   ClipboardList,
   Code2,
   Database,
+  FileDiff,
   Files,
   GitBranch,
   Play,
   Search,
   Send,
   Settings,
+  ShieldCheck,
   Sparkles,
   Terminal,
-  Users
+  Users,
+  XCircle
 } from 'lucide-react';
 import { BASE_GOMI_AGENTS, GOMI_SAMPLE_REQUEST } from '../common/gomiConstants';
 import type {
@@ -22,11 +25,20 @@ import type {
   GomiAgentId,
   GomiChatMessage,
   GomiFinalReport,
-  GomiPatchProposal,
   GomiTask,
   GomiWorkspaceSnapshot
 } from '../common/gomiTypes';
 import { GomiAgentRuntime } from '../node/agentRuntime';
+import {
+  approvePatchReview,
+  canApplyPatch,
+  createPatchReviewState,
+  getDiffLineKind,
+  markPatchApplied,
+  markPatchApplying,
+  rejectPatchReview,
+  type GomiPatchReviewState
+} from './gomiPatchApproval';
 import { PhaserOffice } from './PhaserOffice';
 
 const activityItems = [
@@ -46,7 +58,7 @@ export function GomiOfficeApp() {
   const [tasks, setTasks] = useState<GomiTask[]>([]);
   const [messages, setMessages] = useState<GomiChatMessage[]>([]);
   const [report, setReport] = useState<GomiFinalReport | undefined>();
-  const [patch, setPatch] = useState<GomiPatchProposal | undefined>();
+  const [patchReview, setPatchReview] = useState<GomiPatchReviewState | undefined>();
   const [workspace, setWorkspace] = useState<GomiWorkspaceSnapshot | undefined>();
 
   async function runOfficeSession() {
@@ -61,7 +73,7 @@ export function GomiOfficeApp() {
     setTasks([]);
     setMessages([]);
     setReport(undefined);
-    setPatch(undefined);
+    setPatchReview(undefined);
 
     try {
       for await (const event of runtime.run(trimmedRequest)) {
@@ -88,7 +100,7 @@ export function GomiOfficeApp() {
         }
 
         if (event.type === 'patch') {
-          setPatch(event.patch);
+          setPatchReview(createPatchReviewState(event.patch));
         }
 
         if (event.type === 'report') {
@@ -98,6 +110,28 @@ export function GomiOfficeApp() {
     } finally {
       setIsRunning(false);
     }
+  }
+
+  function approvePatch() {
+    setPatchReview((currentReview) =>
+      currentReview ? approvePatchReview(currentReview) : currentReview
+    );
+  }
+
+  function rejectPatch() {
+    setPatchReview((currentReview) =>
+      currentReview ? rejectPatchReview(currentReview) : currentReview
+    );
+  }
+
+  function applyPatch() {
+    setPatchReview((currentReview) => {
+      if (!currentReview || !canApplyPatch(currentReview)) {
+        return currentReview;
+      }
+
+      return markPatchApplied(markPatchApplying(currentReview));
+    });
   }
 
   return (
@@ -151,7 +185,13 @@ export function GomiOfficeApp() {
 
           <section className="gomi-bottom">
             <ChatLog messages={messages} />
-            <FinalReport report={report} patch={patch} />
+            <FinalReport
+              report={report}
+              patchReview={patchReview}
+              onApprovePatch={approvePatch}
+              onRejectPatch={rejectPatch}
+              onApplyPatch={applyPatch}
+            />
           </section>
         </main>
 
@@ -334,10 +374,16 @@ function ChatLog({ messages }: { messages: GomiChatMessage[] }) {
 
 function FinalReport({
   report,
-  patch
+  patchReview,
+  onApprovePatch,
+  onRejectPatch,
+  onApplyPatch
 }: {
   report?: GomiFinalReport;
-  patch?: GomiPatchProposal;
+  patchReview?: GomiPatchReviewState;
+  onApprovePatch: () => void;
+  onRejectPatch: () => void;
+  onApplyPatch: () => void;
 }) {
   return (
     <div className="gomi-report">
@@ -350,6 +396,12 @@ function FinalReport({
           <div className="gomi-report-empty">Waiting for report.</div>
         ) : (
           <>
+            <PatchApprovalPanel
+              patchReview={patchReview}
+              onApprovePatch={onApprovePatch}
+              onRejectPatch={onRejectPatch}
+              onApplyPatch={onApplyPatch}
+            />
             <div className="gomi-project-row">
               <div className="gomi-project-name">{report.summary}</div>
             </div>
@@ -363,15 +415,91 @@ function FinalReport({
                 ))}
               </div>
             ))}
-            {patch ? (
-              <div className="gomi-project-row">
-                <div className="gomi-project-name">{patch.filePath}</div>
-                <div className="gomi-project-detail">{patch.summary}</div>
-              </div>
-            ) : null}
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function PatchApprovalPanel({
+  patchReview,
+  onApprovePatch,
+  onRejectPatch,
+  onApplyPatch
+}: {
+  patchReview?: GomiPatchReviewState;
+  onApprovePatch: () => void;
+  onRejectPatch: () => void;
+  onApplyPatch: () => void;
+}) {
+  if (!patchReview) {
+    return (
+      <div className="gomi-project-row">
+        <div className="gomi-project-name">Patch Review</div>
+        <div className="gomi-project-detail">No patch proposal yet.</div>
+      </div>
+    );
+  }
+
+  const { patch, approvalStatus } = patchReview;
+
+  return (
+    <div className="gomi-project-row gomi-patch-review">
+      <div className="gomi-patch-review__head">
+        <div>
+          <div className="gomi-project-name">{patch.filePath}</div>
+          <div className="gomi-project-detail">{patch.summary}</div>
+        </div>
+        <span className="gomi-status" data-status={approvalStatus}>
+          {approvalStatus}
+        </span>
+      </div>
+
+      <div className="gomi-chip-row">
+        {patch.targetFiles.map((file) => (
+          <span className="gomi-chip" key={file}>
+            {file}
+          </span>
+        ))}
+        <span className="gomi-chip">risk: {patch.riskLevel}</span>
+        <span className="gomi-chip">by: {patch.createdByAgentId}</span>
+      </div>
+
+      <div className="gomi-patch-actions">
+        <button
+          className="gomi-action-button"
+          onClick={onApprovePatch}
+          disabled={approvalStatus === 'applied' || approvalStatus === 'applying'}
+        >
+          <ShieldCheck size={14} />
+          <span>Approve</span>
+        </button>
+        <button
+          className="gomi-action-button is-danger"
+          onClick={onRejectPatch}
+          disabled={approvalStatus === 'applied' || approvalStatus === 'applying'}
+        >
+          <XCircle size={14} />
+          <span>Reject</span>
+        </button>
+        <button
+          className="gomi-action-button is-primary"
+          onClick={onApplyPatch}
+          disabled={!canApplyPatch(patchReview)}
+        >
+          <FileDiff size={14} />
+          <span>Apply</span>
+        </button>
+      </div>
+
+      <pre className="gomi-diff-view" aria-label="Patch diff preview">
+        {patch.diff.split('\n').map((line, index) => (
+          <code data-kind={getDiffLineKind(line)} key={`${line}-${index}`}>
+            {line || ' '}
+          </code>
+        ))}
+      </pre>
     </div>
   );
 }

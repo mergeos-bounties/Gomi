@@ -1,5 +1,9 @@
 import type { GomiWorkspaceSnapshot } from '../common/gomiTypes';
 
+export type GomiWorkspaceSnapshotReader = () =>
+  | GomiWorkspaceSnapshot
+  | Promise<GomiWorkspaceSnapshot>;
+
 export function createDemoWorkspaceSnapshot(rootName = 'Gomi'): GomiWorkspaceSnapshot {
   return {
     rootName,
@@ -15,4 +19,8 @@ export function createDemoWorkspaceSnapshot(rootName = 'Gomi'): GomiWorkspaceSna
     gitSummary: 'Workspace scaffold, no upstream Code - OSS history yet.',
     terminalSummary: 'Node and npm are available for Vite development.'
   };
+}
+
+export function createDemoWorkspaceSnapshotReader(): GomiWorkspaceSnapshotReader {
+  return () => createDemoWorkspaceSnapshot();
 }

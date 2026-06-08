@@ -6,7 +6,11 @@ export function createPatchProposal(request: string, tasks: GomiTask[]): GomiPat
   return {
     id: `patch-${Date.now()}`,
     filePath: 'docs/gomi-agent-plan.md',
+    targetFiles: ['docs/gomi-agent-plan.md'],
     summary: 'Create a planning artifact before applying generated code changes.',
+    approvalStatus: 'pending',
+    riskLevel: 'low',
+    createdByAgentId: 'ceo',
     diff: [
       'diff --git a/docs/gomi-agent-plan.md b/docs/gomi-agent-plan.md',
       'new file mode 100644',

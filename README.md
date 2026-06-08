@@ -34,6 +34,8 @@ This repository is the first production-oriented scaffold for the Gomi module be
 - Chat bubbles above agents when they exchange information.
 - CEO Agent planning flow and specialist agent task updates.
 - Message bus, task planner, workspace reader scaffold, patch proposal, and final report events.
+- A review-first patch approval panel with unified diff preview, approve/reject controls, and apply gating.
+- A Node-side workspace reader that can inspect real project files, product metadata, package scripts, and Git state.
 - Open VSX Registry metadata instead of Microsoft Visual Studio Marketplace metadata.
 
 ## Core Concept
@@ -133,6 +135,7 @@ Key UI areas:
 - **Task Queue**: shows queued, running, and completed work.
 - **Agent Chat Log**: records the information exchanged by agents.
 - **Final Report**: summarizes delivery output and generated patch proposals.
+- **Patch Review**: shows target files and unified diff output before the user approves or rejects generated changes.
 
 ## Runtime Flow
 
@@ -147,7 +150,8 @@ User opens Gomi IDE
 -> Gomi Office displays movement, chat bubbles, and task state
 -> CEO Agent produces a final report
 -> Runtime creates a patch proposal
--> User reviews before applying changes
+-> User reviews the diff before approving
+-> Apply remains disabled until the patch is approved
 ```
 
 ## Branding Notes
@@ -215,7 +219,10 @@ Implemented:
 - CEO Agent task planning simulation.
 - Agent status stream and task queue.
 - Final report and patch proposal events.
-- Unit tests for runtime, planner, and message bus.
+- Patch approval UI with raw unified diff preview.
+- Approve, reject, and apply-gated patch state transitions.
+- Node-side workspace reader for real project context.
+- Unit tests for runtime, planner, message bus, workspace reader, and patch approval state.
 
 Not yet implemented:
 
@@ -224,7 +231,6 @@ Not yet implemented:
 - Real LLM provider adapter.
 - Real local model adapter.
 - Real filesystem workspace indexing inside the browser demo.
-- Diff viewer with approve/reject controls.
 - Full desktop packaging pipeline.
 
 ## Code - OSS Integration Path
