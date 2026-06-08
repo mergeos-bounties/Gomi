@@ -89,7 +89,12 @@ jobs:
     name: Build Code - OSS Windows package
     runs-on: windows-latest
     timeout-minutes: 180
-    if: github.event_name == 'workflow_dispatch' && inputs.build_code_oss_windows == true
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_code_oss_windows == true)
+    env:
+      GOMI_CODE_OSS_REPOSITORY: ${{ inputs.code_oss_repository || vars.GOMI_CODE_OSS_REPOSITORY || 'microsoft/vscode' }}
+      GOMI_CODE_OSS_REF: ${{ inputs.code_oss_ref || vars.GOMI_CODE_OSS_REF || 'main' }}
+      GOMI_WINDOWS_PLATFORM: ${{ inputs.windows_platform || vars.GOMI_WINDOWS_PLATFORM || 'win32-x64' }}
+      GOMI_BUILD_SETUP_EXE: ${{ inputs.build_setup_exe || (github.event_name != 'workflow_dispatch' && vars.GOMI_BUILD_SETUP_EXE != 'false') }}
 
     steps:
       - name: Checkout Gomi
@@ -100,8 +105,8 @@ jobs:
       - name: Checkout Code - OSS fork
         uses: actions/checkout@v4
         with:
-          repository: ${{ inputs.code_oss_repository }}
-          ref: ${{ inputs.code_oss_ref }}
+          repository: ${{ env.GOMI_CODE_OSS_REPOSITORY }}
+          ref: ${{ env.GOMI_CODE_OSS_REF }}
           path: code-oss
 
       - name: Setup Node from Code - OSS
@@ -116,11 +121,11 @@ jobs:
         run: |
           $args = @(
             '-CodeOssRoot', (Resolve-Path 'code-oss').Path,
-            '-Platform', '${{ inputs.windows_platform }}',
+            '-Platform', '${{ env.GOMI_WINDOWS_PLATFORM }}',
             '-Minified'
           )
 
-          if ('${{ inputs.build_setup_exe }}' -eq 'true') {
+          if ('${{ env.GOMI_BUILD_SETUP_EXE }}' -eq 'true') {
             $args += '-BuildSetup'
           }
 
@@ -133,9 +138,9 @@ jobs:
           $files = Get-ChildItem -Path code-oss\.build -Recurse -File -Include *.exe,*.msi,*.zip -ErrorAction SilentlyContinue
 
           if (-not $files) {
-            $archiveRoot = Join-Path 'code-oss' ".build\${{ inputs.windows_platform }}"
+            $archiveRoot = Join-Path 'code-oss' ".build\${{ env.GOMI_WINDOWS_PLATFORM }}"
             if (Test-Path $archiveRoot) {
-              Compress-Archive -Path "$archiveRoot\*" -DestinationPath "release\gomi-ide-${{ inputs.windows_platform }}.zip" -Force
+              Compress-Archive -Path "$archiveRoot\*" -DestinationPath "release\gomi-ide-${{ env.GOMI_WINDOWS_PLATFORM }}.zip" -Force
             } else {
               throw 'No Code - OSS Windows artifacts were found.'
             }

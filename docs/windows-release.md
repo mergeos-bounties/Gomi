@@ -17,13 +17,27 @@ Gomi repository
 
 The repository includes `.github/workflows/build-release.yml`.
 
-Pushes to `master` run the verification job and upload the prototype artifact. Tagged releases and manual runs can also publish GitHub Release assets.
+Pushes to `master` run the verification job and upload the prototype artifact. Release tags named `v*` run the Windows Code - OSS packaging job and publish the produced artifacts to a GitHub prerelease. Manual runs can also publish a release, with or without the heavy Windows desktop packaging step.
 
 It has three jobs:
 
 - `verify-prototype`: installs dependencies, runs typecheck/tests, builds the current Gomi Office webview prototype, and uploads `gomi-office-webview-prototype.zip`.
-- `code-oss-windows`: optional manual job that checks out a Code - OSS fork, applies the Gomi integration manifest, and packages Gomi for Windows.
+- `code-oss-windows`: checks out a Code - OSS fork, applies the Gomi integration manifest, and packages Gomi for Windows. It runs automatically for `v*` tags and can be enabled manually with `build_code_oss_windows`.
 - `release`: publishes artifacts to a GitHub Release for `v*` tags or manual runs with `create_release` enabled.
+
+For tagged releases, the Code - OSS source defaults to `microsoft/vscode` at `main`. In production, configure repository variables before tagging:
+
+- `GOMI_CODE_OSS_REPOSITORY`: the real Gomi Code - OSS fork, for example `mergeos-bounties/gomi-code-oss`.
+- `GOMI_CODE_OSS_REF`: the branch, tag, or SHA to package.
+- `GOMI_WINDOWS_PLATFORM`: `win32-x64`, `win32-arm64`, or `win32-ia32`.
+- `GOMI_BUILD_SETUP_EXE`: set to `false` to skip the Windows setup installer task. Tag builds attempt the setup `.exe` by default because the product release should be a desktop installer when the fork supports it.
+
+To create a release from a tag:
+
+```powershell
+git tag v0.1.0-alpha.1
+git push origin v0.1.0-alpha.1
+```
 
 To run the full Windows desktop packaging workflow:
 
