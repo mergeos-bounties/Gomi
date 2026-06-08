@@ -58,6 +58,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Patch review workflow** with diff preview, approve/reject controls, and apply gating.
 - **Safe node-side patch application core** for approved unified diffs inside the workspace root.
 - **Runtime events** for session lifecycle, messages, task updates, agent results, patch proposals, and final reports.
+- **Workbench bridge controller** for routing webview messages to the runtime and approved patch applier.
 - **Open VSX Registry metadata** instead of Microsoft Visual Studio Marketplace metadata.
 
 ## Multi-Agent Office
@@ -165,7 +166,7 @@ The intended product path is:
 4. Configure Open VSX or a Gomi-owned extension marketplace.
 5. Register `Gomi Office` in the Activity Bar.
 6. Load the Gomi Office webview inside the workbench.
-7. Connect `gomiBridge.ts` to the workbench/webview message boundary.
+7. Connect `gomiBridge.ts` and `gomiWorkbenchController.ts` to the workbench/webview message boundary.
 8. Run the AI runtime from the workbench/node side.
 9. Feed workspace files, open editors, selected code, terminal output, git diff, diagnostics, and logs into the project context indexer.
 10. Show generated changes through a diff-first approval flow.
@@ -194,6 +195,7 @@ src/vs/workbench/contrib/gomi/
 |
 `-- node/
     |-- agentRuntime.ts
+    |-- gomiWorkbenchController.ts
     |-- agentProvider.ts
     |-- taskPlanner.ts
     |-- messageBus.ts
@@ -227,6 +229,7 @@ Implemented in this repository:
 - Office settings for CEO and department-head CLI routing.
 - Department-head sleep mode and employee fire/restore controls.
 - Runtime event stream.
+- Workbench bridge controller for `gomi.run`, runtime event forwarding, and approved patch apply messages.
 - Agent provider contract with a demo provider.
 - Hybrid project memory with lexical and vector-style retrieval.
 - Project context chunking and indexing.
@@ -288,6 +291,7 @@ The current verification suite covers:
 - Task planner output.
 - Patch approval state transitions.
 - Safe patch application and workspace path containment.
+- Workbench bridge controller message routing.
 - Node workspace context reading.
 - Project context indexing.
 - Shared project memory.
