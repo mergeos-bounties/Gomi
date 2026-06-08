@@ -1,5 +1,5 @@
 import { execFile as execFileCallback } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
+import { access, mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -61,8 +61,20 @@ describe('Code - OSS integration manifest', () => {
   it.runIf(process.platform === 'win32')('merges Gomi product branding without dropping upstream packaging keys', async () => {
     const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'gomi-code-oss-'));
     const codeOssRoot = path.join(tempRoot, 'code-oss');
+    const webviewAssetRoot = path.join(process.cwd(), 'build', 'gomi-office-webview');
+    let createdWebviewAssets = false;
 
     try {
+      try {
+        await access(webviewAssetRoot);
+      } catch {
+        createdWebviewAssets = true;
+        await mkdir(path.join(webviewAssetRoot, 'assets'), { recursive: true });
+        await writeFile(path.join(webviewAssetRoot, 'index.html'), '<div id="root"></div>\n');
+        await writeFile(path.join(webviewAssetRoot, 'assets', 'index.js'), 'export {};\n');
+        await writeFile(path.join(webviewAssetRoot, 'assets', 'index.css'), ':root{}\n');
+      }
+
       await mkdir(path.join(codeOssRoot, 'src', 'vs', 'workbench'), { recursive: true });
       await writeFile(path.join(codeOssRoot, 'package.json'), '{"name":"code-oss-stub"}\n');
       await writeFile(
@@ -125,6 +137,10 @@ describe('Code - OSS integration manifest', () => {
       expect(workbenchMain).toContain("import 'vs/workbench/contrib/gomi/browser/gomiContribution';");
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
+
+      if (createdWebviewAssets) {
+        await rm(webviewAssetRoot, { recursive: true, force: true });
+      }
     }
   });
 });
