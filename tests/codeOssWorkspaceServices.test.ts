@@ -34,6 +34,64 @@ describe('Code - OSS workspace services adapter', () => {
     expect(snapshot.terminalSummary).toContain('Code - OSS workspace');
   });
 
+  it('captures selected code and diagnostics from native editor services', async () => {
+    const services = createFakeCodeOssServices({
+      'src/login.ts': 'const token = login();\n'
+    });
+
+    services.editorService = {};
+    services.codeEditorService = {
+      getFocusedCodeEditor: () => ({
+        getModel: () => ({
+          uri: new FakeUri('/workspace/src/login.ts'),
+          getValueInRange: () => 'const token = login();'
+        }),
+        getSelection: () => ({
+          startLineNumber: 1,
+          startColumn: 1,
+          endLineNumber: 1,
+          endColumn: 22,
+          isEmpty: () => false
+        })
+      })
+    };
+    services.markerService = {
+      read: () => [
+        {
+          resource: new FakeUri('/workspace/src/login.ts'),
+          severity: 8,
+          message: 'Cannot find name login.',
+          source: 'ts',
+          code: '2304',
+          startLineNumber: 1,
+          startColumn: 15
+        }
+      ]
+    };
+
+    const snapshot = await readCodeOssWorkspaceSnapshot(services, {
+      maxFiles: 10,
+      maxDepth: 3,
+      maxSnippets: 4,
+      maxSnippetLength: 500,
+      maxDiagnostics: 5,
+      maxSelectionLength: 100
+    });
+
+    expect(snapshot.openEditors).toEqual(['src/login.ts']);
+    expect(snapshot.contentSnippets?.[0]).toMatchObject({
+      filePath: 'src/login.ts',
+      content: 'const token = login();',
+      source: 'selection'
+    });
+    expect(snapshot.contentSnippets?.[1]).toMatchObject({
+      filePath: 'Code - OSS Diagnostics',
+      source: 'diagnostic'
+    });
+    expect(snapshot.contentSnippets?.[1]?.content).toContain('error src/login.ts:1:15 [ts 2304]');
+    expect(snapshot.terminalSummary).toContain('1 selection snippet(s), 1 diagnostic snippet(s)');
+  });
+
   it('applies approved unified diffs through text-file services', async () => {
     const services = createFakeCodeOssServices({
       'src/login.ts': 'export const ok = false;\n'

@@ -1,5 +1,6 @@
 import { $, append, findParentWithClass, getWindow } from '../../../../base/browser/dom.js';
 import { Codicon } from '../../../../base/common/codicons.js';
+import { ICodeEditorService } from '../../../../editor/browser/services/codeEditorService.js';
 import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
 import { DisposableStore, MutableDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
 import { FileAccess } from '../../../../base/common/network.js';
@@ -14,6 +15,7 @@ import { IFileService } from '../../../../platform/files/common/files.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
 import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
+import { IMarkerService } from '../../../../platform/markers/common/markers.js';
 import { IOpenerService } from '../../../../platform/opener/common/opener.js';
 import { Registry } from '../../../../platform/registry/common/platform.js';
 import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
@@ -78,7 +80,9 @@ class GomiOfficeViewPane extends ViewPane {
     @IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
     @IFileService private readonly fileService: IFileService,
     @IEditorService private readonly editorService: IEditorService,
-    @ITextFileService private readonly textFileService: ITextFileService
+    @ITextFileService private readonly textFileService: ITextFileService,
+    @IMarkerService private readonly markerService: IMarkerService,
+    @ICodeEditorService private readonly codeEditorService: ICodeEditorService
   ) {
     super(
       { ...options, titleMenuId: MenuId.ViewTitle, showActions: ViewPaneShowActions.WhenExpanded },
@@ -150,7 +154,9 @@ class GomiOfficeViewPane extends ViewPane {
       workspaceContextService: this.workspaceContextService,
       fileService: this.fileService,
       editorService: this.editorService,
+      codeEditorService: this.codeEditorService,
       textFileService: this.textFileService,
+      markerService: this.markerService,
       basename,
       dirname,
       joinPath,

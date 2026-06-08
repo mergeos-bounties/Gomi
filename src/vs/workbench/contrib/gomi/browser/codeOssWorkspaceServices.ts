@@ -56,8 +56,16 @@ export interface GomiCodeOssWorkspaceServices {
   };
   editorService?: {
     activeEditor?: GomiCodeOssEditorInput;
+    activeTextEditorControl?: GomiCodeOssTextEditorControl;
     visibleEditors?: readonly GomiCodeOssEditorInput[];
     editors?: readonly GomiCodeOssEditorInput[];
+  };
+  codeEditorService?: {
+    getActiveCodeEditor?: () => GomiCodeOssTextEditorControl | null;
+    getFocusedCodeEditor?: () => GomiCodeOssTextEditorControl | null;
+  };
+  markerService?: {
+    read(filter?: unknown): GomiCodeOssMarker[];
   };
   basename?: (resource: GomiCodeOssUri) => string;
   dirname?: (resource: GomiCodeOssUri) => GomiCodeOssUri;
@@ -70,6 +78,8 @@ export interface GomiCodeOssWorkspaceOptions {
   maxDepth?: number;
   maxSnippets?: number;
   maxSnippetLength?: number;
+  maxDiagnostics?: number;
+  maxSelectionLength?: number;
 }
 
 interface GomiCodeOssEditorInput {
@@ -86,11 +96,46 @@ interface GomiCodeOssEditorInput {
   name?: string;
 }
 
+interface GomiCodeOssTextEditorControl {
+  getModel?: () => GomiCodeOssTextModel | null | undefined;
+  getSelection?: () => GomiCodeOssRange | null | undefined;
+  getSelections?: () => Array<GomiCodeOssRange | null | undefined> | null | undefined;
+}
+
+interface GomiCodeOssTextModel {
+  uri?: GomiCodeOssUri;
+  getValueInRange?: (range: GomiCodeOssRange) => string;
+}
+
+interface GomiCodeOssRange {
+  startLineNumber?: number;
+  startColumn?: number;
+  endLineNumber?: number;
+  endColumn?: number;
+  isEmpty?: () => boolean;
+}
+
+interface GomiCodeOssMarker {
+  resource: GomiCodeOssUri;
+  severity?: number;
+  message: string;
+  source?: string;
+  code?: string | {
+    value: string;
+  };
+  startLineNumber?: number;
+  startColumn?: number;
+  endLineNumber?: number;
+  endColumn?: number;
+}
+
 const DEFAULT_WORKSPACE_OPTIONS: Required<GomiCodeOssWorkspaceOptions> = {
   maxFiles: 220,
   maxDepth: 5,
   maxSnippets: 14,
-  maxSnippetLength: 2600
+  maxSnippetLength: 2600,
+  maxDiagnostics: 12,
+  maxSelectionLength: 2600
 };
 
 const IGNORED_PATH_SEGMENTS = new Set([
@@ -158,16 +203,27 @@ export async function readCodeOssWorkspaceSnapshot(
   const openEditors = uniqueStrings(
     openEditorResources.map((resource) => toWorkspaceRelativePath(services, folders, resource)).filter(Boolean)
   );
-  const snippetResources = pickSnippetResources(services, folders, files, openEditorResources, options);
+  const selectionSnippets = collectSelectionSnippets(services, folders, options);
+  const diagnosticSnippets = collectDiagnosticSnippets(services, folders, options);
+  const snippetBudget = Math.max(0, options.maxSnippets - selectionSnippets.length - diagnosticSnippets.length);
+  const snippetResources = pickSnippetResources(services, folders, files, openEditorResources, {
+    ...options,
+    maxSnippets: snippetBudget
+  });
   const contentSnippets = await readWorkspaceContentSnippets(services, folders, snippetResources, options);
+  const allContentSnippets = [
+    ...selectionSnippets,
+    ...diagnosticSnippets,
+    ...contentSnippets
+  ].slice(0, options.maxSnippets);
 
   return {
     rootName,
     files: files.slice(0, options.maxFiles),
     openEditors,
     gitSummary: `Native Code - OSS workspace: ${folders.length} folder(s). SCM diff service is not attached yet.`,
-    terminalSummary: `Indexed through Code - OSS workspace, editor, file, and text-file services. ${contentSnippets.length} context snippet(s) loaded.`,
-    contentSnippets
+    terminalSummary: `Indexed through Code - OSS workspace, editor, marker, file, and text-file services. ${selectionSnippets.length} selection snippet(s), ${diagnosticSnippets.length} diagnostic snippet(s), ${contentSnippets.length} file snippet(s) loaded.`,
+    contentSnippets: allContentSnippets
   };
 }
 
@@ -310,8 +366,97 @@ function collectOpenEditorResources(services: GomiCodeOssWorkspaceServices): Gom
     editor.modified?.resource,
     editor.original?.resource
   ]);
+  const activeModelResource = getActiveTextEditorControl(services)?.getModel?.()?.uri;
 
-  return uniqueResources(resources.filter(Boolean) as GomiCodeOssUri[]);
+  return uniqueResources([...resources, activeModelResource].filter(Boolean) as GomiCodeOssUri[]);
+}
+
+function collectSelectionSnippets(
+  services: GomiCodeOssWorkspaceServices,
+  folders: GomiCodeOssWorkspaceFolder[],
+  options: Required<GomiCodeOssWorkspaceOptions>
+): GomiWorkspaceContentSnippet[] {
+  const control = getActiveTextEditorControl(services);
+  const model = control?.getModel?.();
+
+  if (!control || !model?.getValueInRange || !model.uri) {
+    return [];
+  }
+
+  const selections = (control.getSelections?.() ?? [control.getSelection?.()]).filter(Boolean) as GomiCodeOssRange[];
+  const snippets: GomiWorkspaceContentSnippet[] = [];
+
+  for (const selection of selections) {
+    if (isEmptyRange(selection)) {
+      continue;
+    }
+
+    const selectedText = model.getValueInRange(selection).slice(0, options.maxSelectionLength);
+
+    if (!selectedText.trim()) {
+      continue;
+    }
+
+    snippets.push({
+      filePath: toWorkspaceRelativePath(services, folders, model.uri),
+      content: selectedText,
+      language: languageFromPath(toWorkspaceRelativePath(services, folders, model.uri)),
+      source: 'selection'
+    });
+  }
+
+  return snippets.slice(0, options.maxSnippets);
+}
+
+function getActiveTextEditorControl(
+  services: GomiCodeOssWorkspaceServices
+): GomiCodeOssTextEditorControl | undefined {
+  return (
+    services.codeEditorService?.getFocusedCodeEditor?.() ??
+    services.codeEditorService?.getActiveCodeEditor?.() ??
+    services.editorService?.activeTextEditorControl ??
+    undefined
+  );
+}
+
+function collectDiagnosticSnippets(
+  services: GomiCodeOssWorkspaceServices,
+  folders: GomiCodeOssWorkspaceFolder[],
+  options: Required<GomiCodeOssWorkspaceOptions>
+): GomiWorkspaceContentSnippet[] {
+  const markers = services.markerService?.read() ?? [];
+  const lines = markers
+    .map((marker) => ({
+      marker,
+      filePath: toWorkspaceRelativePathOrUndefined(services, folders, marker.resource)
+    }))
+    .filter((item): item is { marker: GomiCodeOssMarker; filePath: string } => Boolean(item.filePath))
+    .slice(0, options.maxDiagnostics)
+    .map(({ marker, filePath }) => {
+      const location = `${filePath}:${marker.startLineNumber ?? 1}:${marker.startColumn ?? 1}`;
+      const code = typeof marker.code === 'string' ? marker.code : marker.code?.value;
+      const source = marker.source ? `${marker.source}${code ? ` ${code}` : ''}` : code;
+
+      return [
+        severityLabel(marker.severity),
+        location,
+        source ? `[${source}]` : '',
+        marker.message
+      ].filter(Boolean).join(' ');
+    });
+
+  if (lines.length === 0) {
+    return [];
+  }
+
+  return [
+    {
+      filePath: 'Code - OSS Diagnostics',
+      content: lines.join('\n'),
+      language: 'text',
+      source: 'diagnostic'
+    }
+  ];
 }
 
 function pickSnippetResources(
@@ -540,16 +685,24 @@ function toWorkspaceRelativePath(
   folders: GomiCodeOssWorkspaceFolder[],
   resource: GomiCodeOssUri
 ): string {
+  return toWorkspaceRelativePathOrUndefined(services, folders, resource) ?? getResourcePath(resource);
+}
+
+function toWorkspaceRelativePathOrUndefined(
+  services: GomiCodeOssWorkspaceServices,
+  folders: GomiCodeOssWorkspaceFolder[],
+  resource: GomiCodeOssUri
+): string | undefined {
   for (const folder of folders) {
     const relative = services.relativePath?.(folder.uri, resource);
 
-    if (relative && !relative.startsWith('..')) {
+    if (relative !== undefined && relative !== null && !relative.startsWith('..')) {
       const prefix = folderPrefix(folder, services);
       return prefix ? `${prefix}/${relative.split('\\').join('/')}` : relative.split('\\').join('/');
     }
   }
 
-  return getResourcePath(resource);
+  return undefined;
 }
 
 function getStatName(services: GomiCodeOssWorkspaceServices, stat: GomiCodeOssFileStat): string {
@@ -594,6 +747,37 @@ function uniqueStrings(values: string[]): string[] {
 function isImportantFile(filePath: string): boolean {
   const name = filePath.split('/').pop() ?? filePath;
   return IMPORTANT_FILE_PATTERNS.some((pattern) => pattern.test(name));
+}
+
+function isEmptyRange(range: GomiCodeOssRange): boolean {
+  if (range.isEmpty?.()) {
+    return true;
+  }
+
+  return (
+    range.startLineNumber === range.endLineNumber &&
+    range.startColumn === range.endColumn
+  );
+}
+
+function severityLabel(severity: number | undefined): string {
+  if (severity === 8) {
+    return 'error';
+  }
+
+  if (severity === 4) {
+    return 'warning';
+  }
+
+  if (severity === 2) {
+    return 'info';
+  }
+
+  if (severity === 1) {
+    return 'hint';
+  }
+
+  return 'diagnostic';
 }
 
 function assertSafeWorkspacePath(value: string): void {
