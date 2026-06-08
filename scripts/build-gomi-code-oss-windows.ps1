@@ -8,6 +8,7 @@ param(
   [switch]$Minified,
   [switch]$BuildSetup,
   [switch]$SkipInstall,
+  [switch]$SkipWebviewBundle,
   [switch]$DryRun
 )
 
@@ -79,12 +80,21 @@ Write-Host "Preparing Gomi IDE Windows package from Code - OSS root: $codeRoot" 
 Write-Host "Platform: $Platform" -ForegroundColor Green
 Write-Host "Minified: $($Minified.IsPresent)" -ForegroundColor Green
 Write-Host "Build setup installer: $($BuildSetup.IsPresent)" -ForegroundColor Green
+Write-Host "Build Gomi Office webview bundle: $(-not $SkipWebviewBundle.IsPresent)" -ForegroundColor Green
 
 $targetProductJson = Join-Path $codeRoot 'product.json'
 $backupProductJson = Join-Path $codeRoot 'product.gomi-backup.json'
 
 if (-not $DryRun -and -not (Test-Path -LiteralPath $backupProductJson)) {
   Copy-Item -LiteralPath $targetProductJson -Destination $backupProductJson -Force
+}
+
+if (-not $SkipWebviewBundle) {
+  if (-not (Test-Path -LiteralPath (Join-Path $repoRoot 'node_modules'))) {
+    Invoke-GomiBuildCommand -FilePath 'npm.cmd' -ArgumentList @('ci') -WorkingDirectory $repoRoot
+  }
+
+  Invoke-GomiBuildCommand -FilePath 'npm.cmd' -ArgumentList @('run', 'build:webview') -WorkingDirectory $repoRoot
 }
 
 $integrationArgs = @('-ExecutionPolicy', 'Bypass', '-File', $integrationScript, '-CodeOssRoot', $codeRoot)

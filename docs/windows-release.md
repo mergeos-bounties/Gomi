@@ -6,6 +6,7 @@ The Windows release path is:
 
 ```text
 Gomi repository
+-> Build Gomi Office webview bundle
 -> Code - OSS fork checkout
 -> Apply Gomi product metadata and Gomi workbench module
 -> Run Code - OSS Windows gulp packaging task
@@ -34,7 +35,7 @@ To run the full Windows desktop packaging workflow:
 6. Choose `win32-x64`, `win32-arm64`, or `win32-ia32`.
 7. Enable `build_setup_exe` when the fork has a compatible Windows setup gulp task.
 
-The Windows packaging job runs `scripts/build-gomi-code-oss-windows.ps1`. That script validates the Code - OSS checkout, applies `build/gomi-code-oss.integration.json`, copies Gomi branding/module files into the fork, overlays the native Gomi workbench registration template, appends the Gomi workbench import when needed, and then runs the Code - OSS gulp package task.
+The Windows packaging job runs `scripts/build-gomi-code-oss-windows.ps1`. That script validates the Code - OSS checkout, builds the Gomi Office React/Phaser webview bundle, applies `build/gomi-code-oss.integration.json`, copies Gomi branding/module files into the fork, overlays the native Gomi workbench registration template, copies the generated webview assets into the workbench module, appends the Gomi workbench import when needed, and then runs the Code - OSS gulp package task.
 
 ## Local Windows Packaging
 
@@ -55,6 +56,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-gomi-code-oss-windows.p
   -Minified `
   -BuildSetup
 ```
+
+The local packaging script runs `npm run build:webview` before applying the manifest. The generated assets are written to `build/gomi-office-webview` locally and copied into `src/vs/workbench/contrib/gomi/browser/media/office` inside the Code - OSS checkout.
 
 For a faster packaged folder build without installer:
 
@@ -84,7 +87,7 @@ End users should not run Gomi IDE with `npm run dev`.
 
 - Developing the Gomi Office module.
 - Running tests.
-- Building the prototype webview bundle.
+- Building the prototype and Code - OSS webview bundles.
 - Invoking Code - OSS gulp packaging tasks during automation.
 
 The product release artifact should be a Windows desktop package from the Code - OSS fork, usually a packaged folder/ZIP and, when the setup task is available, an Inno Setup `.exe` installer.

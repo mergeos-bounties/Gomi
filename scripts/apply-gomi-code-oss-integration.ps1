@@ -119,6 +119,26 @@ foreach ($copy in $manifest.templateCopies) {
   Copy-GomiIntegrationItem -Source $source -Destination $target
 }
 
+foreach ($copy in $manifest.webviewAssetCopies) {
+  $sourcePath = Join-Path $repoRoot $copy.source
+  $target = Join-Path $codeRoot $copy.target
+
+  if (-not (Test-Path -LiteralPath $sourcePath)) {
+    $message = "Generated Gomi Office webview assets were not found: $sourcePath. Run npm run build:webview before applying to a Code - OSS fork."
+
+    if ($ValidateOnly -or $DryRun) {
+      Write-Host $message -ForegroundColor Yellow
+      Write-Host "Copy $sourcePath -> $target" -ForegroundColor DarkCyan
+      continue
+    }
+
+    throw $message
+  }
+
+  $source = (Resolve-Path -LiteralPath $sourcePath).Path
+  Copy-GomiIntegrationItem -Source $source -Destination $target
+}
+
 foreach ($copy in $manifest.resourceCopies) {
   $source = Resolve-GomiPath -PathValue (Join-Path $repoRoot $copy.source) -Description 'Gomi resource source'
   $target = Join-Path $codeRoot $copy.target

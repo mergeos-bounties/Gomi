@@ -18,6 +18,12 @@
       "target": "src/vs/workbench/contrib/gomi/browser/gomiContribution.ts"
     }
   ],
+  "webviewAssetCopies": [
+    {
+      "source": "build/gomi-office-webview",
+      "target": "src/vs/workbench/contrib/gomi/browser/media/office"
+    }
+  ],
   "resourceCopies": [
     {
       "source": "resources/gomi-icon.svg",
