@@ -1,4 +1,5 @@
 import type { GomiPatchProposal, GomiRuntimeEvent } from '../common/gomiTypes';
+import type { GomiPatchApplyResult } from '../node/workspacePatchApplier';
 
 export type GomiBridgeMessage =
   | {
@@ -12,6 +13,12 @@ export type GomiBridgeMessage =
   | {
       type: 'gomi.applyPatch';
       patch: GomiPatchProposal;
+    }
+  | {
+      type: 'gomi.applyPatchResult';
+      patchId: string;
+      result?: GomiPatchApplyResult;
+      error?: string;
     };
 
 export interface GomiWorkbenchBridge {

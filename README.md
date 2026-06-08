@@ -56,6 +56,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Hybrid project memory** using lexical search plus vector-style retrieval.
 - **Project context indexing** for file tree, manifests, open editor snippets, selected code, terminal output, diagnostics, and git diff input shapes.
 - **Patch review workflow** with diff preview, approve/reject controls, and apply gating.
+- **Safe node-side patch application core** for approved unified diffs inside the workspace root.
 - **Runtime events** for session lifecycle, messages, task updates, agent results, patch proposals, and final reports.
 - **Open VSX Registry metadata** instead of Microsoft Visual Studio Marketplace metadata.
 
@@ -149,9 +150,10 @@ Agent results
 -> Diff preview
 -> User approves or rejects
 -> Apply remains disabled until approval
+-> Approved unified diff can be applied inside the workspace root
 ```
 
-This keeps generated changes auditable and prevents agents from silently modifying source code.
+The node-side patch applier parses unified diffs, verifies context lines, blocks paths that escape the workspace, supports dry-run mode, and refuses unapproved patches by default. This keeps generated changes auditable and prevents agents from silently modifying source code.
 
 ## Code - OSS Integration Path
 
@@ -204,6 +206,7 @@ src/vs/workbench/contrib/gomi/
     |-- resultAggregator.ts
     |-- workspaceReader.ts
     |-- nodeWorkspaceReader.ts
+    |-- workspacePatchApplier.ts
     `-- patchApplier.ts
 ```
 
@@ -230,7 +233,8 @@ Implemented in this repository:
 - Communication policy for selective agent broadcast.
 - Node workspace reader for real project metadata and content snippets.
 - Patch proposal, diff preview, approve/reject, and apply gating.
-- Tests for runtime, planner, message bus, patch approval, workspace reader, project context indexing, shared memory, and vector memory.
+- Safe unified-diff patch application core for approved workspace edits.
+- Tests for runtime, planner, message bus, patch approval, patch application, workspace reader, project context indexing, shared memory, and vector memory.
 
 Not yet implemented:
 
@@ -239,7 +243,7 @@ Not yet implemented:
 - Production LLM API provider.
 - Production local model provider.
 - Persistent database-backed memory.
-- Real patch application against workspace files.
+- Workbench-integrated patch application through Code - OSS editor and file service APIs.
 - Signed desktop packaging and release pipeline.
 - Enterprise settings, licensing, update channel, and telemetry policy.
 
@@ -283,6 +287,7 @@ The current verification suite covers:
 - Message bus publish/subscribe.
 - Task planner output.
 - Patch approval state transitions.
+- Safe patch application and workspace path containment.
 - Node workspace context reading.
 - Project context indexing.
 - Shared project memory.
