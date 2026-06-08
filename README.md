@@ -66,6 +66,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Workbench bridge controller** for routing webview messages to the runtime and approved patch applier.
 - **Webview bridge client** that can send run requests, office settings, and patch-apply messages from the React office to the native workbench host.
 - **Native webview host bridge and controller** for receiving `gomi.run` messages from the mounted office webview and streaming runtime events back into the UI.
+- **Code - OSS workspace services adapter** for reading workspace folders, open editors, important text snippets, and applying approved unified diffs through workbench file/text services.
 - **Node-side CLI agent router** for executing selected CEO and department-head CLI providers when enabled in the workbench runtime.
 - **GitHub Actions release workflow** for verification, artifacts, and optional Windows Code - OSS packaging.
 - **Open VSX Registry metadata** instead of Microsoft Visual Studio Marketplace metadata.
@@ -209,7 +210,7 @@ The prototype `npm` commands remain useful for developing and testing the Gomi O
 
 The desktop packaging script builds the React/Phaser office bundle into `build/gomi-office-webview`, copies it to `src/vs/workbench/contrib/gomi/browser/media/office` inside the Code - OSS fork, and the native contribution template mounts that bundle through an internal workbench webview.
 
-The webview bundle includes an optional workbench bridge client. It only activates when the native host explicitly enables `__GOMI_ENABLE_WORKBENCH_BRIDGE__`, then sends `gomi.run` messages with the current office settings and sends approved `gomi.applyPatch` messages back to the host. The native template now creates a host bridge/controller for runtime event streaming; production patch application still needs the Code - OSS file-service/node applier to be attached before real edits are enabled.
+The webview bundle includes an optional workbench bridge client. It only activates when the native host explicitly enables `__GOMI_ENABLE_WORKBENCH_BRIDGE__`, then sends `gomi.run` messages with the current office settings and sends approved `gomi.applyPatch` messages back to the host. The native template creates a host bridge/controller, reads workspace context through Code - OSS workspace/editor/file/text-file services, streams runtime events back into the office UI, and applies approved unified diffs through workbench services.
 
 Local dry-run validation:
 
@@ -227,6 +228,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-gomi-code-oss-windows.p
 ```text
 src/vs/workbench/contrib/gomi/
 |-- browser/
+|   |-- codeOssWorkspaceServices.ts
 |   |-- GomiOfficeApp.tsx
 |   |-- PhaserOffice.tsx
 |   |-- gomiPatchApproval.ts
@@ -237,6 +239,7 @@ src/vs/workbench/contrib/gomi/
 |   `-- gomiChatView.ts
 |
 |-- common/
+|   |-- gomiUnifiedDiff.ts
 |   |-- gomiTypes.ts
 |   |-- gomiEvents.ts
 |   `-- gomiConstants.ts
@@ -304,6 +307,7 @@ Implemented in this repository:
 - Generated webview asset path for mounting the React/Phaser office bundle inside the native pane.
 - Optional webview bridge client with deterministic demo fallback when no native host is attached.
 - Native webview host bridge/controller path for run-message handling and runtime event streaming.
+- Code - OSS workspace services adapter for native workspace folders, open editors, text snippets, and approved patch application.
 - Agent provider contract with a demo provider.
 - Node-side CLI provider router with command execution, JSON/plain-text output mapping, and demo fallback.
 - Hybrid project memory with lexical and vector-style retrieval.
@@ -315,19 +319,18 @@ Implemented in this repository:
 - Safe unified-diff patch application core for approved workspace edits.
 - Code - OSS integration manifest and validation/apply script.
 - GitHub Actions build/release workflow and Windows Code - OSS packaging script.
-- Tests for runtime, CLI routing, planner, message bus, patch approval, patch application, workspace reader, project context indexing, shared memory, and vector memory.
+- Tests for runtime, CLI routing, planner, message bus, patch approval, patch application, Code - OSS workspace service adaptation, workspace reader, project context indexing, shared memory, and vector memory.
 
 Not yet implemented:
 
 - Full upstream Code - OSS source integration.
 - Validating the React/Phaser webview mount inside a real Code - OSS checkout.
-- Code - OSS workspace/file-service wiring for the native webview host bridge.
-- Code - OSS file-service-backed patch applier attached to the native webview host controller.
+- Selection, terminal transcript, diagnostics, SCM/git diff, and error-log service capture in the native adapter.
+- Real Code - OSS diff editor preview before patch apply.
 - Production LLM API provider.
 - Production local model provider.
 - Workspace trust and enterprise policy UI for enabling live CLI execution.
 - Persistent database-backed memory.
-- Workbench-integrated patch application through Code - OSS editor and file service APIs.
 - Signed desktop packaging assets and production release signing.
 - Enterprise settings, licensing, update channel, and telemetry policy.
 
@@ -372,6 +375,7 @@ The current verification suite covers:
 - Task planner output.
 - Patch approval state transitions.
 - Safe patch application and workspace path containment.
+- Code - OSS workspace service adaptation and approved native patch application path.
 - Workbench bridge controller message routing.
 - Persistent lexical and vector memory storage.
 - Node workspace context reading.
@@ -408,8 +412,8 @@ Recommended next milestones:
 2. Complete Gomi branding assets across Windows, macOS, and Linux.
 3. Add provider adapters for OpenAI-compatible APIs and local model runtimes.
 4. Add persistent memory using SQLite and optional vector database support.
-5. Connect real workspace context: open editors, selections, terminal output, diagnostics, and git diff.
-6. Implement patch application through the workbench diff/editor APIs.
+5. Extend native workspace context: selections, terminal output, diagnostics, and git diff.
+6. Add workbench diff editor preview before approved patch application.
 7. Add settings for model provider, privacy mode, memory retention, and approval policy.
 8. Add packaging, signing, update channel, and release automation.
 9. Define licensing, commercial terms, and enterprise deployment policy.

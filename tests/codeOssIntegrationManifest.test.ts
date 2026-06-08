@@ -32,6 +32,10 @@ describe('Code - OSS integration manifest', () => {
     expect(template).toContain('createWebviewOverlay');
     expect(template).toContain('createGomiWebviewHostBridge');
     expect(template).toContain('GomiWebviewHostController');
+    expect(template).toContain('createCodeOssWorkspaceSnapshotReader');
+    expect(template).toContain('applyCodeOssPatchMessage');
+    expect(template).toContain('IWorkspaceContextService');
+    expect(template).toContain('ITextFileService');
     expect(template).toContain('localResourceRoots');
     expect(template).toContain('__GOMI_ENABLE_WORKBENCH_BRIDGE__');
     expect(template).toContain('assets/index.js');

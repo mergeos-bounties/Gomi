@@ -3,12 +3,14 @@ import { Codicon } from '../../../../base/common/codicons.js';
 import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
 import { DisposableStore, MutableDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
 import { FileAccess } from '../../../../base/common/network.js';
+import { basename, dirname, joinPath, relativePath } from '../../../../base/common/resources.js';
 import { URI } from '../../../../base/common/uri.js';
 import { localize, localize2 } from '../../../../nls.js';
 import { MenuId } from '../../../../platform/actions/common/actions.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
 import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
+import { IFileService } from '../../../../platform/files/common/files.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
 import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
@@ -16,6 +18,7 @@ import { IOpenerService } from '../../../../platform/opener/common/opener.js';
 import { Registry } from '../../../../platform/registry/common/platform.js';
 import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
 import { IThemeService } from '../../../../platform/theme/common/themeService.js';
+import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { IHoverService } from '../../../../platform/hover/browser/hover.js';
 import { ViewPane, ViewPaneShowActions } from '../../../browser/parts/views/viewPane.js';
 import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
@@ -31,6 +34,12 @@ import {
   IWebviewService,
   WebviewContentPurpose
 } from '../../webview/browser/webview.js';
+import { IEditorService } from '../../../services/editor/common/editorService.js';
+import { ITextFileService } from '../../../services/textfile/common/textfiles.js';
+import {
+  applyCodeOssPatchMessage,
+  createCodeOssWorkspaceSnapshotReader
+} from './codeOssWorkspaceServices.js';
 import { createGomiWebviewHostBridge } from './gomiWebviewHostBridge.js';
 import { GomiWebviewHostController } from './gomiWebviewHostController.js';
 
@@ -65,7 +74,11 @@ class GomiOfficeViewPane extends ViewPane {
     @IHoverService hoverService: IHoverService,
     @IThemeService themeService: IThemeService,
     @IViewDescriptorService viewDescriptorService: IViewDescriptorService,
-    @IWebviewService private readonly webviewService: IWebviewService
+    @IWebviewService private readonly webviewService: IWebviewService,
+    @IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
+    @IFileService private readonly fileService: IFileService,
+    @IEditorService private readonly editorService: IEditorService,
+    @ITextFileService private readonly textFileService: ITextFileService
   ) {
     super(
       { ...options, titleMenuId: MenuId.ViewTitle, showActions: ViewPaneShowActions.WhenExpanded },
@@ -133,7 +146,23 @@ class GomiOfficeViewPane extends ViewPane {
     webview.setHtml(createGomiOfficeWebviewHtml());
     this.webview.value = webview;
     const bridge = createGomiWebviewHostBridge(webview);
-    const controller = new GomiWebviewHostController({ bridge });
+    const codeOssWorkspaceServices = {
+      workspaceContextService: this.workspaceContextService,
+      fileService: this.fileService,
+      editorService: this.editorService,
+      textFileService: this.textFileService,
+      basename,
+      dirname,
+      joinPath,
+      relativePath
+    };
+    const controller = new GomiWebviewHostController({
+      bridge,
+      runtimeOptions: {
+        workspaceReader: createCodeOssWorkspaceSnapshotReader(codeOssWorkspaceServices)
+      },
+      patchApplier: (message) => applyCodeOssPatchMessage(message, codeOssWorkspaceServices)
+    });
     controller.start();
     this.webviewDisposables.add(bridge);
     this.webviewDisposables.add(controller);
