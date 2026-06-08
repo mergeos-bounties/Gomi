@@ -224,17 +224,18 @@ The node-side patch applier parses unified diffs, verifies context lines, blocks
 The intended product path is:
 
 1. Fork Code - OSS.
-2. Apply `build/gomi-code-oss.integration.json` with `scripts/apply-gomi-code-oss-integration.ps1`.
-3. Replace all product metadata with Gomi branding.
-4. Replace app icons, splash/about assets, and distribution names.
-5. Configure Open VSX or a Gomi-owned extension marketplace.
-6. Register `Gomi Office` in the Activity Bar.
-7. Load the Gomi Office webview inside the workbench.
-8. Connect `gomiBridge.ts` and `gomiWorkbenchController.ts` to the workbench/webview message boundary.
-9. Run the AI runtime from the workbench/node side.
-10. Feed workspace files, open editors, selected code, terminal output, git diff, diagnostics, and logs into the project context indexer.
-11. Show generated changes through a diff-first approval flow.
-12. Package Gomi IDE for Windows, macOS, and Linux.
+2. Bootstrap or reuse a Code - OSS checkout with `scripts/bootstrap-gomi-code-oss-fork.ps1`.
+3. Apply `build/gomi-code-oss.integration.json` with `scripts/apply-gomi-code-oss-integration.ps1`.
+4. Replace all product metadata with Gomi branding.
+5. Replace app icons, splash/about assets, and distribution names.
+6. Configure Open VSX or a Gomi-owned extension marketplace.
+7. Register `Gomi Office` in the Activity Bar.
+8. Load the Gomi Office webview inside the workbench.
+9. Connect `gomiBridge.ts` and `gomiWorkbenchController.ts` to the workbench/webview message boundary.
+10. Run the AI runtime from the workbench/node side.
+11. Feed workspace files, open editors, selected code, terminal output, git diff, diagnostics, and logs into the project context indexer.
+12. Show generated changes through a diff-first approval flow.
+13. Package Gomi IDE for Windows, macOS, and Linux.
 
 ## Windows Desktop Build
 
@@ -247,6 +248,7 @@ This repository includes:
 - `build/code-oss-templates/gomiContribution.ts` for overlaying the native Code - OSS view/container registration during fork integration.
 - `npm run build:webview` for generating the bundled Gomi Office webview assets copied into the Code - OSS workbench module.
 - `npm run generate:brand-assets` for generating the Gomi desktop icon, Windows installer bitmaps, Linux icon, and macOS icon bundle copied into the Code - OSS packaging resource paths.
+- `scripts/bootstrap-gomi-code-oss-fork.ps1` for cloning or reusing a Code - OSS checkout, building Gomi assets, and applying the Gomi workbench integration.
 - `scripts/apply-gomi-code-oss-integration.ps1` for applying or validating Gomi branding/module integration against a Code - OSS fork.
 - `scripts/build-gomi-code-oss-windows.ps1` for local or CI packaging against a real Code - OSS fork.
 - `docs/windows-release.md` with the Windows build and release workflow.
@@ -265,6 +267,16 @@ The desktop packaging script builds the React/Phaser office bundle into `build/g
 The webview bundle includes an optional workbench bridge client. It only activates when the native host explicitly enables `__GOMI_ENABLE_WORKBENCH_BRIDGE__`, then sends `gomi.run` messages with the current office settings and sends approved `gomi.applyPatch` messages back to the host. The native template creates a host bridge/controller, reads workspace context through Code - OSS workspace/code-editor/editor/marker/file/text-file services, streams runtime events back into the office UI, and applies approved unified diffs through workbench services.
 
 Local dry-run validation:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-gomi-code-oss-fork.ps1 `
+  -CodeOssRoot D:\path\to\code-oss-fork `
+  -Repository https://github.com/your-org/gomi-code-oss.git `
+  -Ref main `
+  -DryRun
+```
+
+Local integration validation against an existing checkout:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-gomi-code-oss-windows.ps1 `
@@ -331,6 +343,7 @@ build/
 
 scripts/
 |-- apply-gomi-code-oss-integration.ps1
+|-- bootstrap-gomi-code-oss-fork.ps1
 |-- generate-gomi-brand-assets.mjs
 `-- build-gomi-code-oss-windows.ps1
 
@@ -393,6 +406,7 @@ Implemented in this repository:
 - Patch proposal, webview diff preview, native diff preview hook, approve/reject, and apply gating.
 - Safe unified-diff patch application core for approved workspace edits.
 - Code - OSS integration manifest and validation/apply script.
+- Code - OSS fork bootstrap script for cloning/reusing a checkout and applying the Gomi overlay.
 - GitHub Actions build/release workflow and Windows Code - OSS packaging script.
 - Tests for runtime memory updates, CLI routing, planner, message bus, patch approval, patch application, Code - OSS workspace service adaptation, workspace reader, project context indexing, shared memory, privacy guard, persistent memory pruning, and vector memory.
 

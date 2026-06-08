@@ -67,6 +67,17 @@ The workflow intentionally keeps the heavy Code - OSS packaging job separate fro
 
 ## Local Windows Packaging
 
+Bootstrap or update a Code - OSS checkout with the Gomi overlay:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-gomi-code-oss-fork.ps1 `
+  -CodeOssRoot D:\path\to\code-oss-fork `
+  -Repository https://github.com/your-org/gomi-code-oss.git `
+  -Ref main
+```
+
+The bootstrap script clones the checkout when it is missing, checks out the requested ref when the worktree is clean, generates Gomi branding assets, builds the Gomi Office webview bundle, and runs the integration manifest. Use `-ValidateOnly` against an existing checkout to inspect the integration without copying files, or `-DryRun` to preview the command sequence.
+
 Validate the integration without changing the Code - OSS checkout:
 
 ```powershell

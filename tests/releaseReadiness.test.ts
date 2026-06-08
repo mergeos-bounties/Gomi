@@ -174,6 +174,7 @@ describe('release readiness', () => {
     expect(await exists(win32Tile150?.source ?? '')).toBe(true);
     expect(await exists(linuxIcon?.source ?? '')).toBe(true);
     expect(await exists(macIcon?.source ?? '')).toBe(true);
+    expect(await exists('scripts/bootstrap-gomi-code-oss-fork.ps1')).toBe(true);
 
     const installerBitmaps = manifest.resourceCopies?.filter((copy) => copy.target.startsWith('resources/win32/inno-')) ?? [];
     expect(installerBitmaps).toHaveLength(14);
@@ -239,6 +240,7 @@ describe('release readiness', () => {
   it('documents the executable-first release path instead of presenting npm as the product runtime', async () => {
     const readme = await readFile(path.join(root, 'README.md'), 'utf8');
     const windowsRelease = await readFile(path.join(root, 'docs/windows-release.md'), 'utf8');
+    const bootstrapScript = await readFile(path.join(root, 'scripts/bootstrap-gomi-code-oss-fork.ps1'), 'utf8');
     const packageJson = await readJson<{ scripts?: Record<string, string> }>('package.json');
 
     expect(readme).toContain('Gomi IDE should be released as a desktop artifact from a Code - OSS fork');
@@ -246,12 +248,20 @@ describe('release readiness', () => {
     expect(readme).toContain('GitHub Actions release workflow');
     expect(readme).toContain('Windows Code - OSS packaging script');
     expect(readme).toContain('Generated desktop branding assets');
+    expect(readme).toContain('scripts/bootstrap-gomi-code-oss-fork.ps1');
     expect(readme).toContain('Manual workflow runs can publish a release only when the Windows desktop packaging job is enabled and succeeds.');
     expect(windowsRelease).toContain('## Why EXE, Not NPM');
+    expect(windowsRelease).toContain('Bootstrap or update a Code - OSS checkout');
     expect(windowsRelease).toContain('Generate Gomi desktop branding assets');
     expect(windowsRelease).toContain('GitHub Releases do not present the prototype bundle as the final IDE');
     expect(windowsRelease).toContain('End users should not run Gomi IDE with `npm run dev`.');
     expect(windowsRelease).toContain('Inno Setup `.exe` installer');
+    expect(bootstrapScript).toContain("'clone', '--filter=blob:none'");
+    expect(bootstrapScript).toContain('Test-GitWorktreeClean');
+    expect(bootstrapScript).toContain('npm.cmd');
+    expect(bootstrapScript).toContain('apply-gomi-code-oss-integration.ps1');
+    expect(bootstrapScript).toContain('-ValidateOnly');
+    expect(bootstrapScript).toContain('-DryRun');
     expect(packageJson.scripts?.['verify:release']).toBe(
       'vitest run tests/releaseReadiness.test.ts tests/codeOssIntegrationManifest.test.ts'
     );
