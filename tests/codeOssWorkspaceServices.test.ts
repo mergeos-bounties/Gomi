@@ -165,6 +165,66 @@ describe('Code - OSS workspace services adapter', () => {
     expect(snapshot.terminalSummary).toContain('1 terminal snippet(s), 1 git diff snippet(s), 1 error-log snippet(s)');
   });
 
+  it('indexes multiple terminal instances and prefers selected terminal text', async () => {
+    const services = createFakeCodeOssServices({
+      'src/login.ts': 'export const ok = true;\n'
+    });
+    const activeTerminal = {
+      title: 'npm test',
+      shellType: 'pwsh',
+      cwd: 'D:/repo/gomi',
+      hasSelection: () => false,
+      getCommandAndOutputAsText: () => 'npm test\nPASS login.spec.ts\n'
+    };
+    const duplicateTitleTerminal = {
+      title: 'npm test',
+      shellType: 'pwsh',
+      cwd: 'D:/repo/gomi',
+      hasSelection: () => false,
+      serialize: () => 'npm run build\nDone in 1.2s\n'
+    };
+    const selectedTerminal = {
+      title: 'debug shell',
+      shellType: 'bash',
+      cwd: 'D:/repo/gomi',
+      selection: 'TypeError: Cannot read properties of undefined',
+      hasSelection: () => true,
+      getCommandAndOutputAsText: () => 'very long unrelated server transcript'
+    };
+    const emptyTerminal = {
+      title: 'empty',
+      hasSelection: () => false,
+      getCommandAndOutputAsText: () => '   '
+    };
+
+    services.terminalService = {
+      activeInstance: activeTerminal,
+      instances: [activeTerminal, duplicateTitleTerminal, selectedTerminal, emptyTerminal]
+    };
+
+    const snapshot = await readCodeOssWorkspaceSnapshot(services, {
+      maxFiles: 10,
+      maxDepth: 3,
+      maxSnippets: 8,
+      maxSnippetLength: 500,
+      maxTerminalInstances: 3,
+      maxTerminalOutputLength: 600
+    });
+    const terminalSnippets = snapshot.contentSnippets?.filter((snippet) => snippet.source === 'terminal') ?? [];
+
+    expect(terminalSnippets.map((snippet) => snippet.filePath)).toEqual([
+      'Terminal: npm test',
+      'Terminal: debug shell',
+      'Terminal: npm test (2)'
+    ]);
+    expect(terminalSnippets[0]?.content).toContain('PASS login.spec.ts');
+    expect(terminalSnippets[1]?.content).toContain('source: selected terminal text');
+    expect(terminalSnippets[1]?.content).toContain('TypeError: Cannot read properties of undefined');
+    expect(terminalSnippets[1]?.content).not.toContain('very long unrelated server transcript');
+    expect(terminalSnippets[2]?.content).toContain('npm run build');
+    expect(snapshot.terminalSummary).toContain('3 terminal snippet(s)');
+  });
+
   it('keeps SCM summaries when original resources cannot be read', async () => {
     const services = createFakeCodeOssServices({
       'src/login.ts': 'export const ok = true;\n'

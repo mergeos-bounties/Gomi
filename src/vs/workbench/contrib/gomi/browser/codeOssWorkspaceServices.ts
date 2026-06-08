@@ -99,6 +99,7 @@ export interface GomiCodeOssWorkspaceOptions {
   maxDiagnostics?: number;
   maxSelectionLength?: number;
   maxTerminalOutputLength?: number;
+  maxTerminalInstances?: number;
   maxGitDiffFiles?: number;
   maxGitDiffLength?: number;
   maxErrorLogLength?: number;
@@ -157,6 +158,7 @@ interface GomiCodeOssTerminalInstance {
   cwd?: string | GomiCodeOssUri;
   selection?: string;
   hasSelection?: () => boolean;
+  getSelection?: () => string | undefined;
   getCommandAndOutputAsText?: () => string | undefined;
   serialize?: () => string | undefined;
 }
@@ -205,6 +207,7 @@ const DEFAULT_WORKSPACE_OPTIONS: Required<GomiCodeOssWorkspaceOptions> = {
   maxDiagnostics: 12,
   maxSelectionLength: 2600,
   maxTerminalOutputLength: 2600,
+  maxTerminalInstances: 3,
   maxGitDiffFiles: 4,
   maxGitDiffLength: 4200,
   maxErrorLogLength: 2600
@@ -644,34 +647,119 @@ function collectTerminalSnippets(
   services: GomiCodeOssWorkspaceServices,
   options: Required<GomiCodeOssWorkspaceOptions>
 ): GomiWorkspaceContentSnippet[] {
-  const terminal = services.terminalService?.activeInstance ?? services.terminalService?.instances?.[0];
+  const terminalService = services.terminalService;
 
-  if (!terminal) {
+  if (!terminalService) {
     return [];
   }
 
-  const transcript = terminal.getCommandAndOutputAsText?.() ?? terminal.serialize?.() ?? terminal.selection ?? '';
+  const terminals = uniqueTerminalInstances([
+    terminalService.activeInstance,
+    ...(terminalService.instances ?? [])
+  ]);
+  const terminalContexts = terminals
+    .map((terminal, index) => {
+      const transcript = readTerminalTranscript(terminal);
 
-  if (!transcript.trim()) {
+      return transcript.content.trim()
+        ? {
+            terminal,
+            index,
+            transcript,
+            isActive: terminal === terminalService.activeInstance,
+            hasSelectedText: hasTerminalSelectedText(terminal)
+          }
+        : undefined;
+    })
+    .filter((context): context is NonNullable<typeof context> => Boolean(context))
+    .sort((left, right) => {
+      const leftRank = left.isActive ? 0 : left.hasSelectedText ? 1 : 2;
+      const rightRank = right.isActive ? 0 : right.hasSelectedText ? 1 : 2;
+
+      return leftRank - rightRank || left.index - right.index;
+    })
+    .slice(0, options.maxTerminalInstances);
+
+  if (terminalContexts.length === 0) {
     return [];
   }
 
-  const title = terminal.title ? `Terminal: ${terminal.title}` : 'Terminal';
-  const cwd = typeof terminal.cwd === 'string' ? terminal.cwd : terminal.cwd?.fsPath ?? terminal.cwd?.path;
+  const titleCounts = new Map<string, number>();
+  const terminalOutputLength = Math.max(
+    1,
+    Math.floor(options.maxTerminalOutputLength / Math.max(1, terminalContexts.length))
+  );
 
-  return [
-    {
+  return terminalContexts.map(({ terminal, transcript }) => {
+    const title = toUniqueTerminalTitle(terminal, titleCounts);
+    const cwd = typeof terminal.cwd === 'string' ? terminal.cwd : terminal.cwd?.fsPath ?? terminal.cwd?.path;
+
+    return {
       filePath: title,
       content: [
         cwd ? `cwd: ${cwd}` : undefined,
         terminal.shellType ? `shell: ${terminal.shellType}` : undefined,
-        terminal.hasSelection?.() ? 'source: selected terminal text' : 'source: terminal transcript',
-        transcript.slice(0, options.maxTerminalOutputLength)
+        `source: ${transcript.source}`,
+        transcript.content.slice(0, terminalOutputLength)
       ].filter(Boolean).join('\n'),
       language: 'text',
       source: 'terminal'
     }
-  ];
+  });
+}
+
+function uniqueTerminalInstances(
+  terminals: Array<GomiCodeOssTerminalInstance | null | undefined>
+): GomiCodeOssTerminalInstance[] {
+  const seen = new Set<GomiCodeOssTerminalInstance>();
+  const result: GomiCodeOssTerminalInstance[] = [];
+
+  for (const terminal of terminals) {
+    if (!terminal || seen.has(terminal)) {
+      continue;
+    }
+
+    seen.add(terminal);
+    result.push(terminal);
+  }
+
+  return result;
+}
+
+function readTerminalTranscript(terminal: GomiCodeOssTerminalInstance): {
+  content: string;
+  source: 'selected terminal text' | 'terminal transcript';
+} {
+  const selectedText = terminal.getSelection?.() ?? terminal.selection ?? '';
+
+  if (hasTerminalSelectedText(terminal) && selectedText.trim()) {
+    return {
+      content: selectedText,
+      source: 'selected terminal text'
+    };
+  }
+
+  return {
+    content: terminal.getCommandAndOutputAsText?.() ?? terminal.serialize?.() ?? selectedText,
+    source: 'terminal transcript'
+  };
+}
+
+function hasTerminalSelectedText(terminal: GomiCodeOssTerminalInstance): boolean {
+  const selectedText = terminal.getSelection?.() ?? terminal.selection ?? '';
+
+  return terminal.hasSelection?.() === true && Boolean(selectedText.trim());
+}
+
+function toUniqueTerminalTitle(
+  terminal: GomiCodeOssTerminalInstance,
+  titleCounts: Map<string, number>
+): string {
+  const baseTitle = terminal.title ? `Terminal: ${terminal.title}` : 'Terminal';
+  const count = (titleCounts.get(baseTitle) ?? 0) + 1;
+  titleCounts.set(baseTitle, count);
+
+  return count === 1 ? baseTitle : `${baseTitle} (${count})`;
 }
 
 async function collectScmContext(
