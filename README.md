@@ -36,6 +36,7 @@ This repository is the first production-oriented scaffold for the Gomi module be
 - Message bus, task planner, workspace reader scaffold, patch proposal, and final report events.
 - A review-first patch approval panel with unified diff preview, approve/reject controls, and apply gating.
 - A Node-side workspace reader that can inspect real project files, product metadata, package scripts, and Git state.
+- A hybrid project memory layer with lexical search plus vector-style retrieval for agent context sharing.
 - Open VSX Registry metadata instead of Microsoft Visual Studio Marketplace metadata.
 
 ## Core Concept
@@ -145,8 +146,11 @@ User opens Gomi IDE
 -> Opens Gomi Office
 -> Enters a request
 -> CEO Agent reads project context
+-> Runtime retrieves relevant shared project memory
 -> CEO Agent creates a task plan
 -> Specialist agents process their tasks
+-> Each agent writes useful facts back into shared project memory
+-> Communication policy broadcasts only important findings
 -> Gomi Office displays movement, chat bubbles, and task state
 -> CEO Agent produces a final report
 -> Runtime creates a patch proposal
@@ -172,6 +176,20 @@ Current product metadata is defined in `product.json`:
 ```
 
 The extension gallery is configured for **Open VSX Registry**, which is the recommended open registry path for Code - OSS based products.
+
+## Shared Project Memory
+
+Gomi uses a shared memory design so agents do not need to repeat everything in chat.
+
+The current scaffold implements a hybrid memory layer:
+
+- **Lexical memory search** for exact terms, file paths, package names, and command names.
+- **Vector-style memory search** for semantic retrieval across project facts and agent findings.
+- **Scoped memory** by workspace so project knowledge does not leak between repositories.
+- **Agent result memory** so each agent can reuse prior findings from the same project.
+- **Communication policy** so low-importance updates are stored silently while high-importance findings become visible chat bubbles.
+
+For the MVP, vector retrieval uses a local hashing embedding provider. It does not need an API key and keeps the demo deterministic. In a production Code - OSS fork, this provider can be replaced with OpenAI embeddings or a local embedding model while keeping the same memory store contract.
 
 ## Getting Started
 
@@ -222,6 +240,8 @@ Implemented:
 - Patch approval UI with raw unified diff preview.
 - Approve, reject, and apply-gated patch state transitions.
 - Node-side workspace reader for real project context.
+- Shared project memory with lexical and vector-style retrieval.
+- Communication policy that avoids broadcasting low-importance agent updates.
 - Unit tests for runtime, planner, message bus, workspace reader, and patch approval state.
 
 Not yet implemented:

@@ -25,6 +25,7 @@ export type GomiPatchApprovalStatus =
   | 'applied'
   | 'failed';
 export type GomiPatchRiskLevel = 'low' | 'medium' | 'high';
+export type GomiMemoryKind = 'request' | 'workspace' | 'agent_result' | 'patch' | 'report';
 
 export interface GomiAgent {
   id: GomiAgentId;
@@ -84,6 +85,26 @@ export interface GomiWorkspaceSnapshot {
   terminalSummary: string;
 }
 
+export interface GomiAgentResult {
+  agentId: GomiAgentId;
+  taskId: string;
+  summary: string;
+  findings: string[];
+  recommendations: string[];
+  proposedFiles: string[];
+  confidence: number;
+}
+
+export interface GomiMemoryEntry {
+  id: string;
+  sessionId: string;
+  kind: GomiMemoryKind;
+  content: string;
+  createdAt: string;
+  agentId?: GomiAgentId;
+  taskId?: string;
+}
+
 export type GomiRuntimeEvent =
   | {
       type: 'session_started';
@@ -104,6 +125,10 @@ export type GomiRuntimeEvent =
   | {
       type: 'task_update';
       task: GomiTask;
+    }
+  | {
+      type: 'agent_result';
+      result: GomiAgentResult;
     }
   | {
       type: 'patch';

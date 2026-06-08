@@ -1,12 +1,17 @@
-import type { GomiPatchProposal, GomiTask } from '../common/gomiTypes';
+import type { GomiAgentResult, GomiPatchProposal, GomiTask } from '../common/gomiTypes';
 
-export function createPatchProposal(request: string, tasks: GomiTask[]): GomiPatchProposal {
+export function createPatchProposal(
+  request: string,
+  tasks: GomiTask[],
+  results: GomiAgentResult[] = []
+): GomiPatchProposal {
   const taskLines = tasks.map((task) => `+- ${task.title} [${task.agentId}]`).join('\n');
+  const proposedFiles = Array.from(new Set(results.flatMap((result) => result.proposedFiles)));
 
   return {
     id: `patch-${Date.now()}`,
     filePath: 'docs/gomi-agent-plan.md',
-    targetFiles: ['docs/gomi-agent-plan.md'],
+    targetFiles: ['docs/gomi-agent-plan.md', ...proposedFiles].slice(0, 6),
     summary: 'Create a planning artifact before applying generated code changes.',
     approvalStatus: 'pending',
     riskLevel: 'low',

@@ -5,14 +5,25 @@ describe('GomiAgentRuntime', () => {
   it('streams a final report and patch proposal', async () => {
     const runtime = new GomiAgentRuntime({ delayMs: 0 });
     const eventTypes: string[] = [];
+    let agentResultCount = 0;
+    let messageCount = 0;
 
     for await (const event of runtime.run('Review API and UI')) {
       eventTypes.push(event.type);
+      if (event.type === 'agent_result') {
+        agentResultCount += 1;
+      }
+      if (event.type === 'message') {
+        messageCount += 1;
+      }
     }
 
     expect(eventTypes).toContain('session_started');
+    expect(eventTypes).toContain('agent_result');
     expect(eventTypes).toContain('patch');
     expect(eventTypes).toContain('report');
+    expect(agentResultCount).toBeGreaterThan(0);
+    expect(messageCount).toBeLessThan(agentResultCount + 4);
     expect(eventTypes.at(-1)).toBe('session_completed');
   });
 
