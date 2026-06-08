@@ -41,7 +41,7 @@ import {
   type GomiWorkspaceSnapshotReader
 } from './workspaceReader';
 
-interface GomiRuntimeOptions {
+export interface GomiRuntimeOptions {
   delayMs?: number;
   workspaceReader?: GomiWorkspaceSnapshotReader;
   agentProvider?: GomiAgentProvider;

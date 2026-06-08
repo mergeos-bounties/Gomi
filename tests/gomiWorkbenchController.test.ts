@@ -140,6 +140,36 @@ describe('GomiWorkbenchController', () => {
       patchId: 'first'
     });
   });
+
+  it('uses persistent project memory for the default workbench runtime', async () => {
+    const bridge = new MemoryWorkbenchBridge();
+    const memoryDirectory = path.join(workspaceRoot, '.gomi-ide', 'memory');
+    await fs.writeFile(
+      path.join(workspaceRoot, 'package.json'),
+      JSON.stringify({ name: 'persistent-workspace', scripts: { test: 'vitest' } }),
+      'utf8'
+    );
+    const controller = new GomiWorkbenchController({
+      bridge,
+      workspaceRoot,
+      memoryDirectory,
+      runtimeOptions: {
+        delayMs: 0
+      }
+    });
+
+    await controller.handleMessage({
+      type: 'gomi.run',
+      request: 'Review workspace memory'
+    });
+
+    const lexicalMemory = await fs.readFile(path.join(memoryDirectory, 'lexical-memory.json'), 'utf8');
+    const vectorMemory = await fs.readFile(path.join(memoryDirectory, 'vector-memory.json'), 'utf8');
+
+    expect(lexicalMemory).toContain('Review workspace memory');
+    expect(lexicalMemory).toContain('workspace:files');
+    expect(vectorMemory).toContain('workspace:files');
+  });
 });
 
 class MemoryWorkbenchBridge implements GomiWorkbenchBridge {

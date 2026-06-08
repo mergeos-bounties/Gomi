@@ -54,6 +54,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Employee lifecycle controls** for removing or restoring non-lead staff seats.
 - **Agent communication policy** that keeps routine updates in memory and only broadcasts important findings.
 - **Hybrid project memory** using lexical search plus vector-style retrieval.
+- **Persistent workspace memory storage** for lexical and vector records under `.gomi-ide/memory`.
 - **Project context indexing** for file tree, manifests, open editor snippets, selected code, terminal output, diagnostics, and git diff input shapes.
 - **Patch review workflow** with diff preview, approve/reject controls, and apply gating.
 - **Safe node-side patch application core** for approved unified diffs inside the workspace root.
@@ -134,9 +135,10 @@ The current implementation uses hybrid retrieval:
 - **Scoped memory** by workspace/thread to avoid leaking knowledge between projects.
 - **Agent result memory** so specialist agents can build on prior findings.
 - **Project context indexing** so workspace metadata and content snippets can be retrieved by task.
+- **Workspace persistence** through file-backed lexical and vector memory stores when running from the workbench controller.
 - **Communication policy** so low-importance findings are stored silently while high-importance findings become visible messages and chat bubbles.
 
-For the MVP, vector retrieval uses a local hashing embedding provider. It does not require an API key and keeps tests deterministic. In a production build, this provider can be replaced by OpenAI embeddings, a local embedding model, or an enterprise embedding service without changing the runtime contract.
+For the MVP, vector retrieval uses a local hashing embedding provider. It does not require an API key and keeps tests deterministic. The workbench controller persists lexical and vector memory records in workspace storage so future sessions can reuse project context. In a production build, this storage can be replaced by SQLite, a local vector database, OpenAI embeddings, a local embedding model, or an enterprise embedding service without changing the runtime contract.
 
 ## Patch Review And Safety
 
@@ -204,6 +206,7 @@ src/vs/workbench/contrib/gomi/
     |-- embeddingProvider.ts
     |-- sharedProjectMemory.ts
     |-- projectContextIndexer.ts
+    |-- persistentProjectMemory.ts
     |-- communicationPolicy.ts
     |-- resultAggregator.ts
     |-- workspaceReader.ts
@@ -232,6 +235,7 @@ Implemented in this repository:
 - Workbench bridge controller for `gomi.run`, runtime event forwarding, and approved patch apply messages.
 - Agent provider contract with a demo provider.
 - Hybrid project memory with lexical and vector-style retrieval.
+- File-backed persistent project memory for workbench sessions.
 - Project context chunking and indexing.
 - Communication policy for selective agent broadcast.
 - Node workspace reader for real project metadata and content snippets.
@@ -292,6 +296,7 @@ The current verification suite covers:
 - Patch approval state transitions.
 - Safe patch application and workspace path containment.
 - Workbench bridge controller message routing.
+- Persistent lexical and vector memory storage.
 - Node workspace context reading.
 - Project context indexing.
 - Shared project memory.

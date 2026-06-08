@@ -1,6 +1,12 @@
+import path from 'node:path';
 import type { GomiWorkbenchBridge, GomiBridgeMessage } from '../electron-sandbox/gomiBridge';
 import type { GomiRuntimeEvent } from '../common/gomiTypes';
-import { GomiAgentRuntime } from './agentRuntime';
+import { GomiAgentRuntime, type GomiRuntimeOptions } from './agentRuntime';
+import {
+  createFileBackedGomiMemoryStore,
+  createFileBackedVectorMemoryStore
+} from './persistentProjectMemory';
+import { readNodeWorkspaceSnapshot } from './nodeWorkspaceReader';
 import {
   applyPatchProposalToWorkspace,
   type GomiPatchApplyOptions,
@@ -15,6 +21,8 @@ export interface GomiWorkbenchControllerOptions {
   bridge: GomiWorkbenchBridge;
   workspaceRoot: string;
   runtime?: GomiRuntimeRunner;
+  memoryDirectory?: string;
+  runtimeOptions?: GomiRuntimeOptions;
   patchApplyOptions?: GomiPatchApplyOptions;
   applyPatch?: (
     message: Extract<GomiBridgeMessage, { type: 'gomi.applyPatch' }>,
@@ -35,7 +43,9 @@ export class GomiWorkbenchController {
   constructor(options: GomiWorkbenchControllerOptions) {
     this.bridge = options.bridge;
     this.workspaceRoot = options.workspaceRoot;
-    this.runtime = options.runtime ?? new GomiAgentRuntime();
+    this.runtime =
+      options.runtime ??
+      createWorkbenchRuntime(options.workspaceRoot, options.memoryDirectory, options.runtimeOptions);
     this.patchApplyOptions = options.patchApplyOptions;
     this.applyPatch =
       options.applyPatch ??
@@ -120,4 +130,25 @@ export class GomiWorkbenchController {
       });
     }
   }
+}
+
+function createWorkbenchRuntime(
+  workspaceRoot: string,
+  memoryDirectory?: string,
+  runtimeOptions: GomiRuntimeOptions = {}
+): GomiRuntimeRunner {
+  const projectMemoryDirectory = memoryDirectory ?? path.join(workspaceRoot, '.gomi-ide', 'memory');
+
+  return new GomiAgentRuntime({
+    ...runtimeOptions,
+    workspaceReader: runtimeOptions.workspaceReader ?? (() => readNodeWorkspaceSnapshot(workspaceRoot)),
+    memoryStore:
+      runtimeOptions.memoryStore ??
+      createFileBackedGomiMemoryStore(path.join(projectMemoryDirectory, 'lexical-memory.json')),
+    vectorMemoryStore:
+      runtimeOptions.vectorMemoryStore ??
+      createFileBackedVectorMemoryStore(
+      path.join(projectMemoryDirectory, 'vector-memory.json')
+    )
+  });
 }
