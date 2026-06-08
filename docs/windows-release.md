@@ -34,7 +34,7 @@ To run the full Windows desktop packaging workflow:
 6. Choose `win32-x64`, `win32-arm64`, or `win32-ia32`.
 7. Enable `build_setup_exe` when the fork has a compatible Windows setup gulp task.
 
-The Windows packaging job runs `scripts/build-gomi-code-oss-windows.ps1`. That script validates the Code - OSS checkout, applies `build/gomi-code-oss.integration.json`, copies Gomi branding/module files into the fork, appends the Gomi workbench import when needed, and then runs the Code - OSS gulp package task.
+The Windows packaging job runs `scripts/build-gomi-code-oss-windows.ps1`. That script validates the Code - OSS checkout, applies `build/gomi-code-oss.integration.json`, copies Gomi branding/module files into the fork, overlays the native Gomi workbench registration template, appends the Gomi workbench import when needed, and then runs the Code - OSS gulp package task.
 
 ## Local Windows Packaging
 
@@ -93,4 +93,4 @@ VS Code's Windows setup path uses Inno Setup. MSI is not the primary upstream pa
 
 ## Current Limitation
 
-This repository is still a Gomi product foundation and module scaffold. A full release requires a real Code - OSS fork containing the native workbench contribution registration and final branding assets.
+This repository is still a Gomi product foundation and module scaffold. A full release requires validating the native workbench contribution inside a real Code - OSS fork, mounting the full React/Phaser office webview in that pane, and replacing all final branding assets.

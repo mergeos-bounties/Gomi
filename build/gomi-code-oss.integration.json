@@ -12,6 +12,12 @@
       "target": "src/vs/workbench/contrib/gomi"
     }
   ],
+  "templateCopies": [
+    {
+      "source": "build/code-oss-templates/gomiContribution.ts",
+      "target": "src/vs/workbench/contrib/gomi/browser/gomiContribution.ts"
+    }
+  ],
   "resourceCopies": [
     {
       "source": "resources/gomi-icon.svg",
@@ -25,7 +31,8 @@
     }
   ],
   "activityBar": {
-    "viewId": "workbench.view.gomiOffice",
+    "viewContainerId": "workbench.view.gomiOffice",
+    "viewId": "gomi.office.view",
     "title": "Gomi Office",
     "command": "gomi.openOffice"
   },

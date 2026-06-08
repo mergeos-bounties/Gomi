@@ -2,11 +2,13 @@ import {
   GOMI_COMMAND_OPEN_OFFICE,
   GOMI_COMMAND_RUN_AGENT_TASK,
   GOMI_COMMAND_STOP_AGENT_TASK,
-  GOMI_VIEW_ID
+  GOMI_OFFICE_VIEW_ID,
+  GOMI_VIEW_CONTAINER_ID
 } from '../common/gomiConstants';
 
 export const GOMI_OFFICE_VIEW_DESCRIPTOR = {
-  id: GOMI_VIEW_ID,
+  id: GOMI_OFFICE_VIEW_ID,
+  containerId: GOMI_VIEW_CONTAINER_ID,
   title: 'Gomi Office',
   containerTitle: 'Gomi Multi-Agent Office',
   activityBarCommand: GOMI_COMMAND_OPEN_OFFICE,

@@ -113,6 +113,12 @@ foreach ($copy in $manifest.moduleCopies) {
   Copy-GomiIntegrationItem -Source $source -Destination $target
 }
 
+foreach ($copy in $manifest.templateCopies) {
+  $source = Resolve-GomiPath -PathValue (Join-Path $repoRoot $copy.source) -Description 'Gomi Code - OSS template source'
+  $target = Join-Path $codeRoot $copy.target
+  Copy-GomiIntegrationItem -Source $source -Destination $target
+}
+
 foreach ($copy in $manifest.resourceCopies) {
   $source = Resolve-GomiPath -PathValue (Join-Path $repoRoot $copy.source) -Description 'Gomi resource source'
   $target = Join-Path $codeRoot $copy.target

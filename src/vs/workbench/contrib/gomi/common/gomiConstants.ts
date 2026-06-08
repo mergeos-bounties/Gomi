@@ -1,6 +1,8 @@
 import type { GomiAgent } from './gomiTypes';
 
-export const GOMI_VIEW_ID = 'workbench.view.gomiOffice';
+export const GOMI_VIEW_CONTAINER_ID = 'workbench.view.gomiOffice';
+export const GOMI_OFFICE_VIEW_ID = 'gomi.office.view';
+export const GOMI_VIEW_ID = GOMI_VIEW_CONTAINER_ID;
 export const GOMI_COMMAND_OPEN_OFFICE = 'gomi.openOffice';
 export const GOMI_COMMAND_RUN_AGENT_TASK = 'gomi.runAgentTask';
 export const GOMI_COMMAND_STOP_AGENT_TASK = 'gomi.stopAgentTask';

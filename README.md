@@ -45,6 +45,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Gomi-branded product metadata** through `product.json`.
 - **Workbench-compatible module structure** under `src/vs/workbench/contrib/gomi`.
 - **Code - OSS integration manifest** for copying branding, resources, and the Gomi workbench module into a real fork before packaging.
+- **Native Code - OSS workbench contribution template** that registers the Gomi Office Activity Bar container and view through workbench registries.
 - **Gomi Office panel UI** built with React.
 - **Collapsible workbench views and Office Focus mode** so the visual office can expand across the workspace.
 - **2D office simulation** built with Phaser.
@@ -195,6 +196,7 @@ This repository includes:
 
 - `.github/workflows/build-release.yml` for verification, artifact upload, optional Code - OSS Windows packaging, and GitHub Releases.
 - `build/gomi-code-oss.integration.json` for declaring the Gomi files and workbench import to apply to a Code - OSS checkout.
+- `build/code-oss-templates/gomiContribution.ts` for overlaying the native Code - OSS view/container registration during fork integration.
 - `scripts/apply-gomi-code-oss-integration.ps1` for applying or validating Gomi branding/module integration against a Code - OSS fork.
 - `scripts/build-gomi-code-oss-windows.ps1` for local or CI packaging against a real Code - OSS fork.
 - `docs/windows-release.md` with the Windows build and release workflow.
@@ -259,6 +261,8 @@ Supporting release files:
 
 ```text
 build/
+|-- code-oss-templates/
+|   `-- gomiContribution.ts
 `-- gomi-code-oss.integration.json
 
 scripts/
@@ -287,6 +291,7 @@ Implemented in this repository:
 - Department-head sleep mode and employee fire/restore controls.
 - Runtime event stream.
 - Workbench bridge controller for `gomi.run`, runtime event forwarding, and approved patch apply messages.
+- Native Code - OSS registration template for the Gomi Office Activity Bar container and initial view pane.
 - Agent provider contract with a demo provider.
 - Node-side CLI provider router with command execution, JSON/plain-text output mapping, and demo fallback.
 - Hybrid project memory with lexical and vector-style retrieval.
@@ -303,7 +308,7 @@ Implemented in this repository:
 Not yet implemented:
 
 - Full upstream Code - OSS source integration.
-- Native workbench contribution registration in a complete Code - OSS tree.
+- Full React/Phaser webview mounting inside the native Code - OSS view pane.
 - Production LLM API provider.
 - Production local model provider.
 - Workspace trust and enterprise policy UI for enabling live CLI execution.
