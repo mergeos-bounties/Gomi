@@ -8,7 +8,7 @@
   "urlProtocol": "gomi",
   "serverApplicationName": "gomi-server",
   "tunnelApplicationName": "gomi-tunnel",
-  "reportIssueUrl": "https://github.com/gomi-office/gomi-ide/issues/new",
+  "reportIssueUrl": "https://github.com/mergeos-bounties/Gomi/issues/new",
   "extensionsGallery": {
     "serviceUrl": "https://open-vsx.org/vscode/gallery",
     "itemUrl": "https://open-vsx.org/vscode/item"

@@ -17,13 +17,13 @@ Gomi repository
 
 The repository includes `.github/workflows/build-release.yml`.
 
-Pushes to `master` run the verification job and upload a prototype artifact. Release tags named `v*` run the Windows Code - OSS packaging job and publish the produced artifacts to a GitHub prerelease. Manual runs can also publish a release, with or without the heavy Windows desktop packaging step.
+Pushes to `master` run the verification job and upload a prototype artifact. Release tags named `v*` run the Windows Code - OSS packaging job and publish the produced artifacts to a GitHub prerelease. Manual release publishing also requires the Windows desktop packaging step to be enabled, so GitHub Releases do not present the prototype bundle as the final IDE.
 
 It has three jobs:
 
-- `verify-prototype`: installs dependencies, runs typecheck/tests, builds the standalone preview and Code - OSS webview bundle, then uploads a versioned `gomi-office-webview-prototype-<commit>.zip`.
+- `verify-prototype`: installs dependencies, runs typecheck/tests/release-readiness checks, builds the standalone preview and Code - OSS webview bundle, then uploads a versioned `gomi-office-webview-prototype-<commit>.zip` with a SHA-256 checksum.
 - `code-oss-windows`: checks out a Code - OSS fork, applies the Gomi integration manifest, packages Gomi for Windows, collects `.exe`, `.msi`, and `.zip` outputs when present, and writes an `ARTIFACTS.md` manifest. It runs automatically for `v*` tags and can be enabled manually with `build_code_oss_windows`.
-- `release`: downloads all artifacts, generates release notes, and publishes artifacts to a GitHub Release for `v*` tags or manual runs with `create_release` enabled.
+- `release`: downloads all artifacts, generates release notes, and publishes artifacts to a GitHub Release only after the Windows desktop packaging job succeeds.
 
 For tagged releases, the Code - OSS source defaults to `microsoft/vscode` at `main`. In production, configure repository variables before tagging:
 

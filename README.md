@@ -235,10 +235,10 @@ The prototype `npm` commands remain useful for developing and testing the Gomi O
 
 GitHub Actions release behavior:
 
-- Pushes to `master` verify the scaffold and upload the Gomi Office prototype/webview bundle.
+- Pushes to `master` verify the scaffold, run release-readiness checks, and upload the Gomi Office prototype/webview bundle with a SHA-256 checksum.
 - Tags matching `v*` run the Windows Code - OSS packaging job and publish a prerelease.
-- Manual workflow runs can publish a release and optionally enable the heavy Windows desktop packaging job.
-- Produced Windows artifacts are collected from Code - OSS `.build` output as `.exe`, `.msi`, or `.zip` files, with a generated `ARTIFACTS.md` manifest.
+- Manual workflow runs can publish a release only when the Windows desktop packaging job is enabled and succeeds.
+- Produced Windows artifacts are collected from Code - OSS `.build` output as `.exe`, `.msi`, or `.zip` files, with a generated `ARTIFACTS.md` manifest and SHA-256 checksums.
 
 The desktop packaging script builds the React/Phaser office bundle into `build/gomi-office-webview`, copies it to `src/vs/workbench/contrib/gomi/browser/media/office` inside the Code - OSS fork, and the native contribution template mounts that bundle through an internal workbench webview.
 
@@ -395,6 +395,12 @@ Run TypeScript checks:
 npm run typecheck
 ```
 
+Run release-readiness checks:
+
+```bash
+npm run verify:release
+```
+
 Build:
 
 ```bash
@@ -417,6 +423,7 @@ The current verification suite covers:
 - Project context indexing.
 - Shared project memory.
 - Vector-style retrieval.
+- Release readiness for Gomi branding, Open VSX metadata, Code - OSS packaging workflow, and executable-first documentation.
 
 Current known build note: Phaser increases the production JavaScript chunk size. This is expected for the visual office prototype and should be optimized with code splitting before a packaged release.
 

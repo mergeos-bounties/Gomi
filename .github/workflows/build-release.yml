@@ -77,6 +77,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Release readiness
+        run: npm run verify:release
+
       - name: Build prototype webview bundle
         run: npm run build
 
@@ -107,12 +110,17 @@ jobs:
           ) | Set-Content -Path release\prototype\README.txt -Encoding UTF8
 
           Compress-Archive -Path release\prototype\* -DestinationPath "release\gomi-office-webview-prototype-$env:GITHUB_SHA.zip" -Force
+          $prototypeArchive = Get-Item "release\gomi-office-webview-prototype-$env:GITHUB_SHA.zip"
+          $prototypeHash = Get-FileHash -LiteralPath $prototypeArchive.FullName -Algorithm SHA256
+          "$($prototypeHash.Hash.ToLowerInvariant())  $($prototypeArchive.Name)" | Set-Content -Path release\PROTOTYPE-SHA256SUMS.txt -Encoding UTF8
 
       - name: Upload prototype artifact
         uses: actions/upload-artifact@v4
         with:
           name: gomi-office-webview-prototype
-          path: release/gomi-office-webview-prototype-*.zip
+          path: |
+            release/gomi-office-webview-prototype-*.zip
+            release/PROTOTYPE-SHA256SUMS.txt
 
   code-oss-windows:
     name: Build Code - OSS Windows package
@@ -203,6 +211,13 @@ jobs:
 
           $manifest | Set-Content -Path release\ARTIFACTS.md -Encoding UTF8
 
+          $checksumLines = foreach ($file in (Get-ChildItem -Path release -File | Where-Object { $_.Name -ne 'ARTIFACTS.md' } | Sort-Object Name)) {
+            $hash = Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256
+            "$($hash.Hash.ToLowerInvariant())  $($file.Name)"
+          }
+
+          $checksumLines | Set-Content -Path release\WINDOWS-SHA256SUMS.txt -Encoding UTF8
+
       - name: Upload Windows desktop artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -218,8 +233,8 @@ jobs:
     if: >
       always() &&
       needs.verify-prototype.result == 'success' &&
-      (needs.code-oss-windows.result == 'success' || needs.code-oss-windows.result == 'skipped') &&
-      (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true))
+      needs.code-oss-windows.result == 'success' &&
+      (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true && inputs.build_code_oss_windows == true))
 
     steps:
       - name: Download artifacts
@@ -240,11 +255,11 @@ jobs:
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Workflow run: \`${GITHUB_RUN_ID}\`"
             echo
+            echo "This prerelease includes the Gomi Office webview bundle and Windows desktop artifacts produced from the Code - OSS packaging job."
+            echo
             echo "### Included artifacts"
             echo
             find release-assets -maxdepth 2 -type f -print | sort | sed 's#^release-assets/#- #'
-            echo
-            echo "Tagged releases can include the full Windows Code - OSS desktop package when the Code - OSS packaging job is enabled or the tag workflow runs with a configured fork."
           } > release-notes.md
 
       - name: Publish release
