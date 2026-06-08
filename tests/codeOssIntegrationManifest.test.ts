@@ -38,6 +38,10 @@ describe('Code - OSS integration manifest', () => {
     expect(template).toContain('ITextFileService');
     expect(template).toContain('IMarkerService');
     expect(template).toContain('ICodeEditorService');
+    expect(template).toContain('ITerminalService');
+    expect(template).toContain('ISCMService');
+    expect(template).toContain('terminalService: this.terminalService');
+    expect(template).toContain('scmService: this.scmService');
     expect(template).toContain('localResourceRoots');
     expect(template).toContain('__GOMI_ENABLE_WORKBENCH_BRIDGE__');
     expect(template).toContain('assets/index.js');

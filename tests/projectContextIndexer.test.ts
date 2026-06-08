@@ -19,6 +19,24 @@ const workspace: GomiWorkspaceSnapshot = {
       content: 'export function loginController() { return validateUserSession(); }',
       language: 'typescript',
       source: 'open_editor'
+    },
+    {
+      filePath: 'Terminal: npm test',
+      content: 'npm test\nPASS login.spec.ts',
+      language: 'text',
+      source: 'terminal'
+    },
+    {
+      filePath: 'src/api/login.ts',
+      content: 'diff --git a/src/api/login.ts b/src/api/login.ts\n-export const ok = false;\n+export const ok = true;',
+      language: 'diff',
+      source: 'git_diff'
+    },
+    {
+      filePath: 'Code - OSS Error Log',
+      content: 'Extension host warning: failed to activate demo extension.',
+      language: 'text',
+      source: 'error_log'
     }
   ]
 };
@@ -29,6 +47,9 @@ describe('project context indexer', () => {
 
     expect(chunks.some((chunk) => chunk.id === 'context:workspace:file-tree')).toBe(true);
     expect(chunks.some((chunk) => chunk.sourcePath === 'src/api/login.ts')).toBe(true);
+    expect(chunks.some((chunk) => chunk.id === 'context:terminal:Terminal: npm test:0')).toBe(true);
+    expect(chunks.some((chunk) => chunk.id === 'context:git_diff:src/api/login.ts:0')).toBe(true);
+    expect(chunks.some((chunk) => chunk.id === 'context:error_log:Code - OSS Error Log:0')).toBe(true);
   });
 
   it('indexes chunks into lexical and vector memory stores', async () => {

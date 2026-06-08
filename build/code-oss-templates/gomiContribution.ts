@@ -38,6 +38,8 @@ import {
 } from '../../webview/browser/webview.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { ITextFileService } from '../../../services/textfile/common/textfiles.js';
+import { ITerminalService } from '../../terminal/browser/terminal.js';
+import { ISCMService } from '../../scm/common/scm.js';
 import {
   applyCodeOssPatchMessage,
   createCodeOssWorkspaceSnapshotReader
@@ -82,7 +84,9 @@ class GomiOfficeViewPane extends ViewPane {
     @IEditorService private readonly editorService: IEditorService,
     @ITextFileService private readonly textFileService: ITextFileService,
     @IMarkerService private readonly markerService: IMarkerService,
-    @ICodeEditorService private readonly codeEditorService: ICodeEditorService
+    @ICodeEditorService private readonly codeEditorService: ICodeEditorService,
+    @ITerminalService private readonly terminalService: ITerminalService,
+    @ISCMService private readonly scmService: ISCMService
   ) {
     super(
       { ...options, titleMenuId: MenuId.ViewTitle, showActions: ViewPaneShowActions.WhenExpanded },
@@ -157,6 +161,8 @@ class GomiOfficeViewPane extends ViewPane {
       codeEditorService: this.codeEditorService,
       textFileService: this.textFileService,
       markerService: this.markerService,
+      terminalService: this.terminalService,
+      scmService: this.scmService,
       basename,
       dirname,
       joinPath,

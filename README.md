@@ -59,7 +59,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Agent communication policy** that keeps routine updates in memory and only broadcasts important findings.
 - **Hybrid project memory** using lexical search plus vector-style retrieval.
 - **Persistent workspace memory storage** for lexical and vector records under `.gomi-ide/memory`.
-- **Project context indexing** for file tree, manifests, open editor snippets, selected code, terminal output, diagnostics, and git diff input shapes.
+- **Project context indexing** for file tree, manifests, open editor snippets, selected code, terminal output, diagnostics, SCM/git diff previews, and optional error logs.
 - **Patch review workflow** with diff preview, approve/reject controls, and apply gating.
 - **Safe node-side patch application core** for approved unified diffs inside the workspace root.
 - **Runtime events** for session lifecycle, messages, task updates, agent results, patch proposals, and final reports.
@@ -314,7 +314,7 @@ Implemented in this repository:
 - Generated webview asset path for mounting the React/Phaser office bundle inside the native pane.
 - Optional webview bridge client with deterministic demo fallback when no native host is attached.
 - Native webview host bridge/controller path for run-message handling and runtime event streaming.
-- Code - OSS workspace services adapter for native workspace folders, open editors, selected code, diagnostics, text snippets, and approved patch application.
+- Code - OSS workspace services adapter for native workspace folders, open editors, selected code, diagnostics, terminal output, SCM/git diff previews, optional error logs, text snippets, and approved patch application.
 - Agent provider contract with a demo provider.
 - Node-side CLI provider router with command execution, JSON/plain-text output mapping, and demo fallback.
 - Hybrid project memory with lexical and vector-style retrieval.
@@ -332,7 +332,8 @@ Not yet implemented:
 
 - Full upstream Code - OSS source integration.
 - Validating the React/Phaser webview mount inside a real Code - OSS checkout.
-- Terminal transcript, SCM/git diff, and error-log service capture in the native adapter.
+- Durable terminal scrollback capture beyond the selected/current exposed terminal text.
+- Native output-channel/log-service integration beyond the current optional error-log provider hook.
 - Real Code - OSS diff editor preview before patch apply.
 - Production LLM API provider.
 - Production local model provider.
@@ -382,7 +383,7 @@ The current verification suite covers:
 - Task planner output.
 - Patch approval state transitions.
 - Safe patch application and workspace path containment.
-- Code - OSS workspace service adaptation, selected code capture, diagnostics capture, and approved native patch application path.
+- Code - OSS workspace service adaptation, selected code capture, diagnostics capture, terminal output capture, SCM/git diff previews, optional error-log capture, and approved native patch application path.
 - Workbench bridge controller message routing.
 - Persistent lexical and vector memory storage.
 - Node workspace context reading.
@@ -419,7 +420,7 @@ Recommended next milestones:
 2. Complete Gomi branding assets across Windows, macOS, and Linux.
 3. Add provider adapters for OpenAI-compatible APIs and local model runtimes.
 4. Add persistent memory using SQLite and optional vector database support.
-5. Extend native workspace context: terminal output, SCM/git diff, and error logs.
+5. Deepen native workspace context with durable terminal scrollback and workbench log/output-channel readers.
 6. Add workbench diff editor preview before approved patch application.
 7. Add settings for model provider, privacy mode, memory retention, and approval policy.
 8. Add packaging, signing, update channel, and release automation.

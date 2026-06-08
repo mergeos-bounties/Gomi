@@ -67,6 +67,17 @@ export interface GomiCodeOssWorkspaceServices {
   markerService?: {
     read(filter?: unknown): GomiCodeOssMarker[];
   };
+  terminalService?: {
+    activeInstance?: GomiCodeOssTerminalInstance;
+    instances?: readonly GomiCodeOssTerminalInstance[];
+  };
+  scmService?: {
+    repositories?: Iterable<GomiCodeOssScmRepository>;
+    repositoryCount?: number;
+  };
+  errorLogService?: {
+    getRecentErrorLog?: () => string | undefined;
+  };
   basename?: (resource: GomiCodeOssUri) => string;
   dirname?: (resource: GomiCodeOssUri) => GomiCodeOssUri;
   joinPath?: (resource: GomiCodeOssUri, ...paths: string[]) => GomiCodeOssUri;
@@ -80,6 +91,10 @@ export interface GomiCodeOssWorkspaceOptions {
   maxSnippetLength?: number;
   maxDiagnostics?: number;
   maxSelectionLength?: number;
+  maxTerminalOutputLength?: number;
+  maxGitDiffFiles?: number;
+  maxGitDiffLength?: number;
+  maxErrorLogLength?: number;
 }
 
 interface GomiCodeOssEditorInput {
@@ -129,13 +144,63 @@ interface GomiCodeOssMarker {
   endColumn?: number;
 }
 
+interface GomiCodeOssTerminalInstance {
+  title?: string;
+  shellType?: string;
+  cwd?: string | GomiCodeOssUri;
+  selection?: string;
+  hasSelection?: () => boolean;
+  getCommandAndOutputAsText?: () => string | undefined;
+  serialize?: () => string | undefined;
+}
+
+interface GomiCodeOssScmRepository {
+  id?: string;
+  provider: GomiCodeOssScmProvider;
+}
+
+interface GomiCodeOssScmProvider {
+  id?: string;
+  providerId?: string;
+  label?: string;
+  name?: string;
+  rootUri?: GomiCodeOssUri;
+  groups?: readonly GomiCodeOssScmResourceGroup[];
+  getOriginalResource?: (uri: GomiCodeOssUri) => Promise<GomiCodeOssUri | null | undefined>;
+}
+
+interface GomiCodeOssScmResourceGroup {
+  id?: string;
+  label?: string;
+  resources?: readonly GomiCodeOssScmResource[];
+}
+
+interface GomiCodeOssScmResource {
+  sourceUri: GomiCodeOssUri;
+  decorations?: {
+    tooltip?: string;
+  };
+  contextValue?: string;
+  multiDiffEditorOriginalUri?: GomiCodeOssUri;
+  multiDiffEditorModifiedUri?: GomiCodeOssUri;
+}
+
+interface GomiScmContextResult {
+  summary: string;
+  snippets: GomiWorkspaceContentSnippet[];
+}
+
 const DEFAULT_WORKSPACE_OPTIONS: Required<GomiCodeOssWorkspaceOptions> = {
   maxFiles: 220,
   maxDepth: 5,
   maxSnippets: 14,
   maxSnippetLength: 2600,
   maxDiagnostics: 12,
-  maxSelectionLength: 2600
+  maxSelectionLength: 2600,
+  maxTerminalOutputLength: 2600,
+  maxGitDiffFiles: 4,
+  maxGitDiffLength: 4200,
+  maxErrorLogLength: 2600
 };
 
 const IGNORED_PATH_SEGMENTS = new Set([
@@ -175,26 +240,25 @@ export function createCodeOssWorkspaceSnapshotReader(
   services: GomiCodeOssWorkspaceServices,
   options: GomiCodeOssWorkspaceOptions = {}
 ): GomiWorkspaceSnapshotReader {
-  const resolvedOptions = {
-    ...DEFAULT_WORKSPACE_OPTIONS,
-    ...options
-  };
-
-  return async () => readCodeOssWorkspaceSnapshot(services, resolvedOptions);
+  return async () => readCodeOssWorkspaceSnapshot(services, options);
 }
 
 export async function readCodeOssWorkspaceSnapshot(
   services: GomiCodeOssWorkspaceServices,
-  options: Required<GomiCodeOssWorkspaceOptions> = DEFAULT_WORKSPACE_OPTIONS
+  options: GomiCodeOssWorkspaceOptions = {}
 ): Promise<GomiWorkspaceSnapshot> {
+  const resolvedOptions = {
+    ...DEFAULT_WORKSPACE_OPTIONS,
+    ...options
+  };
   const workspace = services.workspaceContextService.getWorkspace();
   const folders = workspace.folders ?? [];
   const rootName = workspace.name ?? (folders.map((folder) => folder.name).join(', ') || 'Gomi Workspace');
   const files: string[] = [];
 
   for (const folder of folders) {
-    await collectWorkspaceFiles(services, folder, folder.uri, '', files, options);
-    if (files.length >= options.maxFiles) {
+    await collectWorkspaceFiles(services, folder, folder.uri, '', files, resolvedOptions);
+    if (files.length >= resolvedOptions.maxFiles) {
       break;
     }
   }
@@ -203,26 +267,40 @@ export async function readCodeOssWorkspaceSnapshot(
   const openEditors = uniqueStrings(
     openEditorResources.map((resource) => toWorkspaceRelativePath(services, folders, resource)).filter(Boolean)
   );
-  const selectionSnippets = collectSelectionSnippets(services, folders, options);
-  const diagnosticSnippets = collectDiagnosticSnippets(services, folders, options);
-  const snippetBudget = Math.max(0, options.maxSnippets - selectionSnippets.length - diagnosticSnippets.length);
+  const selectionSnippets = collectSelectionSnippets(services, folders, resolvedOptions);
+  const diagnosticSnippets = collectDiagnosticSnippets(services, folders, resolvedOptions);
+  const terminalSnippets = collectTerminalSnippets(services, resolvedOptions);
+  const scmContext = await collectScmContext(services, folders, resolvedOptions);
+  const errorLogSnippets = collectErrorLogSnippets(services, resolvedOptions);
+  const snippetBudget = Math.max(
+    0,
+    resolvedOptions.maxSnippets -
+      selectionSnippets.length -
+      diagnosticSnippets.length -
+      terminalSnippets.length -
+      scmContext.snippets.length -
+      errorLogSnippets.length
+  );
   const snippetResources = pickSnippetResources(services, folders, files, openEditorResources, {
-    ...options,
+    ...resolvedOptions,
     maxSnippets: snippetBudget
   });
-  const contentSnippets = await readWorkspaceContentSnippets(services, folders, snippetResources, options);
+  const contentSnippets = await readWorkspaceContentSnippets(services, folders, snippetResources, resolvedOptions);
   const allContentSnippets = [
     ...selectionSnippets,
     ...diagnosticSnippets,
+    ...terminalSnippets,
+    ...scmContext.snippets,
+    ...errorLogSnippets,
     ...contentSnippets
-  ].slice(0, options.maxSnippets);
+  ].slice(0, resolvedOptions.maxSnippets);
 
   return {
     rootName,
-    files: files.slice(0, options.maxFiles),
+    files: files.slice(0, resolvedOptions.maxFiles),
     openEditors,
-    gitSummary: `Native Code - OSS workspace: ${folders.length} folder(s). SCM diff service is not attached yet.`,
-    terminalSummary: `Indexed through Code - OSS workspace, editor, marker, file, and text-file services. ${selectionSnippets.length} selection snippet(s), ${diagnosticSnippets.length} diagnostic snippet(s), ${contentSnippets.length} file snippet(s) loaded.`,
+    gitSummary: scmContext.summary,
+    terminalSummary: `Indexed through Code - OSS workspace, editor, marker, terminal, SCM, file, and text-file services. ${selectionSnippets.length} selection snippet(s), ${diagnosticSnippets.length} diagnostic snippet(s), ${terminalSnippets.length} terminal snippet(s), ${scmContext.snippets.length} git diff snippet(s), ${errorLogSnippets.length} error-log snippet(s), ${contentSnippets.length} file snippet(s) loaded.`,
     contentSnippets: allContentSnippets
   };
 }
@@ -350,9 +428,10 @@ async function collectWorkspaceFiles(
 
 function collectOpenEditorResources(services: GomiCodeOssWorkspaceServices): GomiCodeOssUri[] {
   const editorService = services.editorService;
+  const activeModelResource = getActiveTextEditorControl(services)?.getModel?.()?.uri;
 
   if (!editorService) {
-    return [];
+    return uniqueResources([activeModelResource].filter(Boolean) as GomiCodeOssUri[]);
   }
 
   const editors = [
@@ -366,8 +445,6 @@ function collectOpenEditorResources(services: GomiCodeOssWorkspaceServices): Gom
     editor.modified?.resource,
     editor.original?.resource
   ]);
-  const activeModelResource = getActiveTextEditorControl(services)?.getModel?.()?.uri;
-
   return uniqueResources([...resources, activeModelResource].filter(Boolean) as GomiCodeOssUri[]);
 }
 
@@ -455,6 +532,140 @@ function collectDiagnosticSnippets(
       content: lines.join('\n'),
       language: 'text',
       source: 'diagnostic'
+    }
+  ];
+}
+
+function collectTerminalSnippets(
+  services: GomiCodeOssWorkspaceServices,
+  options: Required<GomiCodeOssWorkspaceOptions>
+): GomiWorkspaceContentSnippet[] {
+  const terminal = services.terminalService?.activeInstance ?? services.terminalService?.instances?.[0];
+
+  if (!terminal) {
+    return [];
+  }
+
+  const transcript = terminal.getCommandAndOutputAsText?.() ?? terminal.serialize?.() ?? terminal.selection ?? '';
+
+  if (!transcript.trim()) {
+    return [];
+  }
+
+  const title = terminal.title ? `Terminal: ${terminal.title}` : 'Terminal';
+  const cwd = typeof terminal.cwd === 'string' ? terminal.cwd : terminal.cwd?.fsPath ?? terminal.cwd?.path;
+
+  return [
+    {
+      filePath: title,
+      content: [
+        cwd ? `cwd: ${cwd}` : undefined,
+        terminal.shellType ? `shell: ${terminal.shellType}` : undefined,
+        terminal.hasSelection?.() ? 'source: selected terminal text' : 'source: terminal transcript',
+        transcript.slice(0, options.maxTerminalOutputLength)
+      ].filter(Boolean).join('\n'),
+      language: 'text',
+      source: 'terminal'
+    }
+  ];
+}
+
+async function collectScmContext(
+  services: GomiCodeOssWorkspaceServices,
+  folders: GomiCodeOssWorkspaceFolder[],
+  options: Required<GomiCodeOssWorkspaceOptions>
+): Promise<GomiScmContextResult> {
+  const repositories = Array.from(services.scmService?.repositories ?? []);
+
+  if (repositories.length === 0) {
+    return {
+      summary: `Native Code - OSS workspace: ${folders.length} folder(s). No SCM repository is attached yet.`,
+      snippets: []
+    };
+  }
+
+  const changedResources: string[] = [];
+  const snippets: GomiWorkspaceContentSnippet[] = [];
+
+  for (const repository of repositories) {
+    const provider = repository.provider;
+    const repositoryLabel = provider.label ?? provider.name ?? provider.providerId ?? provider.id ?? repository.id ?? 'SCM';
+
+    for (const group of provider.groups ?? []) {
+      for (const resource of group.resources ?? []) {
+        const relativePath = toWorkspaceRelativePathOrUndefined(services, folders, resource.sourceUri);
+
+        if (!relativePath) {
+          continue;
+        }
+
+        const groupLabel = group.label ?? group.id ?? 'Changes';
+        const decoration = resource.decorations?.tooltip ?? resource.contextValue;
+        changedResources.push(`${repositoryLabel} ${groupLabel}: ${relativePath}${decoration ? ` (${decoration})` : ''}`);
+
+        if (snippets.length >= options.maxGitDiffFiles) {
+          continue;
+        }
+
+        const diff = await readScmDiffPreview(services, provider, resource, relativePath, options);
+
+        if (diff) {
+          snippets.push({
+            filePath: relativePath,
+            content: diff,
+            language: 'diff',
+            source: 'git_diff'
+          });
+        }
+      }
+    }
+  }
+
+  return {
+    summary:
+      changedResources.length > 0
+        ? changedResources.slice(0, 24).join('\n')
+        : `Native Code - OSS workspace: ${folders.length} folder(s). ${repositories.length} SCM repository/repositories attached, no changed resource exposed.`,
+    snippets
+  };
+}
+
+async function readScmDiffPreview(
+  services: GomiCodeOssWorkspaceServices,
+  provider: GomiCodeOssScmProvider,
+  resource: GomiCodeOssScmResource,
+  relativePath: string,
+  options: Required<GomiCodeOssWorkspaceOptions>
+): Promise<string | undefined> {
+  try {
+    const modifiedResource = resource.multiDiffEditorModifiedUri ?? resource.sourceUri;
+    const originalResource =
+      resource.multiDiffEditorOriginalUri ?? (await provider.getOriginalResource?.(resource.sourceUri));
+    const modifiedContent = await readTextResource(services, modifiedResource);
+    const originalContent = originalResource ? await readTextResource(services, originalResource) : '';
+
+    return createDiffPreview(relativePath, originalContent, modifiedContent, options.maxGitDiffLength);
+  } catch {
+    return undefined;
+  }
+}
+
+function collectErrorLogSnippets(
+  services: GomiCodeOssWorkspaceServices,
+  options: Required<GomiCodeOssWorkspaceOptions>
+): GomiWorkspaceContentSnippet[] {
+  const recentLog = services.errorLogService?.getRecentErrorLog?.();
+
+  if (!recentLog?.trim()) {
+    return [];
+  }
+
+  return [
+    {
+      filePath: 'Code - OSS Error Log',
+      content: recentLog.slice(0, options.maxErrorLogLength),
+      language: 'text',
+      source: 'error_log'
     }
   ];
 }
@@ -778,6 +989,77 @@ function severityLabel(severity: number | undefined): string {
   }
 
   return 'diagnostic';
+}
+
+function createDiffPreview(
+  filePath: string,
+  originalContent: string,
+  modifiedContent: string,
+  maxLength: number
+): string {
+  const originalLines = splitPreviewLines(originalContent);
+  const modifiedLines = splitPreviewLines(modifiedContent);
+  let firstChangedIndex = 0;
+
+  while (
+    firstChangedIndex < originalLines.length &&
+    firstChangedIndex < modifiedLines.length &&
+    originalLines[firstChangedIndex] === modifiedLines[firstChangedIndex]
+  ) {
+    firstChangedIndex += 1;
+  }
+
+  if (firstChangedIndex === originalLines.length && firstChangedIndex === modifiedLines.length) {
+    return `diff --git a/${filePath} b/${filePath}\n# No text changes detected.`;
+  }
+
+  let originalChangeEnd = originalLines.length;
+  let modifiedChangeEnd = modifiedLines.length;
+
+  while (
+    originalChangeEnd > firstChangedIndex &&
+    modifiedChangeEnd > firstChangedIndex &&
+    originalLines[originalChangeEnd - 1] === modifiedLines[modifiedChangeEnd - 1]
+  ) {
+    originalChangeEnd -= 1;
+    modifiedChangeEnd -= 1;
+  }
+
+  const contextStart = Math.max(0, firstChangedIndex - 3);
+  const contextEndOriginal = Math.min(originalLines.length, originalChangeEnd + 3);
+  const contextEndModified = Math.min(modifiedLines.length, modifiedChangeEnd + 3);
+  const previewLines = [
+    `diff --git a/${filePath} b/${filePath}`,
+    `--- a/${filePath}`,
+    `+++ b/${filePath}`,
+    `@@ -${contextStart + 1},${contextEndOriginal - contextStart} +${contextStart + 1},${contextEndModified - contextStart} @@`
+  ];
+
+  for (let index = contextStart; index < firstChangedIndex; index += 1) {
+    previewLines.push(` ${originalLines[index] ?? ''}`);
+  }
+
+  for (let index = firstChangedIndex; index < originalChangeEnd; index += 1) {
+    previewLines.push(`-${originalLines[index] ?? ''}`);
+  }
+
+  for (let index = firstChangedIndex; index < modifiedChangeEnd; index += 1) {
+    previewLines.push(`+${modifiedLines[index] ?? ''}`);
+  }
+
+  for (let index = originalChangeEnd; index < contextEndOriginal; index += 1) {
+    previewLines.push(` ${originalLines[index] ?? ''}`);
+  }
+
+  return previewLines.join('\n').slice(0, maxLength);
+}
+
+function splitPreviewLines(value: string): string[] {
+  if (!value) {
+    return [];
+  }
+
+  return value.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n');
 }
 
 function assertSafeWorkspacePath(value: string): void {

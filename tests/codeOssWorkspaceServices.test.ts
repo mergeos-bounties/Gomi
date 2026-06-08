@@ -92,6 +92,119 @@ describe('Code - OSS workspace services adapter', () => {
     expect(snapshot.terminalSummary).toContain('1 selection snippet(s), 1 diagnostic snippet(s)');
   });
 
+  it('captures terminal output, SCM diff previews, and error-log context', async () => {
+    const services = createFakeCodeOssServices({
+      'src/login.ts': 'export const ok = true;\n',
+      'package.json': '{"scripts":{"test":"vitest"}}'
+    });
+    services.readFileMap().set('/original/src/login.ts', 'export const ok = false;\n');
+    services.terminalService = {
+      activeInstance: {
+        title: 'npm test',
+        shellType: 'pwsh',
+        cwd: 'D:/repo/gomi',
+        hasSelection: () => false,
+        getCommandAndOutputAsText: () => 'npm test\nPASS login.spec.ts\n'
+      }
+    };
+    services.scmService = {
+      repositories: [
+        {
+          id: 'repo-1',
+          provider: {
+            id: 'git',
+            providerId: 'git',
+            label: 'Git',
+            name: 'Git',
+            groups: [
+              {
+                id: 'changes',
+                label: 'Changes',
+                resources: [
+                  {
+                    sourceUri: new FakeUri('/workspace/src/login.ts'),
+                    decorations: {
+                      tooltip: 'Modified'
+                    },
+                    contextValue: 'modified',
+                    multiDiffEditorOriginalUri: new FakeUri('/original/src/login.ts')
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    };
+    services.errorLogService = {
+      getRecentErrorLog: () => 'Extension host warning: failed to activate demo extension.'
+    };
+
+    const snapshot = await readCodeOssWorkspaceSnapshot(services, {
+      maxFiles: 10,
+      maxDepth: 3,
+      maxSnippets: 8,
+      maxSnippetLength: 500
+    });
+    const terminalSnippet = snapshot.contentSnippets?.find((snippet) => snippet.source === 'terminal');
+    const gitSnippet = snapshot.contentSnippets?.find((snippet) => snippet.source === 'git_diff');
+    const errorLogSnippet = snapshot.contentSnippets?.find((snippet) => snippet.source === 'error_log');
+
+    expect(terminalSnippet?.filePath).toBe('Terminal: npm test');
+    expect(terminalSnippet?.content).toContain('PASS login.spec.ts');
+    expect(snapshot.gitSummary).toContain('Git Changes: src/login.ts (Modified)');
+    expect(gitSnippet?.content).toContain('diff --git a/src/login.ts b/src/login.ts');
+    expect(gitSnippet?.content).toContain('-export const ok = false;');
+    expect(gitSnippet?.content).toContain('+export const ok = true;');
+    expect(errorLogSnippet).toMatchObject({
+      filePath: 'Code - OSS Error Log',
+      source: 'error_log'
+    });
+    expect(errorLogSnippet?.content).toContain('failed to activate demo extension');
+    expect(snapshot.terminalSummary).toContain('1 terminal snippet(s), 1 git diff snippet(s), 1 error-log snippet(s)');
+  });
+
+  it('keeps SCM summaries when original resources cannot be read', async () => {
+    const services = createFakeCodeOssServices({
+      'src/login.ts': 'export const ok = true;\n'
+    });
+    services.scmService = {
+      repositories: [
+        {
+          provider: {
+            label: 'Git',
+            groups: [
+              {
+                label: 'Changes',
+                resources: [
+                  {
+                    sourceUri: new FakeUri('/workspace/src/login.ts'),
+                    decorations: {
+                      tooltip: 'Modified'
+                    }
+                  }
+                ]
+              }
+            ],
+            getOriginalResource: async () => {
+              throw new Error('original resource is unavailable');
+            }
+          }
+        }
+      ]
+    };
+
+    const snapshot = await readCodeOssWorkspaceSnapshot(services, {
+      maxFiles: 10,
+      maxDepth: 3,
+      maxSnippets: 6,
+      maxSnippetLength: 500
+    });
+
+    expect(snapshot.gitSummary).toContain('Git Changes: src/login.ts (Modified)');
+    expect(snapshot.contentSnippets?.some((snippet) => snippet.source === 'git_diff')).toBe(false);
+  });
+
   it('applies approved unified diffs through text-file services', async () => {
     const services = createFakeCodeOssServices({
       'src/login.ts': 'export const ok = false;\n'

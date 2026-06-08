@@ -123,4 +123,4 @@ VS Code's Windows setup path uses Inno Setup. MSI is not the primary upstream pa
 
 ## Current Limitation
 
-This repository is still a Gomi product foundation and module scaffold. A full release requires validating the native workbench contribution inside a real Code - OSS fork, extending native context capture for terminal output, SCM/git diff, and error logs, adding a workbench diff preview before approved patch application, and replacing all final branding assets.
+This repository is still a Gomi product foundation and module scaffold. A full release requires validating the native workbench contribution inside a real Code - OSS fork, deepening terminal scrollback and workbench log/output-channel readers beyond the current adapter hooks, adding a workbench diff preview before approved patch application, and replacing all final branding assets.

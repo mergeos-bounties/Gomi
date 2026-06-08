@@ -135,7 +135,7 @@ export interface GomiWorkspaceContentSnippet {
   filePath: string;
   content: string;
   language?: string;
-  source: 'workspace' | 'open_editor' | 'selection' | 'terminal' | 'diagnostic' | 'git_diff';
+  source: 'workspace' | 'open_editor' | 'selection' | 'terminal' | 'diagnostic' | 'error_log' | 'git_diff';
 }
 
 export interface GomiAgentResult {
