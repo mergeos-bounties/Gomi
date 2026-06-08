@@ -1,6 +1,11 @@
-import { readFile } from 'node:fs/promises';
+import { execFile as execFileCallback } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
+
+const execFile = promisify(execFileCallback);
 
 describe('Code - OSS integration manifest', () => {
   it('overlays a native Gomi workbench registration template', async () => {
@@ -51,5 +56,75 @@ describe('Code - OSS integration manifest', () => {
     expect(template).toContain('assets/index.css');
     expect(template).toContain('workbench.view.gomiOffice');
     expect(template).toContain('gomi.office.view');
+  });
+
+  it.runIf(process.platform === 'win32')('merges Gomi product branding without dropping upstream packaging keys', async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'gomi-code-oss-'));
+    const codeOssRoot = path.join(tempRoot, 'code-oss');
+
+    try {
+      await mkdir(path.join(codeOssRoot, 'src', 'vs', 'workbench'), { recursive: true });
+      await writeFile(path.join(codeOssRoot, 'package.json'), '{"name":"code-oss-stub"}\n');
+      await writeFile(
+        path.join(codeOssRoot, 'product.json'),
+        JSON.stringify(
+          {
+            nameShort: 'Code - OSS',
+            nameLong: 'Code - OSS',
+            applicationName: 'code-oss',
+            dataFolderName: '.vscode-oss',
+            upstreamOnlyPackagingKey: 'keep-me',
+            extensionsGallery: {
+              serviceUrl: 'https://marketplace.visualstudio.com/_apis/public/gallery',
+              itemUrl: 'https://marketplace.visualstudio.com/items',
+              resourceUrlTemplate: 'https://example.test/resource/{publisher}/{name}'
+            }
+          },
+          null,
+          2
+        )
+      );
+      await writeFile(
+        path.join(codeOssRoot, 'src', 'vs', 'workbench', 'workbench.common.main.ts'),
+        "import 'vs/workbench/contrib/files/browser/files.contribution';\n"
+      );
+
+      await execFile('powershell.exe', [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        path.join(process.cwd(), 'scripts', 'apply-gomi-code-oss-integration.ps1'),
+        '-CodeOssRoot',
+        codeOssRoot
+      ]);
+
+      const product = JSON.parse(await readFile(path.join(codeOssRoot, 'product.json'), 'utf8')) as {
+        nameShort?: string;
+        nameLong?: string;
+        applicationName?: string;
+        upstreamOnlyPackagingKey?: string;
+        extensionsGallery?: {
+          serviceUrl?: string;
+          itemUrl?: string;
+          resourceUrlTemplate?: string;
+        };
+      };
+      const workbenchMain = await readFile(
+        path.join(codeOssRoot, 'src', 'vs', 'workbench', 'workbench.common.main.ts'),
+        'utf8'
+      );
+
+      expect(product.nameShort).toBe('Gomi');
+      expect(product.nameLong).toBe('Gomi IDE');
+      expect(product.applicationName).toBe('gomi-ide');
+      expect(product.upstreamOnlyPackagingKey).toBe('keep-me');
+      expect(product.extensionsGallery?.serviceUrl).toBe('https://open-vsx.org/vscode/gallery');
+      expect(product.extensionsGallery?.itemUrl).toBe('https://open-vsx.org/vscode/item');
+      expect(product.extensionsGallery?.resourceUrlTemplate).toBe('https://example.test/resource/{publisher}/{name}');
+      expect(workbenchMain).toContain("import 'vs/workbench/contrib/gomi/browser/gomiContribution';");
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 });

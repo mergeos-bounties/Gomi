@@ -4,7 +4,8 @@
   "description": "Code - OSS integration manifest for Gomi Office IDE.",
   "productJson": {
     "source": "product.json",
-    "target": "product.json"
+    "target": "product.json",
+    "mode": "merge"
   },
   "moduleCopies": [
     {

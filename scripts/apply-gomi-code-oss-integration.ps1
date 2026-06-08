@@ -50,6 +50,67 @@ function Copy-GomiIntegrationItem {
   Copy-Item -LiteralPath $Source -Destination $Destination -Force -Recurse
 }
 
+function Merge-GomiJsonObject {
+  param(
+    [Parameter(Mandatory = $true)]
+    [pscustomobject]$Base,
+
+    [Parameter(Mandatory = $true)]
+    [pscustomobject]$Overlay
+  )
+
+  foreach ($property in $Overlay.PSObject.Properties) {
+    $baseProperty = $Base.PSObject.Properties[$property.Name]
+
+    if (
+      $baseProperty -and
+      $baseProperty.Value -is [pscustomobject] -and
+      $property.Value -is [pscustomobject]
+    ) {
+      Merge-GomiJsonObject -Base $baseProperty.Value -Overlay $property.Value
+      continue
+    }
+
+    if ($baseProperty) {
+      $baseProperty.Value = $property.Value
+    } else {
+      $Base | Add-Member -MemberType NoteProperty -Name $property.Name -Value $property.Value
+    }
+  }
+}
+
+function Set-GomiProductJson {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Source,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Destination,
+
+    [string]$Mode = 'copy'
+  )
+
+  if ($Mode -eq 'merge') {
+    Write-Host "Merge product metadata $Source -> $Destination" -ForegroundColor DarkCyan
+  } else {
+    Copy-GomiIntegrationItem -Source $Source -Destination $Destination
+    return
+  }
+
+  if ($ValidateOnly -or $DryRun) {
+    return
+  }
+
+  $baseProduct = Get-Content -LiteralPath $Destination -Raw | ConvertFrom-Json
+  $overlayProduct = Get-Content -LiteralPath $Source -Raw | ConvertFrom-Json
+
+  Merge-GomiJsonObject -Base $baseProduct -Overlay $overlayProduct
+
+  $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+  $productJson = $baseProduct | ConvertTo-Json -Depth 64
+  [System.IO.File]::WriteAllText($Destination, "$productJson`n", $utf8NoBom)
+}
+
 function Add-GomiWorkbenchImport {
   param(
     [Parameter(Mandatory = $true)]
@@ -105,7 +166,7 @@ Write-Host "Dry run: $($DryRun.IsPresent)" -ForegroundColor Green
 
 $productSource = Resolve-GomiPath -PathValue (Join-Path $repoRoot $manifest.productJson.source) -Description 'Gomi product.json'
 $productTarget = Join-Path $codeRoot $manifest.productJson.target
-Copy-GomiIntegrationItem -Source $productSource -Destination $productTarget
+Set-GomiProductJson -Source $productSource -Destination $productTarget -Mode $manifest.productJson.mode
 
 foreach ($copy in $manifest.moduleCopies) {
   $source = Resolve-GomiPath -PathValue (Join-Path $repoRoot $copy.source) -Description 'Gomi module source'

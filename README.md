@@ -203,14 +203,14 @@ Gomi IDE should be released as a desktop artifact from a Code - OSS fork, not as
 This repository includes:
 
 - `.github/workflows/build-release.yml` for verification, versioned artifact upload, optional Code - OSS Windows packaging, release notes, and GitHub Releases.
-- `build/gomi-code-oss.integration.json` for declaring the Gomi files and workbench import to apply to a Code - OSS checkout.
+- `build/gomi-code-oss.integration.json` for declaring the Gomi files, product metadata overlay, resources, and workbench import to apply to a Code - OSS checkout.
 - `build/code-oss-templates/gomiContribution.ts` for overlaying the native Code - OSS view/container registration during fork integration.
 - `npm run build:webview` for generating the bundled Gomi Office webview assets copied into the Code - OSS workbench module.
 - `scripts/apply-gomi-code-oss-integration.ps1` for applying or validating Gomi branding/module integration against a Code - OSS fork.
 - `scripts/build-gomi-code-oss-windows.ps1` for local or CI packaging against a real Code - OSS fork.
 - `docs/windows-release.md` with the Windows build and release workflow.
 
-The prototype `npm` commands remain useful for developing and testing the Gomi Office module. The product distribution path is the Code - OSS packaging path: the packaging script applies Gomi metadata and workbench files to a Code - OSS checkout, then invokes the upstream gulp packaging tasks to produce a packaged Windows build and, when the fork exposes a compatible setup task, a setup `.exe`.
+The prototype `npm` commands remain useful for developing and testing the Gomi Office module. The product distribution path is the Code - OSS packaging path: the packaging script merges Gomi product metadata over the fork's existing `product.json`, applies Gomi workbench files, then invokes the upstream gulp packaging tasks to produce a packaged Windows build and, when the fork exposes a compatible setup task, a setup `.exe`.
 
 GitHub Actions release behavior:
 
@@ -300,7 +300,7 @@ scripts/
 
 Implemented in this repository:
 
-- Gomi product metadata.
+- Gomi product metadata with merge-safe Code - OSS overlay integration.
 - Workbench-compatible Gomi module skeleton.
 - React workbench shell.
 - Phaser 2D office simulation.

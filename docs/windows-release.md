@@ -60,7 +60,7 @@ To run the full Windows desktop packaging workflow:
 6. Choose `win32-x64`, `win32-arm64`, or `win32-ia32`.
 7. Enable `build_setup_exe` when the fork has a compatible Windows setup gulp task.
 
-The Windows packaging job runs `scripts/build-gomi-code-oss-windows.ps1`. That script validates the Code - OSS checkout, builds the Gomi Office React/Phaser webview bundle, applies `build/gomi-code-oss.integration.json`, copies Gomi branding/module files into the fork, overlays the native Gomi workbench registration template, copies the generated webview assets into the workbench module, appends the Gomi workbench import when needed, and then runs the Code - OSS gulp package task.
+The Windows packaging job runs `scripts/build-gomi-code-oss-windows.ps1`. That script validates the Code - OSS checkout, builds the Gomi Office React/Phaser webview bundle, applies `build/gomi-code-oss.integration.json`, merges Gomi product metadata over the fork's existing `product.json`, copies Gomi branding/module files into the fork, overlays the native Gomi workbench registration template, copies the generated webview assets into the workbench module, appends the Gomi workbench import when needed, and then runs the Code - OSS gulp package task.
 
 The workflow intentionally keeps the heavy Code - OSS packaging job separate from the normal `master` verification path. Normal pushes verify the Gomi module quickly. Tags or manual release runs produce desktop artifacts.
 
