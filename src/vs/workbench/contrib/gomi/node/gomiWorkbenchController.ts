@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { GomiWorkbenchBridge, GomiBridgeMessage } from '../electron-sandbox/gomiBridge';
-import type { GomiRuntimeEvent } from '../common/gomiTypes';
+import type { GomiOfficeSettings, GomiRuntimeEvent } from '../common/gomiTypes';
 import { GomiAgentRuntime, type GomiRuntimeOptions } from './agentRuntime';
 import {
   createNodeCliGomiAgentProvider,
@@ -41,7 +41,8 @@ export interface GomiWorkbenchControllerOptions {
 export class GomiWorkbenchController {
   private readonly bridge: GomiWorkbenchBridge;
   private readonly workspaceRoot: string;
-  private readonly runtime: GomiRuntimeRunner;
+  private readonly runtime?: GomiRuntimeRunner;
+  private readonly runtimeFactory: (officeSettings?: GomiOfficeSettings) => GomiRuntimeRunner;
   private readonly patchApplyOptions?: GomiPatchApplyOptions;
   private readonly applyPatch: NonNullable<GomiWorkbenchControllerOptions['applyPatch']>;
   private unsubscribe?: () => void;
@@ -50,13 +51,21 @@ export class GomiWorkbenchController {
   constructor(options: GomiWorkbenchControllerOptions) {
     this.bridge = options.bridge;
     this.workspaceRoot = options.workspaceRoot;
-    this.runtime =
-      options.runtime ??
-      createWorkbenchRuntime(options.workspaceRoot, options.memoryDirectory, options.runtimeOptions, {
-        enableCliAgentExecution: options.enableCliAgentExecution,
-        cliAgentCommandRunner: options.cliAgentCommandRunner,
-        cliAgentTimeoutMs: options.cliAgentTimeoutMs
-      });
+    this.runtime = options.runtime;
+    this.runtimeFactory = (officeSettings) =>
+      createWorkbenchRuntime(
+        options.workspaceRoot,
+        options.memoryDirectory,
+        {
+          ...options.runtimeOptions,
+          officeSettings: officeSettings ?? options.runtimeOptions?.officeSettings
+        },
+        {
+          enableCliAgentExecution: options.enableCliAgentExecution,
+          cliAgentCommandRunner: options.cliAgentCommandRunner,
+          cliAgentTimeoutMs: options.cliAgentTimeoutMs
+        }
+      );
     this.patchApplyOptions = options.patchApplyOptions;
     this.applyPatch =
       options.applyPatch ??
@@ -81,7 +90,7 @@ export class GomiWorkbenchController {
 
   async handleMessage(message: GomiBridgeMessage): Promise<void> {
     if (message.type === 'gomi.run') {
-      await this.runOfficeSession(message.request);
+      await this.runOfficeSession(message);
       return;
     }
 
@@ -90,7 +99,7 @@ export class GomiWorkbenchController {
     }
   }
 
-  private async runOfficeSession(request: string): Promise<void> {
+  private async runOfficeSession(message: Extract<GomiBridgeMessage, { type: 'gomi.run' }>): Promise<void> {
     if (this.isRunning) {
       this.bridge.postMessage({
         type: 'gomi.event',
@@ -111,7 +120,9 @@ export class GomiWorkbenchController {
     this.isRunning = true;
 
     try {
-      for await (const event of this.runtime.run(request)) {
+      const runtime = this.runtime ?? this.runtimeFactory(message.officeSettings);
+
+      for await (const event of runtime.run(message.request)) {
         this.bridge.postMessage({
           type: 'gomi.event',
           event

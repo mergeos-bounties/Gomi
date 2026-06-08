@@ -228,7 +228,7 @@ function createGomiOfficeWebviewHtml(): string {
     '</head>',
     '<body>',
     '<div id="root"></div>',
-    `<script nonce="${nonce}">window.__GOMI_CODE_OSS_WEBVIEW__ = true;</script>`,
+    `<script nonce="${nonce}">window.__GOMI_CODE_OSS_WEBVIEW__ = true; window.__GOMI_ENABLE_WORKBENCH_BRIDGE__ = false;</script>`,
     `<script nonce="${nonce}" type="module" src="${scriptUri}"></script>`,
     '</body>',
     '</html>'

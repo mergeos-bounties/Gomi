@@ -31,6 +31,7 @@ describe('Code - OSS integration manifest', () => {
     expect(template).toContain('registerViews');
     expect(template).toContain('createWebviewOverlay');
     expect(template).toContain('localResourceRoots');
+    expect(template).toContain('__GOMI_ENABLE_WORKBENCH_BRIDGE__');
     expect(template).toContain('assets/index.js');
     expect(template).toContain('assets/index.css');
     expect(template).toContain('workbench.view.gomiOffice');

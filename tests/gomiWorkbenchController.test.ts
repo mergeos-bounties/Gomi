@@ -4,6 +4,10 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { GomiBridgeMessage, GomiWorkbenchBridge } from '../src/vs/workbench/contrib/gomi/electron-sandbox/gomiBridge';
 import type { GomiPatchProposal } from '../src/vs/workbench/contrib/gomi/common/gomiTypes';
+import {
+  DEFAULT_GOMI_OFFICE_SETTINGS,
+  setSeatWorkMode
+} from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
 import { GomiAgentRuntime } from '../src/vs/workbench/contrib/gomi/node/agentRuntime';
 import type { GomiCliCommandInvocation } from '../src/vs/workbench/contrib/gomi/node/cliAgentProvider';
 import { GomiWorkbenchController } from '../src/vs/workbench/contrib/gomi/node/gomiWorkbenchController';
@@ -217,6 +221,41 @@ describe('GomiWorkbenchController', () => {
     expect(invocations.length).toBeGreaterThan(0);
     expect(invocations[0].executable).toBe('codex');
     expect(resultSummaries.some((summary) => summary.includes('via Codex CLI'))).toBe(true);
+  });
+
+  it('uses office settings from run messages for default runtime sessions', async () => {
+    const bridge = new MemoryWorkbenchBridge();
+    const controller = new GomiWorkbenchController({
+      bridge,
+      workspaceRoot,
+      runtimeOptions: {
+        delayMs: 0,
+        workspaceReader: () => ({
+          rootName: 'MessageSettingsWorkspace',
+          files: ['src/api/login.ts'],
+          openEditors: ['src/api/login.ts'],
+          gitSummary: 'Git branch master, 0 changed files.',
+          terminalSummary: 'npm test'
+        })
+      }
+    });
+
+    await controller.handleMessage({
+      type: 'gomi.run',
+      request: 'Build backend login API',
+      officeSettings: setSeatWorkMode(DEFAULT_GOMI_OFFICE_SETTINGS, 'head-backend', 'sleeping')
+    });
+
+    const backendResults = bridge.outbox
+      .filter((message): message is Extract<GomiBridgeMessage, { type: 'gomi.event' }> => message.type === 'gomi.event')
+      .filter((message) => message.event.type === 'agent_result')
+      .filter((message) => message.event.type === 'agent_result' && message.event.result.agentId === 'backend');
+    const sleepingBackendStatus = bridge.outbox
+      .filter((message): message is Extract<GomiBridgeMessage, { type: 'gomi.event' }> => message.type === 'gomi.event')
+      .some((message) => message.event.type === 'agent_status' && message.event.agentId === 'backend' && message.event.status === 'sleeping');
+
+    expect(sleepingBackendStatus).toBe(true);
+    expect(backendResults).toHaveLength(0);
   });
 });
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Bot,
   Braces,
@@ -50,6 +50,7 @@ import type {
   GomiChatMessage,
   GomiFinalReport,
   GomiOfficeSettings,
+  GomiRuntimeEvent,
   GomiTask,
   GomiWorkspaceSnapshot
 } from '../common/gomiTypes';
@@ -61,9 +62,11 @@ import {
   getDiffLineKind,
   markPatchApplied,
   markPatchApplying,
+  markPatchFailed,
   rejectPatchReview,
   type GomiPatchReviewState
 } from './gomiPatchApproval';
+import { resolveGomiWebviewBridge } from './gomiWebviewBridge';
 import { PhaserOffice } from './PhaserOffice';
 
 const activityItems = [
@@ -87,6 +90,7 @@ export function GomiOfficeApp() {
       }),
     [officeSettings]
   );
+  const workbenchBridge = useMemo(() => resolveGomiWebviewBridge(), []);
   const [request, setRequest] = useState(GOMI_SAMPLE_REQUEST);
   const [isRunning, setIsRunning] = useState(false);
   const [agents, setAgents] = useState<GomiAgent[]>(() =>
@@ -126,6 +130,36 @@ export function GomiOfficeApp() {
     officeFocus
   ].join(':');
 
+  useEffect(() => {
+    if (!workbenchBridge) {
+      return undefined;
+    }
+
+    return workbenchBridge.onMessage((message) => {
+      if (message.type === 'gomi.event') {
+        applyRuntimeEvent(message.event);
+
+        if (message.event.type === 'session_completed') {
+          setIsRunning(false);
+        }
+      }
+
+      if (message.type === 'gomi.applyPatchResult') {
+        setPatchReview((currentReview) => {
+          if (!currentReview || currentReview.patch.id !== message.patchId) {
+            return currentReview;
+          }
+
+          if (message.error) {
+            return markPatchFailed(currentReview, message.error);
+          }
+
+          return markPatchApplied(currentReview);
+        });
+      }
+    });
+  }, [workbenchBridge]);
+
   async function runOfficeSession() {
     const trimmedRequest = request.trim();
 
@@ -139,38 +173,20 @@ export function GomiOfficeApp() {
     setMessages([]);
     setReport(undefined);
     setPatchReview(undefined);
+    setWorkspace(undefined);
+
+    if (workbenchBridge) {
+      workbenchBridge.postMessage({
+        type: 'gomi.run',
+        request: trimmedRequest,
+        officeSettings
+      });
+      return;
+    }
 
     try {
       for await (const event of runtime.run(trimmedRequest)) {
-        if (event.type === 'session_started') {
-          setWorkspace(event.workspace);
-        }
-
-        if (event.type === 'agent_status') {
-          setAgents((currentAgents) =>
-            currentAgents.map((agent) =>
-              agent.id === event.agentId
-                ? { ...agent, status: event.status, currentTaskId: event.currentTaskId }
-                : agent
-            )
-          );
-        }
-
-        if (event.type === 'message') {
-          setMessages((currentMessages) => [...currentMessages, event.message]);
-        }
-
-        if (event.type === 'task_update') {
-          setTasks((currentTasks) => upsertTask(currentTasks, event.task));
-        }
-
-        if (event.type === 'patch') {
-          setPatchReview(createPatchReviewState(event.patch));
-        }
-
-        if (event.type === 'report') {
-          setReport(event.report);
-        }
+        applyRuntimeEvent(event);
       }
     } finally {
       setIsRunning(false);
@@ -195,8 +211,54 @@ export function GomiOfficeApp() {
         return currentReview;
       }
 
-      return markPatchApplied(markPatchApplying(currentReview));
+      const applyingReview = markPatchApplying(currentReview);
+
+      if (workbenchBridge) {
+        workbenchBridge.postMessage({
+          type: 'gomi.applyPatch',
+          patch: {
+            ...currentReview.patch,
+            approvalStatus: 'approved'
+          }
+        });
+
+        return applyingReview;
+      }
+
+      return markPatchApplied(applyingReview);
     });
+  }
+
+  function applyRuntimeEvent(event: GomiRuntimeEvent) {
+    if (event.type === 'session_started') {
+      setWorkspace(event.workspace);
+    }
+
+    if (event.type === 'agent_status') {
+      setAgents((currentAgents) =>
+        currentAgents.map((agent) =>
+          agent.id === event.agentId
+            ? { ...agent, status: event.status, currentTaskId: event.currentTaskId }
+            : agent
+        )
+      );
+    }
+
+    if (event.type === 'message') {
+      setMessages((currentMessages) => [...currentMessages, event.message]);
+    }
+
+    if (event.type === 'task_update') {
+      setTasks((currentTasks) => upsertTask(currentTasks, event.task));
+    }
+
+    if (event.type === 'patch') {
+      setPatchReview(createPatchReviewState(event.patch));
+    }
+
+    if (event.type === 'report') {
+      setReport(event.report);
+    }
   }
 
   function assignProvider(seatId: string, providerId: GomiAgentCliProviderId) {
@@ -330,7 +392,7 @@ export function GomiOfficeApp() {
       </div>
 
       <footer className="gomi-statusbar">
-        <span>Gomi Office Runtime</span>
+        <span>{workbenchBridge ? 'Gomi Workbench Bridge' : 'Gomi Demo Runtime'}</span>
         <span>{isRunning ? 'Agents working' : 'Ready'}</span>
       </footer>
     </div>

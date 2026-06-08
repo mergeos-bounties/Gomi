@@ -1,10 +1,11 @@
-import type { GomiPatchProposal, GomiRuntimeEvent } from '../common/gomiTypes';
+import type { GomiOfficeSettings, GomiPatchProposal, GomiRuntimeEvent } from '../common/gomiTypes';
 import type { GomiPatchApplyResult } from '../node/workspacePatchApplier';
 
 export type GomiBridgeMessage =
   | {
       type: 'gomi.run';
       request: string;
+      officeSettings?: GomiOfficeSettings;
     }
   | {
       type: 'gomi.event';
