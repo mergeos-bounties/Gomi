@@ -40,6 +40,7 @@ import {
   fireEmployee,
   getProviderLabel,
   getSeatForAgent,
+  setMemoryBroadcastThreshold,
   setSeatWorkMode
 } from '../common/gomiOfficeSettings';
 import type {
@@ -346,6 +347,12 @@ export function GomiOfficeApp() {
     setOfficeSettings((currentSettings) => setSeatWorkMode(currentSettings, seatId, 'active'));
   }
 
+  function updateBroadcastThreshold(broadcastThreshold: number) {
+    setOfficeSettings((currentSettings) =>
+      setMemoryBroadcastThreshold(currentSettings, broadcastThreshold)
+    );
+  }
+
   function setLayoutMode(mode: GomiOfficeViewMode) {
     setOfficeViewMode(mode);
 
@@ -503,6 +510,7 @@ export function GomiOfficeApp() {
           onToggleSeatSleep={toggleSeatSleep}
           onFireEmployee={fireOfficeEmployee}
           onRestoreEmployee={restoreOfficeEmployee}
+          onBroadcastThresholdChange={updateBroadcastThreshold}
         />
       </div>
 
@@ -594,7 +602,8 @@ function RightPanel({
   onProviderChange,
   onToggleSeatSleep,
   onFireEmployee,
-  onRestoreEmployee
+  onRestoreEmployee,
+  onBroadcastThresholdChange
 }: {
   agents: GomiAgent[];
   tasks: GomiTask[];
@@ -605,6 +614,7 @@ function RightPanel({
   onToggleSeatSleep: (seat: GomiAgentSeat) => void;
   onFireEmployee: (seatId: string) => void;
   onRestoreEmployee: (seatId: string) => void;
+  onBroadcastThresholdChange: (broadcastThreshold: number) => void;
 }) {
   return (
     <aside className="gomi-right-panel" aria-label="Agent Status Panel">
@@ -646,6 +656,7 @@ function RightPanel({
           onToggleSeatSleep={onToggleSeatSleep}
           onFireEmployee={onFireEmployee}
           onRestoreEmployee={onRestoreEmployee}
+          onBroadcastThresholdChange={onBroadcastThresholdChange}
         />
       </div>
     </aside>
@@ -692,7 +703,8 @@ function OfficeSettingsPanel({
   onProviderChange,
   onToggleSeatSleep,
   onFireEmployee,
-  onRestoreEmployee
+  onRestoreEmployee,
+  onBroadcastThresholdChange
 }: {
   officeSettings: GomiOfficeSettings;
   memoryItems: GomiMemoryBoardItem[];
@@ -700,6 +712,7 @@ function OfficeSettingsPanel({
   onToggleSeatSleep: (seat: GomiAgentSeat) => void;
   onFireEmployee: (seatId: string) => void;
   onRestoreEmployee: (seatId: string) => void;
+  onBroadcastThresholdChange: (broadcastThreshold: number) => void;
 }) {
   const leaders = officeSettings.seats.filter((seat) => seat.seatKind !== 'employee');
   const employees = officeSettings.seats.filter((seat) => seat.seatKind === 'employee');
@@ -787,6 +800,21 @@ function OfficeSettingsPanel({
           <span>{officeSettings.memory.retrievalMode}</span>
           <span>{`broadcast >= ${Math.round(officeSettings.memory.broadcastThreshold * 100)}%`}</span>
           <span>{officeSettings.memory.requirePatchApproval ? 'approval required' : 'auto apply allowed'}</span>
+        </div>
+        <label className="gomi-range-field">
+          <span>Broadcast threshold</span>
+          <input
+            type="range"
+            min={45}
+            max={95}
+            step={1}
+            value={Math.round(officeSettings.memory.broadcastThreshold * 100)}
+            onChange={(event) => onBroadcastThresholdChange(Number(event.target.value) / 100)}
+          />
+          <strong>{Math.round(officeSettings.memory.broadcastThreshold * 100)}%</strong>
+        </label>
+        <div className="gomi-seat-note">
+          Lower values make agents talk more often. Higher values keep routine findings on the shared memory board.
         </div>
         <MemoryBoardPanel memoryItems={memoryItems} />
       </div>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GOMI_OFFICE_SETTINGS,
+  setMemoryBroadcastThreshold,
   setSeatWorkMode
 } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
 import type {
@@ -46,13 +47,19 @@ describe('Gomi webview host controller', () => {
       }
     });
 
+    const officeSettings = setMemoryBroadcastThreshold(
+      setSeatWorkMode(DEFAULT_GOMI_OFFICE_SETTINGS, 'head-backend', 'sleeping'),
+      0.88
+    );
+
     await controller.handleMessage({
       type: 'gomi.run',
       request: 'Review login',
-      officeSettings: setSeatWorkMode(DEFAULT_GOMI_OFFICE_SETTINGS, 'head-backend', 'sleeping')
+      officeSettings
     });
 
     expect(seenSettings[0].seats.find((seat) => seat.id === 'head-backend')?.workMode).toBe('sleeping');
+    expect(seenSettings[0].memory.broadcastThreshold).toBe(0.88);
     expect(bridge.outbox.map((message) => message.type)).toEqual(['gomi.event', 'gomi.event']);
   });
 

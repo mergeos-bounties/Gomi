@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GOMI_OFFICE_SETTINGS,
+  setMemoryBroadcastThreshold,
   setSeatWorkMode
 } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
 import { GomiAgentRuntime } from '../src/vs/workbench/contrib/gomi/node/agentRuntime';
@@ -88,4 +89,35 @@ describe('GomiAgentRuntime', () => {
     expect(backendResults).toHaveLength(0);
     expect(blockedTasks).toContain('blocked');
   });
+
+  it('uses office memory settings to decide when agents broadcast chat', async () => {
+    const quietRuntime = new GomiAgentRuntime({
+      delayMs: 0,
+      officeSettings: setMemoryBroadcastThreshold(DEFAULT_GOMI_OFFICE_SETTINGS, 0.95)
+    });
+    const chattyRuntime = new GomiAgentRuntime({
+      delayMs: 0,
+      officeSettings: setMemoryBroadcastThreshold(DEFAULT_GOMI_OFFICE_SETTINGS, 0.45)
+    });
+
+    const quietAgentMessages = await countSpecialistMessages(quietRuntime);
+    const chattyAgentMessages = await countSpecialistMessages(chattyRuntime);
+
+    expect(quietAgentMessages).toBeLessThan(chattyAgentMessages);
+  });
 });
+
+async function countSpecialistMessages(runtime: GomiAgentRuntime): Promise<number> {
+  let messageCount = 0;
+
+  for await (const event of runtime.run('Review API UI database and deployment')) {
+    if (
+      event.type === 'message' &&
+      !['user', 'ceo', 'pet-gomi', 'system'].includes(event.message.senderId)
+    ) {
+      messageCount += 1;
+    }
+  }
+
+  return messageCount;
+}

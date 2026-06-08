@@ -667,6 +667,29 @@ button {
   box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.16);
 }
 
+.gomi-range-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px auto;
+  align-items: center;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.gomi-range-field input {
+  width: 100%;
+  accent-color: #2dd4bf;
+}
+
+.gomi-range-field strong {
+  min-width: 36px;
+  color: #ccfbf1;
+  font-size: 11px;
+  text-align: right;
+}
+
 .gomi-seat-note {
   color: #94a3b8;
   font-size: 12px;

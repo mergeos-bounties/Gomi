@@ -5,6 +5,7 @@ import {
   fireEmployee,
   getSeatForAgent,
   isAgentAvailableForTask,
+  setMemoryBroadcastThreshold,
   setSeatWorkMode
 } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
 
@@ -34,5 +35,17 @@ describe('Gomi office settings', () => {
       'fired'
     );
     expect(protectedCeo.seats.find((seat) => seat.id === 'seat-ceo')?.workMode).toBe('active');
+  });
+
+  it('updates and clamps the shared-memory broadcast threshold', () => {
+    expect(setMemoryBroadcastThreshold(DEFAULT_GOMI_OFFICE_SETTINGS, 0.88).memory.broadcastThreshold).toBe(
+      0.88
+    );
+    expect(setMemoryBroadcastThreshold(DEFAULT_GOMI_OFFICE_SETTINGS, 0.2).memory.broadcastThreshold).toBe(
+      0.45
+    );
+    expect(setMemoryBroadcastThreshold(DEFAULT_GOMI_OFFICE_SETTINGS, 1.2).memory.broadcastThreshold).toBe(
+      0.95
+    );
   });
 });

@@ -6,6 +6,7 @@ import type { GomiBridgeMessage, GomiWorkbenchBridge } from '../src/vs/workbench
 import type { GomiPatchProposal } from '../src/vs/workbench/contrib/gomi/common/gomiTypes';
 import {
   DEFAULT_GOMI_OFFICE_SETTINGS,
+  setMemoryBroadcastThreshold,
   setSeatWorkMode
 } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
 import { GomiAgentRuntime } from '../src/vs/workbench/contrib/gomi/node/agentRuntime';
@@ -299,10 +300,15 @@ describe('GomiWorkbenchController', () => {
       }
     });
 
+    const officeSettings = setMemoryBroadcastThreshold(
+      setSeatWorkMode(DEFAULT_GOMI_OFFICE_SETTINGS, 'head-backend', 'sleeping'),
+      0.95
+    );
+
     await controller.handleMessage({
       type: 'gomi.run',
       request: 'Build backend login API',
-      officeSettings: setSeatWorkMode(DEFAULT_GOMI_OFFICE_SETTINGS, 'head-backend', 'sleeping')
+      officeSettings
     });
 
     const backendResults = bridge.outbox
@@ -312,9 +318,24 @@ describe('GomiWorkbenchController', () => {
     const sleepingBackendStatus = bridge.outbox
       .filter((message): message is Extract<GomiBridgeMessage, { type: 'gomi.event' }> => message.type === 'gomi.event')
       .some((message) => message.event.type === 'agent_status' && message.event.agentId === 'backend' && message.event.status === 'sleeping');
+    const specialistMessages = bridge.outbox
+      .filter((message): message is Extract<GomiBridgeMessage, { type: 'gomi.event' }> => message.type === 'gomi.event')
+      .filter(
+        (message) =>
+          message.event.type === 'message' &&
+          !['user', 'ceo', 'pet-gomi', 'system'].includes(message.event.message.senderId)
+      );
+    const quietlyStoredMemory = bridge.outbox
+      .filter((message): message is Extract<GomiBridgeMessage, { type: 'gomi.event' }> => message.type === 'gomi.event')
+      .some(
+        (message) =>
+          message.event.type === 'memory_update' && message.event.item.shouldBroadcast === false
+      );
 
     expect(sleepingBackendStatus).toBe(true);
     expect(backendResults).toHaveLength(0);
+    expect(specialistMessages).toHaveLength(0);
+    expect(quietlyStoredMemory).toBe(true);
   });
 });
 

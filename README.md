@@ -58,7 +58,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Office organization settings** for assigning CLI agent routes to the CEO and department heads.
 - **Department head sleep mode** to pause a leader without removing the role from the organization.
 - **Employee lifecycle controls** for removing or restoring non-lead staff seats.
-- **Agent communication policy** that keeps routine updates in memory and only broadcasts important findings.
+- **Configurable agent communication policy** that keeps routine updates in memory and only broadcasts findings above the selected importance threshold.
 - **Hybrid project memory** using lexical search plus vector-style retrieval.
 - **Persistent workspace memory storage** for lexical and vector records under `.gomi-ide/memory`.
 - **Project context indexing** for file tree, manifests, open editor snippets, selected code, terminal output, diagnostics, SCM/git diff previews, and optional error logs.
@@ -147,7 +147,7 @@ The current implementation uses hybrid retrieval:
 - **Agent result memory** so specialist agents can build on prior findings.
 - **Project context indexing** so workspace metadata and content snippets can be retrieved by task.
 - **Workspace persistence** through file-backed lexical and vector memory stores when running from the workbench controller.
-- **Communication policy** so low-importance findings are stored silently while high-importance findings become visible messages and chat bubbles.
+- **Communication policy** so low-importance findings are stored silently while high-importance findings become visible messages and chat bubbles. The Office Settings panel exposes the broadcast threshold, and the runtime uses that value when deciding whether an agent should speak or only update shared memory.
 - **Memory board events** so the visual office can display the actual request, workspace facts, retrieved project context, and agent findings stored in shared memory.
 
 For the MVP, vector retrieval uses a local hashing embedding provider. It does not require an API key and keeps tests deterministic. The workbench controller persists lexical and vector memory records in workspace storage so future sessions can reuse project context. In a production build, this storage can be replaced by SQLite, a local vector database, OpenAI embeddings, a local embedding model, or an enterprise embedding service without changing the runtime contract.
@@ -324,7 +324,7 @@ Implemented in this repository:
 - Hybrid project memory with lexical and vector-style retrieval.
 - File-backed persistent project memory for workbench sessions.
 - Project context chunking and indexing.
-- Communication policy for selective agent broadcast.
+- Configurable communication policy for selective agent broadcast.
 - Node workspace reader for real project metadata and content snippets.
 - Patch proposal, webview diff preview, native diff preview hook, approve/reject, and apply gating.
 - Safe unified-diff patch application core for approved workspace edits.

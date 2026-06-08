@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GomiAgentResult, GomiTask, GomiWorkspaceSnapshot } from '../src/vs/workbench/contrib/gomi/common/gomiTypes';
+import { GOMI_DEFAULT_MEMORY_BROADCAST_THRESHOLD } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
 import { evaluateAgentCommunication } from '../src/vs/workbench/contrib/gomi/node/communicationPolicy';
 import { createInMemoryGomiMemoryStore } from '../src/vs/workbench/contrib/gomi/node/memoryStore';
 import { GomiSharedProjectMemory } from '../src/vs/workbench/contrib/gomi/node/sharedProjectMemory';
@@ -61,7 +62,33 @@ describe('shared project memory and communication policy', () => {
   it('broadcasts high-importance coordination and QA findings', () => {
     const decision = evaluateAgentCommunication(result);
 
+    expect(decision.threshold).toBe(GOMI_DEFAULT_MEMORY_BROADCAST_THRESHOLD);
     expect(decision.shouldBroadcast).toBe(true);
     expect(decision.broadcastSummary).toContain(result.summary);
+  });
+
+  it('uses the configured broadcast threshold for selective agent chat', () => {
+    const quietDecision = evaluateAgentCommunication(
+      {
+        ...result,
+        agentId: 'frontend',
+        proposedFiles: [],
+        confidence: 0.9
+      },
+      { broadcastThreshold: 0.8 }
+    );
+    const chattyDecision = evaluateAgentCommunication(
+      {
+        ...result,
+        agentId: 'frontend',
+        proposedFiles: [],
+        confidence: 0.9
+      },
+      { broadcastThreshold: 0.55 }
+    );
+
+    expect(quietDecision.threshold).toBe(0.8);
+    expect(quietDecision.shouldBroadcast).toBe(false);
+    expect(chattyDecision.shouldBroadcast).toBe(true);
   });
 });

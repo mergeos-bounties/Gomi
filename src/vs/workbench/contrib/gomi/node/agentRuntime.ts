@@ -169,7 +169,9 @@ export class GomiAgentRuntime {
         sharedMemory,
         agentCli: this.getAgentCli(task.agentId)
       });
-      const communicationDecision = evaluateAgentCommunication(agentResult);
+      const communicationDecision = evaluateAgentCommunication(agentResult, {
+        broadcastThreshold: this.officeSettings.memory.broadcastThreshold
+      });
       agentResults.push(agentResult);
       const resultMemory = this.memoryStore.add(
         createAgentResultMemoryEntry({

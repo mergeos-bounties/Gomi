@@ -7,6 +7,8 @@ import type {
   GomiOfficeSettings
 } from './gomiTypes';
 
+export const GOMI_DEFAULT_MEMORY_BROADCAST_THRESHOLD = 0.74;
+
 export const GOMI_AGENT_CLI_PROVIDERS: GomiAgentCliProvider[] = [
   {
     id: 'codex-cli',
@@ -81,7 +83,7 @@ export const DEFAULT_GOMI_OFFICE_SETTINGS: GomiOfficeSettings = {
     retrievalMode: 'hybrid-vector',
     sharedMemoryEnabled: true,
     indexWorkspaceContext: true,
-    broadcastThreshold: 0.74,
+    broadcastThreshold: GOMI_DEFAULT_MEMORY_BROADCAST_THRESHOLD,
     requirePatchApproval: true
   }
 };
@@ -122,6 +124,19 @@ export function fireEmployee(settings: GomiOfficeSettings, seatId: string): Gomi
   return setSeatWorkMode(settings, seatId, 'fired');
 }
 
+export function setMemoryBroadcastThreshold(
+  settings: GomiOfficeSettings,
+  broadcastThreshold: number
+): GomiOfficeSettings {
+  return {
+    ...settings,
+    memory: {
+      ...settings.memory,
+      broadcastThreshold: clampBroadcastThreshold(broadcastThreshold)
+    }
+  };
+}
+
 export function getSeatForAgent(
   settings: GomiOfficeSettings,
   agentId: GomiAgentId
@@ -150,6 +165,14 @@ function updateSeat(
     ...settings,
     seats: settings.seats.map((seat) => (seat.id === seatId ? updater(seat) : seat))
   };
+}
+
+function clampBroadcastThreshold(value: number): number {
+  if (!Number.isFinite(value)) {
+    return GOMI_DEFAULT_MEMORY_BROADCAST_THRESHOLD;
+  }
+
+  return Math.min(0.95, Math.max(0.45, value));
 }
 
 function createDepartmentHeadSeat(
