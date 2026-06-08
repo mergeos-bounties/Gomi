@@ -5,7 +5,17 @@
   "productJson": {
     "source": "product.json",
     "target": "product.json",
-    "mode": "merge"
+    "mode": "merge",
+    "removeKeys": [
+      "builtInExtensions",
+      "builtInExtensionsEnabledWithAutoUpdates",
+      "defaultChatAgent",
+      "trustedExtensionAuthAccess",
+      "webviewContentExternalBaseUrlTemplate",
+      "onboardingKeymaps",
+      "onboardingThemes",
+      "sessionsWindowAllowedExtensions"
+    ]
   },
   "moduleCopies": [
     {

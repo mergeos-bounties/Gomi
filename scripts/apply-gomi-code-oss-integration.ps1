@@ -87,7 +87,9 @@ function Set-GomiProductJson {
     [Parameter(Mandatory = $true)]
     [string]$Destination,
 
-    [string]$Mode = 'copy'
+    [string]$Mode = 'copy',
+
+    [string[]]$RemoveKeys = @()
   )
 
   if ($Mode -eq 'merge') {
@@ -105,6 +107,15 @@ function Set-GomiProductJson {
   $overlayProduct = Get-Content -LiteralPath $Source -Raw | ConvertFrom-Json
 
   Merge-GomiJsonObject -Base $baseProduct -Overlay $overlayProduct
+
+  foreach ($key in $RemoveKeys) {
+    $property = $baseProduct.PSObject.Properties[$key]
+
+    if ($property) {
+      Write-Host "Remove upstream product metadata key: $key" -ForegroundColor DarkCyan
+      $baseProduct.PSObject.Properties.Remove($key)
+    }
+  }
 
   $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
   $productJson = $baseProduct | ConvertTo-Json -Depth 64
@@ -166,7 +177,13 @@ Write-Host "Dry run: $($DryRun.IsPresent)" -ForegroundColor Green
 
 $productSource = Resolve-GomiPath -PathValue (Join-Path $repoRoot $manifest.productJson.source) -Description 'Gomi product.json'
 $productTarget = Join-Path $codeRoot $manifest.productJson.target
-Set-GomiProductJson -Source $productSource -Destination $productTarget -Mode $manifest.productJson.mode
+$productRemoveKeys = @()
+
+if ($manifest.productJson.PSObject.Properties['removeKeys']) {
+  $productRemoveKeys = @($manifest.productJson.removeKeys)
+}
+
+Set-GomiProductJson -Source $productSource -Destination $productTarget -Mode $manifest.productJson.mode -RemoveKeys $productRemoveKeys
 
 foreach ($copy in $manifest.moduleCopies) {
   $source = Resolve-GomiPath -PathValue (Join-Path $repoRoot $copy.source) -Description 'Gomi module source'

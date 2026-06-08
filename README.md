@@ -336,6 +336,7 @@ resources/gomi-branding/
 Implemented in this repository:
 
 - Gomi product metadata with merge-safe Code - OSS overlay integration.
+- Product metadata stripping for upstream built-in extension/chat/onboarding defaults that do not belong in a Gomi-branded commercial fork.
 - Generated Gomi desktop branding assets for Windows, Linux, and macOS Code - OSS packaging resource paths.
 - Workbench-compatible Gomi module skeleton.
 - React workbench shell.
@@ -460,7 +461,16 @@ Current product metadata:
   "nameLong": "Gomi IDE",
   "applicationName": "gomi-ide",
   "dataFolderName": ".gomi-ide",
+  "sharedDataFolderName": ".gomi-ide-shared",
+  "serverApplicationName": "gomi-server",
+  "serverDataFolderName": ".gomi-server",
+  "tunnelApplicationName": "gomi-tunnel",
   "win32MutexName": "gomiide",
+  "win32AppUserModelId": "Gomi.IDE",
+  "win32DirName": "Gomi IDE",
+  "darwinBundleIdentifier": "com.gomi.ide",
+  "linuxIconName": "gomi-ide",
+  "urlProtocol": "gomi",
   "licenseName": "MIT"
 }
 ```

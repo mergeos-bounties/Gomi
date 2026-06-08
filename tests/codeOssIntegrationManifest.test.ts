@@ -85,7 +85,46 @@ describe('Code - OSS integration manifest', () => {
             nameLong: 'Code - OSS',
             applicationName: 'code-oss',
             dataFolderName: '.vscode-oss',
+            sharedDataFolderName: '.vscode-oss-shared',
+            serverApplicationName: 'code-server-oss',
+            serverDataFolderName: '.vscode-server-oss',
+            tunnelApplicationName: 'code-tunnel-oss',
+            win32DirName: 'Microsoft Code OSS',
+            win32NameVersion: 'Microsoft Code OSS',
+            win32RegValueName: 'CodeOSS',
+            win32AppUserModelId: 'Microsoft.CodeOSS',
+            darwinBundleIdentifier: 'com.visualstudio.code.oss',
+            linuxIconName: 'code-oss',
             upstreamOnlyPackagingKey: 'keep-me',
+            builtInExtensions: [
+              {
+                name: 'ms-vscode.js-debug',
+                metadata: {
+                  publisherDisplayName: 'Microsoft'
+                }
+              }
+            ],
+            builtInExtensionsEnabledWithAutoUpdates: ['GitHub.copilot-chat'],
+            defaultChatAgent: {
+              extensionId: 'GitHub.copilot'
+            },
+            trustedExtensionAuthAccess: {
+              github: ['GitHub.copilot-chat']
+            },
+            webviewContentExternalBaseUrlTemplate: 'https://{{uuid}}.vscode-cdn.net/out/vs/workbench/contrib/webview/browser/pre/',
+            onboardingKeymaps: [
+              {
+                id: 'vscode',
+                label: 'VS Code'
+              }
+            ],
+            onboardingThemes: [
+              {
+                id: 'dark-2026',
+                label: 'Dark 2026'
+              }
+            ],
+            sessionsWindowAllowedExtensions: ['GitHub.copilot-chat'],
             extensionsGallery: {
               serviceUrl: 'https://marketplace.visualstudio.com/_apis/public/gallery',
               itemUrl: 'https://marketplace.visualstudio.com/items',
@@ -115,7 +154,25 @@ describe('Code - OSS integration manifest', () => {
         nameShort?: string;
         nameLong?: string;
         applicationName?: string;
+        sharedDataFolderName?: string;
+        serverApplicationName?: string;
+        serverDataFolderName?: string;
+        tunnelApplicationName?: string;
+        win32DirName?: string;
+        win32NameVersion?: string;
+        win32RegValueName?: string;
+        win32AppUserModelId?: string;
+        darwinBundleIdentifier?: string;
+        linuxIconName?: string;
         upstreamOnlyPackagingKey?: string;
+        builtInExtensions?: unknown;
+        builtInExtensionsEnabledWithAutoUpdates?: unknown;
+        defaultChatAgent?: unknown;
+        trustedExtensionAuthAccess?: unknown;
+        webviewContentExternalBaseUrlTemplate?: unknown;
+        onboardingKeymaps?: unknown;
+        onboardingThemes?: unknown;
+        sessionsWindowAllowedExtensions?: unknown;
         extensionsGallery?: {
           serviceUrl?: string;
           itemUrl?: string;
@@ -130,7 +187,25 @@ describe('Code - OSS integration manifest', () => {
       expect(product.nameShort).toBe('Gomi');
       expect(product.nameLong).toBe('Gomi IDE');
       expect(product.applicationName).toBe('gomi-ide');
+      expect(product.sharedDataFolderName).toBe('.gomi-ide-shared');
+      expect(product.serverApplicationName).toBe('gomi-server');
+      expect(product.serverDataFolderName).toBe('.gomi-server');
+      expect(product.tunnelApplicationName).toBe('gomi-tunnel');
+      expect(product.win32DirName).toBe('Gomi IDE');
+      expect(product.win32NameVersion).toBe('Gomi IDE');
+      expect(product.win32RegValueName).toBe('GomiIDE');
+      expect(product.win32AppUserModelId).toBe('Gomi.IDE');
+      expect(product.darwinBundleIdentifier).toBe('com.gomi.ide');
+      expect(product.linuxIconName).toBe('gomi-ide');
       expect(product.upstreamOnlyPackagingKey).toBe('keep-me');
+      expect(product).not.toHaveProperty('builtInExtensions');
+      expect(product).not.toHaveProperty('builtInExtensionsEnabledWithAutoUpdates');
+      expect(product).not.toHaveProperty('defaultChatAgent');
+      expect(product).not.toHaveProperty('trustedExtensionAuthAccess');
+      expect(product).not.toHaveProperty('webviewContentExternalBaseUrlTemplate');
+      expect(product).not.toHaveProperty('onboardingKeymaps');
+      expect(product).not.toHaveProperty('onboardingThemes');
+      expect(product).not.toHaveProperty('sessionsWindowAllowedExtensions');
       expect(product.extensionsGallery?.serviceUrl).toBe('https://open-vsx.org/vscode/gallery');
       expect(product.extensionsGallery?.itemUrl).toBe('https://open-vsx.org/vscode/item');
       expect(product.extensionsGallery?.resourceUrlTemplate).toBe('https://example.test/resource/{publisher}/{name}');

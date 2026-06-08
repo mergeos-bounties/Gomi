@@ -36,7 +36,7 @@ export function createDemoWorkspaceSnapshot(rootName = 'Gomi'): GomiWorkspaceSna
       {
         filePath: 'product.json',
         content:
-          '{"nameShort":"Gomi","nameLong":"Gomi IDE","applicationName":"gomi-ide","dataFolderName":".gomi-ide"}',
+          '{"nameShort":"Gomi","nameLong":"Gomi IDE","applicationName":"gomi-ide","dataFolderName":".gomi-ide","win32AppUserModelId":"Gomi.IDE","darwinBundleIdentifier":"com.gomi.ide","linuxIconName":"gomi-ide"}',
         language: 'json',
         source: 'workspace'
       }

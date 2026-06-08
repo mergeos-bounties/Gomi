@@ -74,11 +74,23 @@ describe('release readiness', () => {
       nameLong: 'Gomi IDE',
       applicationName: 'gomi-ide',
       dataFolderName: '.gomi-ide',
+      sharedDataFolderName: '.gomi-ide-shared',
       win32MutexName: 'gomiide',
       licenseName: 'MIT',
       urlProtocol: 'gomi',
       serverApplicationName: 'gomi-server',
+      serverDataFolderName: '.gomi-server',
       tunnelApplicationName: 'gomi-tunnel',
+      win32DirName: 'Gomi IDE',
+      win32NameVersion: 'Gomi IDE',
+      win32RegValueName: 'GomiIDE',
+      win32AppUserModelId: 'Gomi.IDE',
+      win32ShellNameShort: 'G&omi IDE',
+      win32TunnelServiceMutex: 'gomiide-tunnelservice',
+      win32TunnelMutex: 'gomiide-tunnel',
+      darwinBundleIdentifier: 'com.gomi.ide',
+      linuxIconName: 'gomi-ide',
+      agentsTelemetryAppName: 'gomi-agents',
       reportIssueUrl: 'https://github.com/mergeos-bounties/Gomi/issues/new'
     };
 
@@ -91,6 +103,12 @@ describe('release readiness', () => {
     expect(productText).not.toMatch(/Visual Studio Code/i);
     expect(productText).not.toMatch(/Microsoft/i);
     expect(productText).not.toMatch(/marketplace\.visualstudio\.com/i);
+    expect(product.win32x64AppId).toMatch(/^\{\{[0-9A-F-]{36}\}$/);
+    expect(product.win32arm64AppId).toMatch(/^\{\{[0-9A-F-]{36}\}$/);
+    expect(product.win32x64UserAppId).toMatch(/^\{\{[0-9A-F-]{36}\}$/);
+    expect(product.win32arm64UserAppId).toMatch(/^\{\{[0-9A-F-]{36}\}$/);
+    expect(product.darwinProfileUUID).toMatch(/^[0-9A-F-]{36}$/);
+    expect(product.darwinProfilePayloadUUID).toMatch(/^[0-9A-F-]{36}$/);
     expect(product.extensionsGallery?.serviceUrl).toBe('https://open-vsx.org/vscode/gallery');
     expect(product.extensionsGallery?.itemUrl).toBe('https://open-vsx.org/vscode/item');
   });
@@ -117,7 +135,17 @@ describe('release readiness', () => {
     expect(manifest.productJson).toEqual({
       source: 'product.json',
       target: 'product.json',
-      mode: 'merge'
+      mode: 'merge',
+      removeKeys: [
+        'builtInExtensions',
+        'builtInExtensionsEnabledWithAutoUpdates',
+        'defaultChatAgent',
+        'trustedExtensionAuthAccess',
+        'webviewContentExternalBaseUrlTemplate',
+        'onboardingKeymaps',
+        'onboardingThemes',
+        'sessionsWindowAllowedExtensions'
+      ]
     });
     expect(moduleCopy?.source).toBe('src/vs/workbench/contrib/gomi');
     expect(contributionTemplate?.source).toBe('build/code-oss-templates/gomiContribution.ts');
