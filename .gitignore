@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.vite/
+.vitest/
+*.tsbuildinfo
+
+artifacts/
+*.log
+gomi-vite.*.log
+
+.env
+.env.*
+!.env.example
