@@ -3,6 +3,11 @@ import type { GomiWorkbenchBridge, GomiBridgeMessage } from '../electron-sandbox
 import type { GomiOfficeSettings, GomiPatchPreviewResult, GomiRuntimeEvent } from '../common/gomiTypes';
 import { GomiAgentRuntime, type GomiRuntimeOptions } from './agentRuntime';
 import type { GomiCliCommandRunner } from './cliAgentProvider';
+import {
+  createConfiguredEmbeddingProvider,
+  type GomiEmbeddingFetch,
+  type GomiHttpEmbeddingRoute
+} from './embeddingProvider';
 import type { GomiHttpFetch, GomiHttpProviderRoute } from './httpAgentProvider';
 import {
   createFileBackedGomiMemoryStore,
@@ -32,6 +37,10 @@ export interface GomiWorkbenchControllerOptions {
   httpFetch?: GomiHttpFetch;
   httpRoutes?: Partial<Record<string, GomiHttpProviderRoute>>;
   providerEnv?: Record<string, string | undefined>;
+  enableEmbeddingProviderExecution?: boolean;
+  embeddingFetch?: GomiEmbeddingFetch;
+  embeddingRoute?: GomiHttpEmbeddingRoute;
+  embeddingEnv?: Record<string, string | undefined>;
   cliAgentTimeoutMs?: number;
   patchApplyOptions?: GomiPatchApplyOptions;
   applyPatch?: (
@@ -76,6 +85,10 @@ export class GomiWorkbenchController {
           httpFetch: options.httpFetch,
           httpRoutes: options.httpRoutes,
           providerEnv: options.providerEnv,
+          enableEmbeddingProviderExecution: options.enableEmbeddingProviderExecution,
+          embeddingFetch: options.embeddingFetch,
+          embeddingRoute: options.embeddingRoute,
+          embeddingEnv: options.embeddingEnv,
           cliAgentTimeoutMs: options.cliAgentTimeoutMs
         }
       );
@@ -214,6 +227,10 @@ function createWorkbenchRuntime(
     | 'httpFetch'
     | 'httpRoutes'
     | 'providerEnv'
+    | 'enableEmbeddingProviderExecution'
+    | 'embeddingFetch'
+    | 'embeddingRoute'
+    | 'embeddingEnv'
     | 'cliAgentTimeoutMs'
   > = {}
 ): GomiRuntimeRunner {
@@ -227,7 +244,15 @@ function createWorkbenchRuntime(
       createFileBackedGomiMemoryStore(path.join(projectMemoryDirectory, 'lexical-memory.json')),
     vectorMemoryStore:
       runtimeOptions.vectorMemoryStore ??
-      createFileBackedVectorMemoryStore(path.join(projectMemoryDirectory, 'vector-memory.json')),
+      createFileBackedVectorMemoryStore(
+        path.join(projectMemoryDirectory, 'vector-memory.json'),
+        createConfiguredEmbeddingProvider({
+          enabled: cliOptions.enableEmbeddingProviderExecution ?? cliOptions.enableHttpAgentExecution ?? false,
+          fetchImpl: cliOptions.embeddingFetch ?? cliOptions.httpFetch,
+          route: cliOptions.embeddingRoute,
+          env: cliOptions.embeddingEnv ?? cliOptions.providerEnv
+        })
+      ),
     agentProvider:
       runtimeOptions.agentProvider ??
       createWorkbenchGomiAgentProvider({

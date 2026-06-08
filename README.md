@@ -65,6 +65,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Configurable agent communication policy** that keeps routine updates in memory and only broadcasts findings above the selected importance threshold.
 - **Novelty-aware agent communication** that checks recalled shared memory before showing another chat bubble for repeated routine findings.
 - **Hybrid project memory** using lexical search plus vector-style retrieval.
+- **Configurable embedding provider layer** with deterministic local hashing, OpenAI-compatible HTTP embeddings, and Ollama local embedding routes.
 - **Persistent workspace memory storage** for lexical and vector records under `.gomi-ide/memory`.
 - **Memory privacy and retention controls** for shared-memory enablement, workspace indexing, strict privacy mode, secret redaction, retention days, max project memory items, and patch approval policy.
 - **Project context indexing** for file tree, manifests, open editor snippets, selected code, terminal output, diagnostics, SCM/git diff previews, and optional error logs.
@@ -137,8 +138,9 @@ Gomi IDE
     |-- CLI Agent Routing
     |-- Cloud LLM Adapter Path
     |-- Local Model Adapter Path
+    |-- Cloud/Local Embedding Provider
     |-- Hybrid Project Memory
-    |-- Vector-style Retrieval
+    |-- Vector Retrieval
     |-- Project Context Indexer
     `-- Patch Proposal Flow
 ```
@@ -160,7 +162,16 @@ The current implementation uses hybrid retrieval:
 - **Retention policy** that prunes old lexical and vector memory records and caps the number of stored project memory items per workspace scope.
 - **Memory board events** so the visual office can display the actual request, workspace facts, retrieved project context, and agent findings stored in shared memory.
 
-For the MVP, vector retrieval uses a local hashing embedding provider. It does not require an API key and keeps tests deterministic. The workbench controller persists lexical and vector memory records in workspace storage so future sessions can reuse project context. In a production build, this storage can be replaced by SQLite, a local vector database, OpenAI embeddings, a local embedding model, or an enterprise embedding service without changing the runtime contract.
+By default, vector retrieval uses a deterministic local hashing embedding provider. It does not require an API key, works offline, and keeps tests predictable.
+
+For production-style retrieval, the workbench controller can switch to HTTP embeddings while keeping the same vector memory contract:
+
+- **OpenAI-compatible embeddings** through `GOMI_EMBEDDINGS_ENDPOINT`, `GOMI_EMBEDDINGS_MODEL`, and optional `GOMI_EMBEDDINGS_API_KEY`.
+- **Ollama local embeddings** through `GOMI_EMBEDDINGS_PROVIDER=ollama-embeddings` or `GOMI_EMBEDDINGS_PROVIDER=ollama-embed`, plus `GOMI_LOCAL_EMBEDDINGS_ENDPOINT` and `GOMI_LOCAL_EMBEDDINGS_MODEL`.
+- **Explicit execution control** through `GOMI_EMBEDDINGS_ENABLED=true|false` or host-side `GomiWorkbenchController` options.
+- **Safe fallback behavior** that returns to local hashing when HTTP embeddings are disabled, unavailable, misconfigured, or return an invalid vector.
+
+The workbench controller persists lexical and vector memory records in workspace storage so future sessions can reuse project context. In a production build, this file-backed storage can be replaced by SQLite, a local vector database, or an enterprise-managed vector service without changing the runtime contract.
 
 ## Agent Provider Routing
 
@@ -366,6 +377,7 @@ Implemented in this repository:
 - HTTP agent provider adapter with endpoint/model/API-key environment routing and JSON/plain-text result mapping.
 - Workspace trust and live execution policy for CLI/HTTP providers.
 - Hybrid project memory with lexical and vector-style retrieval.
+- HTTP embedding provider adapter for OpenAI-compatible and Ollama local embedding routes, with deterministic hashing fallback.
 - File-backed persistent project memory for workbench sessions.
 - Memory privacy guard with secret redaction, strict mode, shared-memory toggles, retention days, and max project memory controls.
 - Project context chunking and indexing.
@@ -385,7 +397,7 @@ Not yet implemented:
 - Native output-channel/log-service integration beyond the current optional error-log provider hook.
 - Production provider secrets UI and enterprise model governance.
 - Native Code - OSS workspace-trust service binding beyond the current settings-level trust state.
-- Persistent database-backed memory.
+- Persistent database-backed memory and external vector database indexing.
 - Signed desktop packaging assets and production release signing.
 - Enterprise settings, licensing, update channel, and telemetry policy.
 
