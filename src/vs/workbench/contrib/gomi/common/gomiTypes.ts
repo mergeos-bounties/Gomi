@@ -48,6 +48,11 @@ export type GomiAgentProviderTransport =
   | 'demo';
 export type GomiWorkspaceTrustState = 'trusted' | 'untrusted';
 export type GomiLiveProviderMode = 'demo-only' | 'trusted-workspaces' | 'allow-all';
+export type GomiMemoryEmbeddingProviderId =
+  | 'local-hashing'
+  | 'openai-compatible'
+  | 'ollama-embeddings'
+  | 'ollama-embed';
 
 export interface GomiAgentCliProvider {
   id: GomiAgentCliProviderId;
@@ -75,6 +80,8 @@ export interface GomiAgentSeat {
 
 export interface GomiOfficeMemorySettings {
   retrievalMode: 'hybrid-vector';
+  embeddingProvider: GomiMemoryEmbeddingProviderId;
+  embeddingExecutionEnabled: boolean;
   sharedMemoryEnabled: boolean;
   indexWorkspaceContext: boolean;
   privacyMode: GomiMemoryPrivacyMode;

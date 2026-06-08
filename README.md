@@ -66,6 +66,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Novelty-aware agent communication** that checks recalled shared memory before showing another chat bubble for repeated routine findings.
 - **Hybrid project memory** using lexical search plus vector-style retrieval.
 - **Configurable embedding provider layer** with deterministic local hashing, OpenAI-compatible HTTP embeddings, and Ollama local embedding routes.
+- **Office Settings controls for vector memory embeddings** so users can keep retrieval offline or enable approved cloud/local embedding routes.
 - **Persistent workspace memory storage** for lexical and vector records under `.gomi-ide/memory`.
 - **Memory privacy and retention controls** for shared-memory enablement, workspace indexing, strict privacy mode, secret redaction, retention days, max project memory items, and patch approval policy.
 - **Project context indexing** for file tree, manifests, open editor snippets, selected code, terminal output, diagnostics, SCM/git diff previews, and optional error logs.
@@ -169,6 +170,7 @@ For production-style retrieval, the workbench controller can switch to HTTP embe
 - **OpenAI-compatible embeddings** through `GOMI_EMBEDDINGS_ENDPOINT`, `GOMI_EMBEDDINGS_MODEL`, and optional `GOMI_EMBEDDINGS_API_KEY`.
 - **Ollama local embeddings** through `GOMI_EMBEDDINGS_PROVIDER=ollama-embeddings` or `GOMI_EMBEDDINGS_PROVIDER=ollama-embed`, plus `GOMI_LOCAL_EMBEDDINGS_ENDPOINT` and `GOMI_LOCAL_EMBEDDINGS_MODEL`.
 - **Explicit execution control** through `GOMI_EMBEDDINGS_ENABLED=true|false` or host-side `GomiWorkbenchController` options.
+- **Office-level provider selection** for Local Hashing, OpenAI-compatible embeddings, Ollama `/api/embeddings`, and Ollama `/api/embed`.
 - **Safe fallback behavior** that returns to local hashing when HTTP embeddings are disabled, unavailable, misconfigured, or return an invalid vector.
 
 The workbench controller persists lexical and vector memory records in workspace storage so future sessions can reuse project context. In a production build, this file-backed storage can be replaced by SQLite, a local vector database, or an enterprise-managed vector service without changing the runtime contract.
@@ -378,6 +380,7 @@ Implemented in this repository:
 - Workspace trust and live execution policy for CLI/HTTP providers.
 - Hybrid project memory with lexical and vector-style retrieval.
 - HTTP embedding provider adapter for OpenAI-compatible and Ollama local embedding routes, with deterministic hashing fallback.
+- Office Settings vector embedding provider selection and HTTP embedding execution toggle.
 - File-backed persistent project memory for workbench sessions.
 - Memory privacy guard with secret redaction, strict mode, shared-memory toggles, retention days, and max project memory controls.
 - Project context chunking and indexing.

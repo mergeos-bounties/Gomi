@@ -8,6 +8,8 @@ import {
   DEFAULT_GOMI_OFFICE_SETTINGS,
   setCliProvidersEnabled,
   setMemoryBroadcastThreshold,
+  setMemoryEmbeddingExecutionEnabled,
+  setMemoryEmbeddingProvider,
   setSeatWorkMode,
   setWorkspaceTrustState
 } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
@@ -342,6 +344,72 @@ describe('GomiWorkbenchController', () => {
     expect(backendResults).toHaveLength(0);
     expect(specialistMessages).toHaveLength(0);
     expect(quietlyStoredMemory).toBe(true);
+  });
+
+  it('uses office memory embedding settings for default vector retrieval', async () => {
+    const bridge = new MemoryWorkbenchBridge();
+    const embeddingRequests: Array<{
+      input: string;
+      body: {
+        input?: string;
+        model?: string;
+      };
+      headers?: HeadersInit;
+    }> = [];
+    const controller = new GomiWorkbenchController({
+      bridge,
+      workspaceRoot,
+      enableEmbeddingProviderExecution: true,
+      providerEnv: {
+        GOMI_EMBEDDINGS_ENDPOINT: 'https://embed.gomi.test/v1/embeddings',
+        GOMI_EMBEDDINGS_MODEL: 'gomi-embed-small',
+        GOMI_EMBEDDINGS_API_KEY: 'unit-test-key'
+      },
+      embeddingFetch: async (input, init) => {
+        embeddingRequests.push({
+          input,
+          body: JSON.parse(String(init?.body)) as { input?: string; model?: string },
+          headers: init?.headers
+        });
+
+        return new Response(JSON.stringify({ data: [{ embedding: [1, 0] }] }), { status: 200 });
+      },
+      runtimeOptions: {
+        delayMs: 0,
+        workspaceReader: () => ({
+          rootName: 'EmbeddingWorkspace',
+          files: ['src/memory.ts', 'package.json'],
+          openEditors: ['src/memory.ts'],
+          gitSummary: 'Git branch master, 1 changed file.',
+          terminalSummary: 'npm test',
+          contentSnippets: [
+            {
+              filePath: 'src/memory.ts',
+              content: 'Gomi shared memory uses vector retrieval for agent context.',
+              language: 'typescript',
+              source: 'workspace'
+            }
+          ]
+        })
+      }
+    });
+    const officeSettings = setMemoryEmbeddingExecutionEnabled(
+      setMemoryEmbeddingProvider(DEFAULT_GOMI_OFFICE_SETTINGS, 'openai-compatible'),
+      true
+    );
+
+    await controller.handleMessage({
+      type: 'gomi.run',
+      request: 'Review vector memory',
+      officeSettings
+    });
+
+    expect(embeddingRequests.length).toBeGreaterThan(0);
+    expect(embeddingRequests[0].input).toBe('https://embed.gomi.test/v1/embeddings');
+    expect(embeddingRequests[0].body.model).toBe('gomi-embed-small');
+    expect(embeddingRequests[0].headers).toMatchObject({
+      authorization: 'Bearer unit-test-key'
+    });
   });
 });
 

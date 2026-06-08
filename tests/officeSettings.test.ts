@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GOMI_OFFICE_SETTINGS,
   GOMI_AGENT_CLI_PROVIDERS,
+  GOMI_MEMORY_EMBEDDING_PROVIDERS,
   assignSeatProvider,
   fireEmployee,
+  getMemoryEmbeddingProviderLabel,
   getSeatForAgent,
   isAgentAvailableForTask,
   setMaxProjectMemoryItems,
@@ -16,6 +18,8 @@ import {
   setLiveProviderMode,
   setLiveProviderPatchApprovalRequired,
   setSecretRedactionEnabled,
+  setMemoryEmbeddingExecutionEnabled,
+  setMemoryEmbeddingProvider,
   setSeatWorkMode,
   setWorkspaceTrustState,
   setSharedMemoryEnabled,
@@ -30,6 +34,15 @@ describe('Gomi office settings', () => {
     expect(transports.get('openai-compatible-api')).toBe('openai-compatible');
     expect(transports.get('ollama-local-model')).toBe('ollama-chat');
     expect(transports.get('demo-runtime')).toBe('demo');
+  });
+
+  it('registers memory embedding provider choices for local and HTTP vector retrieval', () => {
+    const providers = new Map(GOMI_MEMORY_EMBEDDING_PROVIDERS.map((provider) => [provider.id, provider]));
+
+    expect(providers.get('local-hashing')?.label).toBe('Local Hashing');
+    expect(providers.get('openai-compatible')?.endpointEnv).toBe('GOMI_EMBEDDINGS_ENDPOINT');
+    expect(providers.get('ollama-embeddings')?.modelEnv).toBe('GOMI_LOCAL_EMBEDDINGS_MODEL');
+    expect(getMemoryEmbeddingProviderLabel('ollama-embed')).toBe('Ollama /api/embed');
   });
 
   it('assigns CLI providers to CEO and department head seats', () => {
@@ -87,6 +100,19 @@ describe('Gomi office settings', () => {
     expect(quietSettings.memory.sharedMemoryEnabled).toBe(false);
     expect(quietSettings.memory.indexWorkspaceContext).toBe(false);
     expect(relaxedApproval.memory.requirePatchApproval).toBe(false);
+  });
+
+  it('updates embedding provider execution while keeping local hashing offline', () => {
+    const httpEmbeddings = setMemoryEmbeddingExecutionEnabled(
+      setMemoryEmbeddingProvider(DEFAULT_GOMI_OFFICE_SETTINGS, 'openai-compatible'),
+      true
+    );
+    const localHashing = setMemoryEmbeddingProvider(httpEmbeddings, 'local-hashing');
+
+    expect(httpEmbeddings.memory.embeddingProvider).toBe('openai-compatible');
+    expect(httpEmbeddings.memory.embeddingExecutionEnabled).toBe(true);
+    expect(localHashing.memory.embeddingProvider).toBe('local-hashing');
+    expect(localHashing.memory.embeddingExecutionEnabled).toBe(false);
   });
 
   it('updates live provider execution policy controls', () => {

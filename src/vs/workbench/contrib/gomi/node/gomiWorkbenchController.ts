@@ -1,6 +1,11 @@
 import path from 'node:path';
 import type { GomiWorkbenchBridge, GomiBridgeMessage } from '../electron-sandbox/gomiBridge';
-import type { GomiOfficeSettings, GomiPatchPreviewResult, GomiRuntimeEvent } from '../common/gomiTypes';
+import type {
+  GomiMemoryEmbeddingProviderId,
+  GomiOfficeSettings,
+  GomiPatchPreviewResult,
+  GomiRuntimeEvent
+} from '../common/gomiTypes';
 import { GomiAgentRuntime, type GomiRuntimeOptions } from './agentRuntime';
 import type { GomiCliCommandRunner } from './cliAgentProvider';
 import {
@@ -235,6 +240,11 @@ function createWorkbenchRuntime(
   > = {}
 ): GomiRuntimeRunner {
   const projectMemoryDirectory = memoryDirectory ?? path.join(workspaceRoot, '.gomi-ide', 'memory');
+  const officeEmbeddingRoute = createOfficeEmbeddingRoute(runtimeOptions.officeSettings?.memory.embeddingProvider);
+  const officeEmbeddingsEnabled =
+    runtimeOptions.officeSettings?.memory.embeddingExecutionEnabled ?? true;
+  const hostEmbeddingsAllowed =
+    cliOptions.enableEmbeddingProviderExecution ?? cliOptions.enableHttpAgentExecution ?? false;
 
   return new GomiAgentRuntime({
     ...runtimeOptions,
@@ -247,9 +257,9 @@ function createWorkbenchRuntime(
       createFileBackedVectorMemoryStore(
         path.join(projectMemoryDirectory, 'vector-memory.json'),
         createConfiguredEmbeddingProvider({
-          enabled: cliOptions.enableEmbeddingProviderExecution ?? cliOptions.enableHttpAgentExecution ?? false,
+          enabled: hostEmbeddingsAllowed && officeEmbeddingsEnabled,
           fetchImpl: cliOptions.embeddingFetch ?? cliOptions.httpFetch,
-          route: cliOptions.embeddingRoute,
+          route: cliOptions.embeddingRoute ?? officeEmbeddingRoute,
           env: cliOptions.embeddingEnv ?? cliOptions.providerEnv
         })
       ),
@@ -266,4 +276,27 @@ function createWorkbenchRuntime(
         cwd: workspaceRoot
       })
   });
+}
+
+function createOfficeEmbeddingRoute(
+  embeddingProvider?: GomiMemoryEmbeddingProviderId
+): GomiHttpEmbeddingRoute | undefined {
+  if (!embeddingProvider || embeddingProvider === 'local-hashing') {
+    return undefined;
+  }
+
+  if (embeddingProvider === 'openai-compatible') {
+    return {
+      mode: 'openai-compatible',
+      endpointEnv: 'GOMI_EMBEDDINGS_ENDPOINT',
+      apiKeyEnv: 'GOMI_EMBEDDINGS_API_KEY',
+      modelEnv: 'GOMI_EMBEDDINGS_MODEL'
+    };
+  }
+
+  return {
+    mode: embeddingProvider,
+    endpointEnv: 'GOMI_LOCAL_EMBEDDINGS_ENDPOINT',
+    modelEnv: 'GOMI_LOCAL_EMBEDDINGS_MODEL'
+  };
 }

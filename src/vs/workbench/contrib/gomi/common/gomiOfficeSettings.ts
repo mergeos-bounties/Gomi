@@ -5,6 +5,7 @@ import type {
   GomiAgentSeat,
   GomiAgentWorkMode,
   GomiLiveProviderMode,
+  GomiMemoryEmbeddingProviderId,
   GomiMemoryPrivacyMode,
   GomiOfficeSettings,
   GomiWorkspaceTrustState
@@ -13,6 +14,43 @@ import type {
 export const GOMI_DEFAULT_MEMORY_BROADCAST_THRESHOLD = 0.74;
 export const GOMI_DEFAULT_MEMORY_RETENTION_DAYS = 30;
 export const GOMI_DEFAULT_MAX_PROJECT_MEMORY_ITEMS = 420;
+
+export const GOMI_MEMORY_EMBEDDING_PROVIDERS: Array<{
+  id: GomiMemoryEmbeddingProviderId;
+  label: string;
+  description: string;
+  endpointEnv?: string;
+  apiKeyEnv?: string;
+  modelEnv?: string;
+}> = [
+  {
+    id: 'local-hashing',
+    label: 'Local Hashing',
+    description: 'Offline deterministic vector fallback for private demos and tests.'
+  },
+  {
+    id: 'openai-compatible',
+    label: 'OpenAI-Compatible Embeddings',
+    description: 'Cloud or enterprise embedding endpoint compatible with OpenAI embeddings.',
+    endpointEnv: 'GOMI_EMBEDDINGS_ENDPOINT',
+    apiKeyEnv: 'GOMI_EMBEDDINGS_API_KEY',
+    modelEnv: 'GOMI_EMBEDDINGS_MODEL'
+  },
+  {
+    id: 'ollama-embeddings',
+    label: 'Ollama /api/embeddings',
+    description: 'Local Ollama embedding route using prompt-based /api/embeddings.',
+    endpointEnv: 'GOMI_LOCAL_EMBEDDINGS_ENDPOINT',
+    modelEnv: 'GOMI_LOCAL_EMBEDDINGS_MODEL'
+  },
+  {
+    id: 'ollama-embed',
+    label: 'Ollama /api/embed',
+    description: 'Local Ollama embedding route using input-based /api/embed.',
+    endpointEnv: 'GOMI_LOCAL_EMBEDDINGS_ENDPOINT',
+    modelEnv: 'GOMI_LOCAL_EMBEDDINGS_MODEL'
+  }
+];
 
 export const GOMI_AGENT_CLI_PROVIDERS: GomiAgentCliProvider[] = [
   {
@@ -112,6 +150,8 @@ export const DEFAULT_GOMI_OFFICE_SETTINGS: GomiOfficeSettings = {
   ],
   memory: {
     retrievalMode: 'hybrid-vector',
+    embeddingProvider: 'local-hashing',
+    embeddingExecutionEnabled: false,
     sharedMemoryEnabled: true,
     indexWorkspaceContext: true,
     privacyMode: 'standard',
@@ -194,6 +234,27 @@ export function setWorkspaceContextIndexing(
 ): GomiOfficeSettings {
   return updateMemorySettings(settings, {
     indexWorkspaceContext
+  });
+}
+
+export function setMemoryEmbeddingProvider(
+  settings: GomiOfficeSettings,
+  embeddingProvider: GomiMemoryEmbeddingProviderId
+): GomiOfficeSettings {
+  return updateMemorySettings(settings, {
+    embeddingProvider,
+    embeddingExecutionEnabled:
+      embeddingProvider === 'local-hashing' ? false : settings.memory.embeddingExecutionEnabled
+  });
+}
+
+export function setMemoryEmbeddingExecutionEnabled(
+  settings: GomiOfficeSettings,
+  embeddingExecutionEnabled: boolean
+): GomiOfficeSettings {
+  return updateMemorySettings(settings, {
+    embeddingExecutionEnabled:
+      settings.memory.embeddingProvider === 'local-hashing' ? false : embeddingExecutionEnabled
   });
 }
 
@@ -304,6 +365,10 @@ export function getSeatForAgent(
 
 export function getProviderLabel(providerId: GomiAgentCliProviderId): string {
   return GOMI_AGENT_CLI_PROVIDERS.find((provider) => provider.id === providerId)?.label ?? providerId;
+}
+
+export function getMemoryEmbeddingProviderLabel(providerId: GomiMemoryEmbeddingProviderId): string {
+  return GOMI_MEMORY_EMBEDDING_PROVIDERS.find((provider) => provider.id === providerId)?.label ?? providerId;
 }
 
 export function isAgentAvailableForTask(settings: GomiOfficeSettings, agentId: GomiAgentId): boolean {

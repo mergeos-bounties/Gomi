@@ -36,8 +36,10 @@ import { BASE_GOMI_AGENTS, GOMI_SAMPLE_REQUEST } from '../common/gomiConstants';
 import {
   DEFAULT_GOMI_OFFICE_SETTINGS,
   GOMI_AGENT_CLI_PROVIDERS,
+  GOMI_MEMORY_EMBEDDING_PROVIDERS,
   assignSeatProvider,
   fireEmployee,
+  getMemoryEmbeddingProviderLabel,
   getProviderLabel,
   getSeatForAgent,
   setCliProvidersEnabled,
@@ -46,6 +48,8 @@ import {
   setLiveProviderPatchApprovalRequired,
   setMaxProjectMemoryItems,
   setMemoryBroadcastThreshold,
+  setMemoryEmbeddingExecutionEnabled,
+  setMemoryEmbeddingProvider,
   setMemoryPrivacyMode,
   setMemoryRetentionDays,
   setPatchApprovalRequired,
@@ -64,6 +68,7 @@ import type {
   GomiFinalReport,
   GomiLiveProviderMode,
   GomiMemoryBoardItem,
+  GomiMemoryEmbeddingProviderId,
   GomiMemoryPrivacyMode,
   GomiOfficeSettings,
   GomiRuntimeEvent,
@@ -380,6 +385,18 @@ export function GomiOfficeApp() {
     );
   }
 
+  function updateMemoryEmbeddingProvider(embeddingProvider: GomiMemoryEmbeddingProviderId) {
+    setOfficeSettings((currentSettings) =>
+      setMemoryEmbeddingProvider(currentSettings, embeddingProvider)
+    );
+  }
+
+  function updateMemoryEmbeddingExecutionEnabled(embeddingExecutionEnabled: boolean) {
+    setOfficeSettings((currentSettings) =>
+      setMemoryEmbeddingExecutionEnabled(currentSettings, embeddingExecutionEnabled)
+    );
+  }
+
   function updateMemoryPrivacyMode(privacyMode: GomiMemoryPrivacyMode) {
     setOfficeSettings((currentSettings) =>
       setMemoryPrivacyMode(currentSettings, privacyMode)
@@ -600,6 +617,8 @@ export function GomiOfficeApp() {
           onBroadcastThresholdChange={updateBroadcastThreshold}
           onSharedMemoryEnabledChange={updateSharedMemoryEnabled}
           onWorkspaceContextIndexingChange={updateWorkspaceContextIndexing}
+          onMemoryEmbeddingProviderChange={updateMemoryEmbeddingProvider}
+          onMemoryEmbeddingExecutionEnabledChange={updateMemoryEmbeddingExecutionEnabled}
           onMemoryPrivacyModeChange={updateMemoryPrivacyMode}
           onSecretRedactionChange={updateSecretRedaction}
           onMemoryRetentionDaysChange={updateMemoryRetentionDays}
@@ -705,6 +724,8 @@ function RightPanel({
   onBroadcastThresholdChange,
   onSharedMemoryEnabledChange,
   onWorkspaceContextIndexingChange,
+  onMemoryEmbeddingProviderChange,
+  onMemoryEmbeddingExecutionEnabledChange,
   onMemoryPrivacyModeChange,
   onSecretRedactionChange,
   onMemoryRetentionDaysChange,
@@ -728,6 +749,8 @@ function RightPanel({
   onBroadcastThresholdChange: (broadcastThreshold: number) => void;
   onSharedMemoryEnabledChange: (sharedMemoryEnabled: boolean) => void;
   onWorkspaceContextIndexingChange: (indexWorkspaceContext: boolean) => void;
+  onMemoryEmbeddingProviderChange: (embeddingProvider: GomiMemoryEmbeddingProviderId) => void;
+  onMemoryEmbeddingExecutionEnabledChange: (embeddingExecutionEnabled: boolean) => void;
   onMemoryPrivacyModeChange: (privacyMode: GomiMemoryPrivacyMode) => void;
   onSecretRedactionChange: (redactSecrets: boolean) => void;
   onMemoryRetentionDaysChange: (retentionDays: number) => void;
@@ -782,6 +805,8 @@ function RightPanel({
           onBroadcastThresholdChange={onBroadcastThresholdChange}
           onSharedMemoryEnabledChange={onSharedMemoryEnabledChange}
           onWorkspaceContextIndexingChange={onWorkspaceContextIndexingChange}
+          onMemoryEmbeddingProviderChange={onMemoryEmbeddingProviderChange}
+          onMemoryEmbeddingExecutionEnabledChange={onMemoryEmbeddingExecutionEnabledChange}
           onMemoryPrivacyModeChange={onMemoryPrivacyModeChange}
           onSecretRedactionChange={onSecretRedactionChange}
           onMemoryRetentionDaysChange={onMemoryRetentionDaysChange}
@@ -842,6 +867,8 @@ function OfficeSettingsPanel({
   onBroadcastThresholdChange,
   onSharedMemoryEnabledChange,
   onWorkspaceContextIndexingChange,
+  onMemoryEmbeddingProviderChange,
+  onMemoryEmbeddingExecutionEnabledChange,
   onMemoryPrivacyModeChange,
   onSecretRedactionChange,
   onMemoryRetentionDaysChange,
@@ -862,6 +889,8 @@ function OfficeSettingsPanel({
   onBroadcastThresholdChange: (broadcastThreshold: number) => void;
   onSharedMemoryEnabledChange: (sharedMemoryEnabled: boolean) => void;
   onWorkspaceContextIndexingChange: (indexWorkspaceContext: boolean) => void;
+  onMemoryEmbeddingProviderChange: (embeddingProvider: GomiMemoryEmbeddingProviderId) => void;
+  onMemoryEmbeddingExecutionEnabledChange: (embeddingExecutionEnabled: boolean) => void;
   onMemoryPrivacyModeChange: (privacyMode: GomiMemoryPrivacyMode) => void;
   onSecretRedactionChange: (redactSecrets: boolean) => void;
   onMemoryRetentionDaysChange: (retentionDays: number) => void;
@@ -875,6 +904,15 @@ function OfficeSettingsPanel({
 }) {
   const leaders = officeSettings.seats.filter((seat) => seat.seatKind !== 'employee');
   const employees = officeSettings.seats.filter((seat) => seat.seatKind === 'employee');
+  const selectedEmbeddingProvider =
+    GOMI_MEMORY_EMBEDDING_PROVIDERS.find(
+      (provider) => provider.id === officeSettings.memory.embeddingProvider
+    ) ?? GOMI_MEMORY_EMBEDDING_PROVIDERS[0];
+  const embeddingEnvNames = [
+    selectedEmbeddingProvider.endpointEnv,
+    selectedEmbeddingProvider.modelEnv,
+    selectedEmbeddingProvider.apiKeyEnv
+  ].filter(Boolean);
 
   return (
     <section className="gomi-settings-panel" aria-label="Office Settings">
@@ -957,6 +995,8 @@ function OfficeSettingsPanel({
         <div className="gomi-settings-title">Shared Memory</div>
         <div className="gomi-memory-summary">
           <span>{officeSettings.memory.retrievalMode}</span>
+          <span>{getMemoryEmbeddingProviderLabel(officeSettings.memory.embeddingProvider)}</span>
+          <span>{officeSettings.memory.embeddingExecutionEnabled ? 'embeddings on' : 'embeddings local'}</span>
           <span>{officeSettings.memory.sharedMemoryEnabled ? 'shared on' : 'shared off'}</span>
           <span>{officeSettings.memory.privacyMode}</span>
           <span>{`broadcast >= ${Math.round(officeSettings.memory.broadcastThreshold * 100)}%`}</span>
@@ -980,6 +1020,34 @@ function OfficeSettingsPanel({
           />
           <span>Index workspace context</span>
         </label>
+        <label className="gomi-field">
+          <span>Embedding Provider</span>
+          <select
+            value={officeSettings.memory.embeddingProvider}
+            onChange={(event) =>
+              onMemoryEmbeddingProviderChange(event.target.value as GomiMemoryEmbeddingProviderId)
+            }
+          >
+            {GOMI_MEMORY_EMBEDDING_PROVIDERS.map((provider) => (
+              <option value={provider.id} key={provider.id}>
+                {provider.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="gomi-toggle-field">
+          <input
+            type="checkbox"
+            checked={officeSettings.memory.embeddingExecutionEnabled}
+            onChange={(event) => onMemoryEmbeddingExecutionEnabledChange(event.target.checked)}
+            disabled={officeSettings.memory.embeddingProvider === 'local-hashing'}
+          />
+          <span>HTTP embeddings</span>
+        </label>
+        <div className="gomi-seat-note">
+          {selectedEmbeddingProvider.description}
+          {embeddingEnvNames.length > 0 ? ` Env: ${embeddingEnvNames.join(', ')}.` : ''}
+        </div>
         <label className="gomi-field">
           <span>Privacy</span>
           <select
