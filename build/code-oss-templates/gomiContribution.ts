@@ -31,6 +31,8 @@ import {
   IWebviewService,
   WebviewContentPurpose
 } from '../../webview/browser/webview.js';
+import { createGomiWebviewHostBridge } from './gomiWebviewHostBridge.js';
+import { GomiWebviewHostController } from './gomiWebviewHostController.js';
 
 const GOMI_VIEW_CONTAINER_ID = 'workbench.view.gomiOffice';
 const GOMI_OFFICE_VIEW_ID = 'gomi.office.view';
@@ -130,6 +132,11 @@ class GomiOfficeViewPane extends ViewPane {
 
     webview.setHtml(createGomiOfficeWebviewHtml());
     this.webview.value = webview;
+    const bridge = createGomiWebviewHostBridge(webview);
+    const controller = new GomiWebviewHostController({ bridge });
+    controller.start();
+    this.webviewDisposables.add(bridge);
+    this.webviewDisposables.add(controller);
     this.webviewDisposables.add(toDisposable(() => this.webview.value?.release(this)));
   }
 
@@ -228,7 +235,7 @@ function createGomiOfficeWebviewHtml(): string {
     '</head>',
     '<body>',
     '<div id="root"></div>',
-    `<script nonce="${nonce}">window.__GOMI_CODE_OSS_WEBVIEW__ = true; window.__GOMI_ENABLE_WORKBENCH_BRIDGE__ = false;</script>`,
+    `<script nonce="${nonce}">window.__GOMI_CODE_OSS_WEBVIEW__ = true; window.__GOMI_ENABLE_WORKBENCH_BRIDGE__ = true;</script>`,
     `<script nonce="${nonce}" type="module" src="${scriptUri}"></script>`,
     '</body>',
     '</html>'
