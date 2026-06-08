@@ -6,6 +6,7 @@ interface PhaserOfficeProps {
   agents: GomiAgent[];
   tasks: GomiTask[];
   messages: GomiChatMessage[];
+  layoutToken?: string;
 }
 
 const statusColors: Record<GomiAgent['status'], number> = {
@@ -14,6 +15,7 @@ const statusColors: Record<GomiAgent['status'], number> = {
   working: 0x38bdf8,
   waiting: 0x94a3b8,
   reviewing: 0xfbbf24,
+  sleeping: 0x818cf8,
   done: 0x22c55e,
   blocked: 0xf43f5e
 };
@@ -23,18 +25,20 @@ const roleColors: Record<GomiAgent['id'], number> = {
   'system-analyst': 0x60a5fa,
   backend: 0xa78bfa,
   frontend: 0xf472b6,
+  designer: 0xfb7185,
   database: 0x38bdf8,
   qa: 0xfbbf24,
   devops: 0x34d399
 };
 
-export function PhaserOffice({ agents, tasks, messages }: PhaserOfficeProps) {
+export function PhaserOffice({ agents, tasks, messages, layoutToken }: PhaserOfficeProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const sceneRef = useRef<GomiOfficeScene | null>(null);
   const agentsRef = useRef(agents);
   const tasksRef = useRef(tasks);
   const messagesRef = useRef(messages);
+  const lastSizeRef = useRef({ width: 0, height: 0 });
 
   useEffect(() => {
     agentsRef.current = agents;
@@ -42,6 +46,17 @@ export function PhaserOffice({ agents, tasks, messages }: PhaserOfficeProps) {
     messagesRef.current = messages;
     sceneRef.current?.renderOffice(agents, tasks, messages);
   }, [agents, tasks, messages]);
+
+  useEffect(() => {
+    const frame = globalThis.requestAnimationFrame(() => {
+      resizeGameToHost(hostRef.current, gameRef.current);
+      sceneRef.current?.renderOffice(agentsRef.current, tasksRef.current, messagesRef.current);
+    });
+
+    return () => {
+      globalThis.cancelAnimationFrame(frame);
+    };
+  }, [layoutToken]);
 
   useEffect(() => {
     if (!hostRef.current || gameRef.current) {
@@ -63,8 +78,8 @@ export function PhaserOffice({ agents, tasks, messages }: PhaserOfficeProps) {
         nextTasks: GomiTask[],
         nextMessages: GomiChatMessage[]
       ) {
-        const width = this.scale.width || 640;
-        const height = this.scale.height || 360;
+        const width = this.game.canvas.width || this.scale.width || 640;
+        const height = this.game.canvas.height || this.scale.height || 360;
         const latestSpeech = this.getLatestSpeechBySender(nextMessages);
 
         this.children.removeAll(true);
@@ -108,11 +123,19 @@ export function PhaserOffice({ agents, tasks, messages }: PhaserOfficeProps) {
         );
         this.drawRoom(
           graphics,
-          width * 0.67,
+          width * 0.64,
           height * 0.1,
-          width * 0.26,
+          width * 0.16,
           height * 0.28,
           'Frontend Studio'
+        );
+        this.drawRoom(
+          graphics,
+          width * 0.82,
+          height * 0.1,
+          width * 0.12,
+          height * 0.28,
+          'Design'
         );
         this.drawRoom(graphics, width * 0.05, height * 0.58, width * 0.25, height * 0.28, 'Data Lab');
         this.drawRoom(graphics, width * 0.38, height * 0.58, width * 0.25, height * 0.28, 'QA Desk');
@@ -159,7 +182,8 @@ export function PhaserOffice({ agents, tasks, messages }: PhaserOfficeProps) {
         const desks = [
           { x: width * 0.11, y: height * 0.28 },
           { x: width * 0.43, y: height * 0.28 },
-          { x: width * 0.74, y: height * 0.28 },
+          { x: width * 0.68, y: height * 0.28 },
+          { x: width * 0.83, y: height * 0.28 },
           { x: width * 0.11, y: height * 0.75 },
           { x: width * 0.45, y: height * 0.75 },
           { x: width * 0.76, y: height * 0.75 }
@@ -246,6 +270,12 @@ export function PhaserOffice({ agents, tasks, messages }: PhaserOfficeProps) {
       private drawAgent(agent: GomiAgent, width: number, height: number, bubbleText?: string) {
         const x = (agent.position.x / 100) * width;
         const y = (agent.position.y / 100) * height;
+
+        if (agent.status === 'sleeping') {
+          this.drawSleepingAgent(agent, x, y, width);
+          return;
+        }
+
         const color = roleColors[agent.id];
         const statusColor = statusColors[agent.status];
         const isActive = agent.status !== 'idle' && agent.status !== 'waiting';
@@ -297,6 +327,46 @@ export function PhaserOffice({ agents, tasks, messages }: PhaserOfficeProps) {
         if (bubbleText) {
           this.drawSpeechBubble(x, y - 88, this.shorten(bubbleText, 58), width);
         }
+      }
+
+      private drawSleepingAgent(agent: GomiAgent, x: number, y: number, sceneWidth: number) {
+        const group = this.add.container(x, y);
+        const color = roleColors[agent.id];
+
+        group.add(this.add.ellipse(0, 30, 70, 18, 0x020617, 0.24));
+        group.add(this.add.rectangle(0, 14, 68, 24, 0x1e293b, 1).setOrigin(0.5));
+        group.add(this.add.rectangle(12, 4, 48, 18, color, 1).setOrigin(0.5));
+        group.add(this.add.circle(-24, 2, 14, 0xffedd5, 1));
+        group.add(this.add.rectangle(7, 12, 58, 18, 0x93c5fd, 0.92).setOrigin(0.5));
+        group.add(this.add.arc(-26, 1, 6, 20, 150, false).setStrokeStyle(2, 0x111827));
+        group.add(this.add.circle(31, -9, 7, statusColors.sleeping, 1));
+
+        this.add
+          .text(x, y + 44, agent.name.replace(' Agent', ''), {
+            color: '#e5e7eb',
+            fontFamily: 'Inter, Arial',
+            fontSize: '12px',
+            fontStyle: '700'
+          })
+          .setOrigin(0.5, 0);
+
+        this.add.text(x + 28, y - 42, 'Zzz', {
+          color: '#c4b5fd',
+          fontFamily: 'Inter, Arial',
+          fontSize: '13px',
+          fontStyle: '700'
+        });
+
+        this.tweens.add({
+          targets: group,
+          y: y - 3,
+          duration: 1100,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+
+        this.drawSpeechBubble(x, y - 82, 'Sleeping. Seat retained.', sceneWidth);
       }
 
       private drawGomiGuide(width: number, height: number, isMoving: boolean, bubbleText?: string) {
@@ -434,7 +504,61 @@ export function PhaserOffice({ agents, tasks, messages }: PhaserOfficeProps) {
     };
   }, []);
 
+  useEffect(() => {
+    const host = hostRef.current;
+
+    if (!host) {
+      return;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+
+      if (!entry) {
+        return;
+      }
+
+      const width = Math.floor(entry.contentRect.width);
+      const height = Math.floor(entry.contentRect.height);
+
+      if (width <= 0 || height <= 0) {
+        return;
+      }
+
+      if (lastSizeRef.current.width === width && lastSizeRef.current.height === height) {
+        return;
+      }
+
+      lastSizeRef.current = { width, height };
+      resizeGameToHost(host, gameRef.current);
+      sceneRef.current?.renderOffice(agentsRef.current, tasksRef.current, messagesRef.current);
+    });
+
+    observer.observe(host);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   return <div className="gomi-office-canvas" ref={hostRef} />;
+}
+
+function resizeGameToHost(host: HTMLDivElement | null, game: Phaser.Game | null) {
+  if (!host || !game) {
+    return;
+  }
+
+  const width = Math.max(1, Math.floor(host.clientWidth));
+  const height = Math.max(1, Math.floor(host.clientHeight));
+  const scale = game.scale;
+  const canvas = game.canvas;
+
+  scale.resize(width, height);
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
 }
 
 interface GomiOfficeScene extends Phaser.Scene {

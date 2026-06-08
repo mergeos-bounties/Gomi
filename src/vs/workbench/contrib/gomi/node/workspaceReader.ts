@@ -17,7 +17,30 @@ export function createDemoWorkspaceSnapshot(rootName = 'Gomi'): GomiWorkspaceSna
     ],
     openEditors: ['GomiOfficeApp.tsx', 'agentRuntime.ts'],
     gitSummary: 'Workspace scaffold, no upstream Code - OSS history yet.',
-    terminalSummary: 'Node and npm are available for Vite development.'
+    terminalSummary: 'Node and npm are available for Vite development.',
+    contentSnippets: [
+      {
+        filePath: 'README.md',
+        content:
+          'Gomi IDE is a Code - OSS fork direction with a visual multi-agent office, shared project memory, patch approval, and agent runtime.',
+        language: 'markdown',
+        source: 'workspace'
+      },
+      {
+        filePath: 'src/vs/workbench/contrib/gomi/node/agentRuntime.ts',
+        content:
+          'GomiAgentRuntime reads workspace context, retrieves shared project memory, runs specialist agents, emits patch proposals, and waits for approval before apply.',
+        language: 'typescript',
+        source: 'open_editor'
+      },
+      {
+        filePath: 'product.json',
+        content:
+          '{"nameShort":"Gomi","nameLong":"Gomi IDE","applicationName":"gomi-ide","dataFolderName":".gomi-ide"}',
+        language: 'json',
+        source: 'workspace'
+      }
+    ]
   };
 }
 

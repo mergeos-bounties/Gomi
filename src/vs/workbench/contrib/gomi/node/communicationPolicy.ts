@@ -12,6 +12,7 @@ const roleImportance: Record<GomiAgentResult['agentId'], number> = {
   'system-analyst': 0.84,
   backend: 0.62,
   frontend: 0.62,
+  designer: 0.68,
   database: 0.54,
   qa: 0.82,
   devops: 0.55

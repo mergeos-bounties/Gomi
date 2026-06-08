@@ -3,6 +3,7 @@ export type GomiAgentId =
   | 'system-analyst'
   | 'backend'
   | 'frontend'
+  | 'designer'
   | 'database'
   | 'qa'
   | 'devops';
@@ -13,6 +14,7 @@ export type GomiAgentStatus =
   | 'working'
   | 'waiting'
   | 'reviewing'
+  | 'sleeping'
   | 'done'
   | 'blocked';
 
@@ -26,6 +28,49 @@ export type GomiPatchApprovalStatus =
   | 'failed';
 export type GomiPatchRiskLevel = 'low' | 'medium' | 'high';
 export type GomiMemoryKind = 'request' | 'workspace' | 'agent_result' | 'patch' | 'report';
+export type GomiAgentCliProviderId =
+  | 'codex-cli'
+  | 'claude-code'
+  | 'gemini-cli'
+  | 'aider-cli'
+  | 'cursor-style-agent'
+  | 'local-llm'
+  | 'demo-runtime';
+export type GomiAgentSeatKind = 'executive' | 'department-head' | 'employee';
+export type GomiAgentWorkMode = 'active' | 'sleeping' | 'fired';
+
+export interface GomiAgentCliProvider {
+  id: GomiAgentCliProviderId;
+  label: string;
+  command: string;
+  description: string;
+}
+
+export interface GomiAgentSeat {
+  id: string;
+  agentId: GomiAgentId;
+  name: string;
+  role: string;
+  seatKind: GomiAgentSeatKind;
+  providerId: GomiAgentCliProviderId;
+  workMode: GomiAgentWorkMode;
+  canSleep: boolean;
+  canFire: boolean;
+  departmentId?: GomiAgentId;
+}
+
+export interface GomiOfficeMemorySettings {
+  retrievalMode: 'hybrid-vector';
+  sharedMemoryEnabled: boolean;
+  indexWorkspaceContext: boolean;
+  broadcastThreshold: number;
+  requirePatchApproval: boolean;
+}
+
+export interface GomiOfficeSettings {
+  seats: GomiAgentSeat[];
+  memory: GomiOfficeMemorySettings;
+}
 
 export interface GomiAgent {
   id: GomiAgentId;
@@ -83,6 +128,14 @@ export interface GomiWorkspaceSnapshot {
   openEditors: string[];
   gitSummary: string;
   terminalSummary: string;
+  contentSnippets?: GomiWorkspaceContentSnippet[];
+}
+
+export interface GomiWorkspaceContentSnippet {
+  filePath: string;
+  content: string;
+  language?: string;
+  source: 'workspace' | 'open_editor' | 'selection' | 'terminal' | 'diagnostic' | 'git_diff';
 }
 
 export interface GomiAgentResult {

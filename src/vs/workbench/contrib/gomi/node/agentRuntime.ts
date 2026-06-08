@@ -1,9 +1,17 @@
 import { BASE_GOMI_AGENTS } from '../common/gomiConstants';
+import {
+  DEFAULT_GOMI_OFFICE_SETTINGS,
+  GOMI_AGENT_CLI_PROVIDERS,
+  getProviderLabel,
+  getSeatForAgent,
+  isAgentAvailableForTask
+} from '../common/gomiOfficeSettings';
 import type {
   GomiAgentId,
   GomiAgentResult,
   GomiAgentStatus,
   GomiChatMessage,
+  GomiOfficeSettings,
   GomiRuntimeEvent,
   GomiTask
 } from '../common/gomiTypes';
@@ -17,6 +25,10 @@ import {
 } from './memoryStore';
 import { GomiMessageBus } from './messageBus';
 import { createPatchProposal } from './patchApplier';
+import {
+  DefaultGomiProjectContextIndexer,
+  type GomiProjectContextIndexer
+} from './projectContextIndexer';
 import { GomiResultAggregator } from './resultAggregator';
 import { GomiSharedProjectMemory } from './sharedProjectMemory';
 import { GomiTaskPlanner } from './taskPlanner';
@@ -35,7 +47,9 @@ interface GomiRuntimeOptions {
   agentProvider?: GomiAgentProvider;
   memoryStore?: GomiMemoryStore;
   vectorMemoryStore?: GomiVectorMemoryStore;
+  projectContextIndexer?: GomiProjectContextIndexer;
   resultAggregator?: GomiResultAggregator;
+  officeSettings?: GomiOfficeSettings;
 }
 
 export class GomiAgentRuntime {
@@ -46,7 +60,9 @@ export class GomiAgentRuntime {
   private readonly agentProvider: GomiAgentProvider;
   private readonly memoryStore: GomiMemoryStore;
   private readonly vectorMemoryStore: GomiVectorMemoryStore;
+  private readonly projectContextIndexer: GomiProjectContextIndexer;
   private readonly resultAggregator: GomiResultAggregator;
+  private readonly officeSettings: GomiOfficeSettings;
 
   constructor(options: GomiRuntimeOptions = {}) {
     this.delayMs = options.delayMs ?? 280;
@@ -54,7 +70,9 @@ export class GomiAgentRuntime {
     this.agentProvider = options.agentProvider ?? createDemoGomiAgentProvider();
     this.memoryStore = options.memoryStore ?? createInMemoryGomiMemoryStore();
     this.vectorMemoryStore = options.vectorMemoryStore ?? createInMemoryVectorMemoryStore();
+    this.projectContextIndexer = options.projectContextIndexer ?? new DefaultGomiProjectContextIndexer();
     this.resultAggregator = options.resultAggregator ?? new GomiResultAggregator();
+    this.officeSettings = options.officeSettings ?? DEFAULT_GOMI_OFFICE_SETTINGS;
   }
 
   subscribe(type: GomiRuntimeEvent['type'], listener: (event: GomiRuntimeEvent) => void): () => void {
@@ -64,11 +82,26 @@ export class GomiAgentRuntime {
   async *run(request: string): AsyncGenerator<GomiRuntimeEvent> {
     const sessionId = `gomi-${Date.now()}`;
     const workspace = await this.workspaceReader();
-    const tasks = this.planner.createPlan(request, workspace);
+    const plannedTasks = this.planner.createPlan(request, workspace);
+    const tasks = plannedTasks.map((task) => this.applyOfficeAvailability(task));
     const agentResults: GomiAgentResult[] = [];
-    const sharedProjectMemory = new GomiSharedProjectMemory(this.memoryStore, {
+    const memoryScope = {
       workspaceId: workspace.rootName
-    }, this.vectorMemoryStore);
+    };
+    const sharedProjectMemory = new GomiSharedProjectMemory(
+      this.memoryStore,
+      memoryScope,
+      this.vectorMemoryStore
+    );
+    const indexResult = this.officeSettings.memory.indexWorkspaceContext
+      ? await this.projectContextIndexer.indexWorkspace(workspace, memoryScope, {
+          memoryStore: this.memoryStore,
+          vectorMemoryStore: this.vectorMemoryStore
+        })
+      : {
+          chunkCount: 0,
+          indexedPaths: []
+        };
 
     this.memoryStore.add({
       sessionId,
@@ -80,7 +113,7 @@ export class GomiAgentRuntime {
       kind: 'workspace',
       content: createMemoryContent(
         'workspace',
-        `${workspace.rootName}: ${workspace.files.slice(0, 12).join(', ')}`
+        `${workspace.rootName}: indexed ${indexResult.chunkCount} context chunks from ${indexResult.indexedPaths.length} paths. ${workspace.files.slice(0, 12).join(', ')}`
       )
     });
     await sharedProjectMemory.rememberWorkspace(workspace);
@@ -94,7 +127,11 @@ export class GomiAgentRuntime {
 
     yield* this.say('user', 'User', request);
     yield* this.status('ceo', 'planning');
-    yield* this.say('ceo', 'CEO Agent', 'I am reading the workspace and splitting this request into agent tasks.');
+    yield* this.say(
+      'ceo',
+      'CEO Agent',
+      `I am reading the workspace through ${getProviderLabel(this.getAgentProviderId('ceo'))} and splitting this request into agent tasks.`
+    );
     await this.wait();
 
     for (const task of tasks) {
@@ -102,6 +139,16 @@ export class GomiAgentRuntime {
     }
 
     for (const task of tasks) {
+      if (!isAgentAvailableForTask(this.officeSettings, task.agentId)) {
+        yield* this.status(task.agentId, 'sleeping');
+        yield* this.say(
+          'pet-gomi',
+          'Pet Gomi',
+          `${this.agentName(task.agentId)} is sleeping. CEO keeps the head seat and skips only this task.`
+        );
+        continue;
+      }
+
       const sharedMemory = await sharedProjectMemory.searchForTask(task, request);
       yield* this.status(task.agentId, 'working', task.id);
       yield* this.updateTask(task, 'running', 42);
@@ -111,7 +158,8 @@ export class GomiAgentRuntime {
         workspace,
         task,
         memory: this.memoryStore.recent(sessionId, 12),
-        sharedMemory
+        sharedMemory,
+        agentCli: this.getAgentCli(task.agentId)
       });
       const communicationDecision = evaluateAgentCommunication(agentResult);
       agentResults.push(agentResult);
@@ -221,6 +269,34 @@ export class GomiAgentRuntime {
 
   private agentName(agentId: GomiAgentId): string {
     return BASE_GOMI_AGENTS.find((agent) => agent.id === agentId)?.name ?? 'Gomi Agent';
+  }
+
+  private applyOfficeAvailability(task: GomiTask): GomiTask {
+    if (isAgentAvailableForTask(this.officeSettings, task.agentId)) {
+      return task;
+    }
+
+    return {
+      ...task,
+      detail: `${task.detail} This department head is sleeping, so CEO will hold the seat and skip execution.`,
+      status: 'blocked',
+      progress: 0
+    };
+  }
+
+  private getAgentProviderId(agentId: GomiAgentId) {
+    return getSeatForAgent(this.officeSettings, agentId)?.providerId ?? 'demo-runtime';
+  }
+
+  private getAgentCli(agentId: GomiAgentId) {
+    const providerId = this.getAgentProviderId(agentId);
+    const provider = GOMI_AGENT_CLI_PROVIDERS.find((candidate) => candidate.id === providerId);
+
+    return {
+      providerId,
+      label: provider?.label ?? providerId,
+      command: provider?.command ?? providerId
+    };
   }
 
   private agentMessage(task: GomiTask, result: GomiAgentResult, broadcastSummary: string): string {

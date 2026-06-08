@@ -2,194 +2,246 @@
 
 **Gomi Office IDE: Multi-Agent Development Environment**
 
-Gomi IDE is a standalone IDE direction based on a **Code - OSS fork**. It rebrands the editor as Gomi IDE, customizes the workbench experience, and introduces a visual **Gomi Multi-Agent Office** where a CEO Agent can plan work and delegate tasks to technical agents.
+Gomi IDE is a product foundation for a standalone developer IDE built from a **Code - OSS fork**. It combines a familiar editor workbench with a visual multi-agent office where software tasks are planned, delegated, reviewed, and approved before code changes are applied.
 
-Instead of presenting AI assistance as a simple chat box, Gomi IDE models software delivery as a virtual office. The user enters a project request, the CEO Agent analyzes the workspace, then specialist agents coordinate through visible task status, chat bubbles, memory notes, and final reports.
-
-![Gomi Office IDE interface](docs/images/gomi-office-cute-office.png)
-
-## Product Direction
+The product direction is not "a VS Code extension". The intended commercial product is an independent IDE distribution:
 
 ```text
 Fork Code - OSS
 -> Rebrand as Gomi IDE
--> Customize the workbench UI
--> Add the Gomi Multi-Agent Panel
+-> Customize the workbench
+-> Add the Gomi Multi-Agent Office
 -> Add the AI Agent Runtime
--> Package as a standalone IDE
+-> Package and distribute as a standalone IDE
 ```
 
-Gomi IDE should be described as **an IDE built from Code - OSS**, not as a VS Code extension or a wrapper around Visual Studio Code.
+![Gomi Office IDE interface](docs/images/gomi-office-cute-office.png)
 
-## What This Repository Contains
+## Product Vision
 
-This repository is the first production-oriented scaffold for the Gomi module before it is merged into a full Code - OSS fork. It includes:
+Modern AI coding tools often compress all collaboration into a single chat surface. Gomi takes a different approach: it turns project work into a visible, structured office.
 
-- Product branding metadata in `product.json`.
-- A workbench-compatible module path under `src/vs/workbench/contrib/gomi`.
-- A React workbench demo for the Gomi Office panel.
-- A Phaser-powered 2D office simulation.
-- Cute game-style agent avatars with animated status behavior.
-- A memory board for task context and shared office notes.
-- Chat bubbles above agents when they exchange information.
-- CEO Agent planning flow and specialist agent task updates.
-- Message bus, task planner, workspace reader scaffold, patch proposal, and final report events.
-- A review-first patch approval panel with unified diff preview, approve/reject controls, and apply gating.
-- A Node-side workspace reader that can inspect real project files, product metadata, package scripts, and Git state.
-- A hybrid project memory layer with lexical search plus vector-style retrieval for agent context sharing.
-- Open VSX Registry metadata instead of Microsoft Visual Studio Marketplace metadata.
+The user enters a development request. A CEO Agent analyzes the workspace, creates a plan, delegates work to specialist agents, stores useful project knowledge in shared memory, and produces a patch proposal that the user must review before applying.
 
-## Core Concept
+The goal is to make AI-assisted development more understandable, auditable, and suitable for professional engineering teams.
 
-The Gomi Multi-Agent Office contains:
+## Commercial Positioning
 
-- **CEO Agent**: receives the request, creates the plan, delegates work, and summarizes results.
+Gomi IDE is designed to become a commercial-grade AI development environment with:
+
+- A standalone branded IDE experience based on Code - OSS.
+- A visual multi-agent workflow instead of a generic chat-only assistant.
+- Project-aware memory and retrieval for long-running work.
+- Human approval gates before code modification.
+- A path to cloud LLM providers, local models, or enterprise-managed model routing.
+- Open VSX or a dedicated extension marketplace strategy.
+- Clear separation between product branding, editor core, AI runtime, and visual office UI.
+
+This repository is the current product foundation and technical prototype. It is not yet a fully packaged Code - OSS distribution.
+
+## Key Capabilities
+
+- **Gomi-branded product metadata** through `product.json`.
+- **Workbench-compatible module structure** under `src/vs/workbench/contrib/gomi`.
+- **Gomi Office panel UI** built with React.
+- **Collapsible workbench views and Office Focus mode** so the visual office can expand across the workspace.
+- **2D office simulation** built with Phaser.
+- **Animated game-style agents** with visible status and chat bubbles.
+- **Shared memory board** for project context.
+- **CEO Agent planning flow** with specialist agent delegation.
+- **Office organization settings** for assigning CLI agent routes to the CEO and department heads.
+- **Department head sleep mode** to pause a leader without removing the role from the organization.
+- **Employee lifecycle controls** for removing or restoring non-lead staff seats.
+- **Agent communication policy** that keeps routine updates in memory and only broadcasts important findings.
+- **Hybrid project memory** using lexical search plus vector-style retrieval.
+- **Project context indexing** for file tree, manifests, open editor snippets, selected code, terminal output, diagnostics, and git diff input shapes.
+- **Patch review workflow** with diff preview, approve/reject controls, and apply gating.
+- **Runtime events** for session lifecycle, messages, task updates, agent results, patch proposals, and final reports.
+- **Open VSX Registry metadata** instead of Microsoft Visual Studio Marketplace metadata.
+
+## Multi-Agent Office
+
+Gomi models product development as a virtual office:
+
+- **CEO Agent**: plans work, delegates tasks, tracks progress, and synthesizes the final report.
 - **System Analyst Agent**: maps requirements, modules, risks, and acceptance criteria.
-- **Backend Agent**: reviews or prepares APIs, services, controllers, and server-side logic.
-- **Frontend Agent**: reviews or prepares workbench UI, views, panels, and user flows.
-- **Database Agent**: reviews schemas, migrations, models, and data persistence.
-- **QA Agent**: checks logic, test coverage, edge cases, and verification gates.
-- **DevOps Agent**: checks build scripts, packaging, environment, CI/CD, and deployment paths.
-- **Gomi Guide**: a visual companion that moves through the office and reports workflow status.
+- **Backend Agent**: reviews APIs, controllers, services, models, and backend logic.
+- **Frontend Agent**: reviews workbench UI, webview state, panels, and user flows.
+- **Designer Agent**: defines UX direction, visual language, office atmosphere, avatar style, and interaction polish.
+- **Database Agent**: reviews schema, migrations, models, and persistence.
+- **QA Agent**: reviews logic risks, edge cases, test strategy, and regression gates.
+- **DevOps Agent**: reviews build, packaging, environment, extension registry, and deployment path.
+- **Gomi Guide**: the visual companion inside the office simulation.
 
 ## Architecture
 
 ```text
 Gomi IDE
-├── Code Editor Core
-│   ├── File Explorer
-│   ├── Text Editor
-│   ├── Terminal
-│   ├── Debug
-│   └── Git
-│
-├── Gomi Multi-Agent Office
-│   ├── CEO Agent
-│   ├── System Analyst Agent
-│   ├── Backend Agent
-│   ├── Frontend Agent
-│   ├── Database Agent
-│   ├── QA Agent
-│   ├── DevOps Agent
-│   └── Gomi Guide
-│
-├── Agent Communication Layer
-│   ├── Task Planner
-│   ├── Message Bus
-│   ├── Event System
-│   └── Result Aggregator
-│
-├── Visual Office Simulation
-│   ├── 2D Office Map
-│   ├── Agent Avatar
-│   ├── Animation
-│   ├── Chat Bubble
-│   ├── Memory Board
-│   └── Task Status Panel
-│
-└── AI Runtime
-    ├── LLM API Adapter
-    ├── Local Model Option
-    ├── Memory
-    └── Project Context Reader
+|-- Code Editor Core
+|   |-- File Explorer
+|   |-- Text Editor
+|   |-- Terminal
+|   |-- Debug
+|   `-- Git
+|
+|-- Gomi Multi-Agent Office
+|   |-- CEO Agent
+|   |-- System Analyst Agent
+|   |-- Backend Agent
+|   |-- Frontend Agent
+|   |-- Designer Agent
+|   |-- Database Agent
+|   |-- QA Agent
+|   |-- DevOps Agent
+|   `-- Gomi Guide
+|
+|-- Agent Communication Layer
+|   |-- Task Planner
+|   |-- Message Bus
+|   |-- Event System
+|   |-- Communication Policy
+|   `-- Result Aggregator
+|
+|-- Visual Office Simulation
+|   |-- 2D Office Map
+|   |-- Agent Avatars
+|   |-- Animation
+|   |-- Chat Bubbles
+|   |-- Memory Board
+|   `-- Task Status Panel
+|
+`-- AI Runtime
+    |-- Agent Provider Contract
+    |-- CLI Agent Routing
+    |-- Cloud LLM Adapter Path
+    |-- Local Model Adapter Path
+    |-- Hybrid Project Memory
+    |-- Vector-style Retrieval
+    |-- Project Context Indexer
+    `-- Patch Proposal Flow
 ```
+
+## Shared Project Memory
+
+Gomi agents share a project memory layer so they do not need to repeat every observation in chat.
+
+The current implementation uses hybrid retrieval:
+
+- **Lexical memory search** for exact file paths, symbols, package names, commands, and configuration keys.
+- **Vector-style retrieval** for semantic search across project facts and agent findings.
+- **Scoped memory** by workspace/thread to avoid leaking knowledge between projects.
+- **Agent result memory** so specialist agents can build on prior findings.
+- **Project context indexing** so workspace metadata and content snippets can be retrieved by task.
+- **Communication policy** so low-importance findings are stored silently while high-importance findings become visible messages and chat bubbles.
+
+For the MVP, vector retrieval uses a local hashing embedding provider. It does not require an API key and keeps tests deterministic. In a production build, this provider can be replaced by OpenAI embeddings, a local embedding model, or an enterprise embedding service without changing the runtime contract.
+
+## Patch Review And Safety
+
+Gomi is designed around review-first code modification.
+
+Current patch flow:
+
+```text
+Agent results
+-> CEO synthesis
+-> Patch proposal
+-> Diff preview
+-> User approves or rejects
+-> Apply remains disabled until approval
+```
+
+This keeps generated changes auditable and prevents agents from silently modifying source code.
+
+## Code - OSS Integration Path
+
+The intended product path is:
+
+1. Fork Code - OSS.
+2. Replace all product metadata with Gomi branding.
+3. Replace app icons, splash/about assets, and distribution names.
+4. Configure Open VSX or a Gomi-owned extension marketplace.
+5. Register `Gomi Office` in the Activity Bar.
+6. Load the Gomi Office webview inside the workbench.
+7. Connect `gomiBridge.ts` to the workbench/webview message boundary.
+8. Run the AI runtime from the workbench/node side.
+9. Feed workspace files, open editors, selected code, terminal output, git diff, diagnostics, and logs into the project context indexer.
+10. Show generated changes through a diff-first approval flow.
+11. Package Gomi IDE for Windows, macOS, and Linux.
 
 ## Repository Layout
 
 ```text
 src/vs/workbench/contrib/gomi/
-├── browser/
-│   ├── GomiOfficeApp.tsx
-│   ├── PhaserOffice.tsx
-│   ├── gomiOfficeView.ts
-│   ├── gomiAgentPanel.ts
-│   ├── gomiTaskView.ts
-│   └── gomiChatView.ts
-│
-├── common/
-│   ├── gomiTypes.ts
-│   ├── gomiEvents.ts
-│   └── gomiConstants.ts
-│
-├── electron-sandbox/
-│   └── gomiBridge.ts
-│
-└── node/
-    ├── agentRuntime.ts
-    ├── taskPlanner.ts
-    ├── messageBus.ts
-    ├── workspaceReader.ts
-    └── patchApplier.ts
+|-- browser/
+|   |-- GomiOfficeApp.tsx
+|   |-- PhaserOffice.tsx
+|   |-- gomiPatchApproval.ts
+|   |-- gomiOfficeView.ts
+|   |-- gomiAgentPanel.ts
+|   |-- gomiTaskView.ts
+|   `-- gomiChatView.ts
+|
+|-- common/
+|   |-- gomiTypes.ts
+|   |-- gomiEvents.ts
+|   `-- gomiConstants.ts
+|
+|-- electron-sandbox/
+|   `-- gomiBridge.ts
+|
+`-- node/
+    |-- agentRuntime.ts
+    |-- agentProvider.ts
+    |-- taskPlanner.ts
+    |-- messageBus.ts
+    |-- memoryStore.ts
+    |-- vectorMemoryStore.ts
+    |-- embeddingProvider.ts
+    |-- sharedProjectMemory.ts
+    |-- projectContextIndexer.ts
+    |-- communicationPolicy.ts
+    |-- resultAggregator.ts
+    |-- workspaceReader.ts
+    |-- nodeWorkspaceReader.ts
+    `-- patchApplier.ts
 ```
 
-## Workbench Experience
+## Current Implementation Status
 
-The current MVP opens directly into a workbench-style interface. It is intentionally not a marketing landing page.
+Implemented in this repository:
 
-Key UI areas:
+- Gomi product metadata.
+- Workbench-compatible Gomi module skeleton.
+- React workbench shell.
+- Phaser 2D office simulation.
+- Animated office avatars and chat bubbles.
+- Memory board and task status UI.
+- Collapsible side/bottom panels and Office Focus mode.
+- CEO Agent planning simulation.
+- Specialist agent runtime flow.
+- Designer Agent role for UX, visual language, office atmosphere, and avatar direction.
+- Office settings for CEO and department-head CLI routing.
+- Department-head sleep mode and employee fire/restore controls.
+- Runtime event stream.
+- Agent provider contract with a demo provider.
+- Hybrid project memory with lexical and vector-style retrieval.
+- Project context chunking and indexing.
+- Communication policy for selective agent broadcast.
+- Node workspace reader for real project metadata and content snippets.
+- Patch proposal, diff preview, approve/reject, and apply gating.
+- Tests for runtime, planner, message bus, patch approval, workspace reader, project context indexing, shared memory, and vector memory.
 
-- **Activity Bar**: includes the Gomi Office entry alongside editor-style navigation.
-- **Project Sidebar**: shows project context, files, and runtime status.
-- **Project Request**: accepts a natural-language engineering request.
-- **2D Office Simulation**: renders rooms, desks, a memory board, animated avatars, and speech bubbles.
-- **Agent List**: tracks each agent's role and live status.
-- **Task Queue**: shows queued, running, and completed work.
-- **Agent Chat Log**: records the information exchanged by agents.
-- **Final Report**: summarizes delivery output and generated patch proposals.
-- **Patch Review**: shows target files and unified diff output before the user approves or rejects generated changes.
+Not yet implemented:
 
-## Runtime Flow
-
-```text
-User opens Gomi IDE
--> Opens a project folder
--> Opens Gomi Office
--> Enters a request
--> CEO Agent reads project context
--> Runtime retrieves relevant shared project memory
--> CEO Agent creates a task plan
--> Specialist agents process their tasks
--> Each agent writes useful facts back into shared project memory
--> Communication policy broadcasts only important findings
--> Gomi Office displays movement, chat bubbles, and task state
--> CEO Agent produces a final report
--> Runtime creates a patch proposal
--> User reviews the diff before approving
--> Apply remains disabled until the patch is approved
-```
-
-## Branding Notes
-
-The fork should not keep Visual Studio Code or Microsoft branding for the standalone product.
-
-Current product metadata is defined in `product.json`:
-
-```json
-{
-  "nameShort": "Gomi",
-  "nameLong": "Gomi IDE",
-  "applicationName": "gomi-ide",
-  "dataFolderName": ".gomi-ide",
-  "win32MutexName": "gomiide",
-  "licenseName": "MIT"
-}
-```
-
-The extension gallery is configured for **Open VSX Registry**, which is the recommended open registry path for Code - OSS based products.
-
-## Shared Project Memory
-
-Gomi uses a shared memory design so agents do not need to repeat everything in chat.
-
-The current scaffold implements a hybrid memory layer:
-
-- **Lexical memory search** for exact terms, file paths, package names, and command names.
-- **Vector-style memory search** for semantic retrieval across project facts and agent findings.
-- **Scoped memory** by workspace so project knowledge does not leak between repositories.
-- **Agent result memory** so each agent can reuse prior findings from the same project.
-- **Communication policy** so low-importance updates are stored silently while high-importance findings become visible chat bubbles.
-
-For the MVP, vector retrieval uses a local hashing embedding provider. It does not need an API key and keeps the demo deterministic. In a production Code - OSS fork, this provider can be replaced with OpenAI embeddings or a local embedding model while keeping the same memory store contract.
+- Full upstream Code - OSS source integration.
+- Native workbench contribution registration in a complete Code - OSS tree.
+- Production LLM API provider.
+- Production local model provider.
+- Persistent database-backed memory.
+- Real patch application against workspace files.
+- Signed desktop packaging and release pipeline.
+- Enterprise settings, licensing, update channel, and telemetry policy.
 
 ## Getting Started
 
@@ -199,16 +251,10 @@ Install dependencies:
 npm install
 ```
 
-Run the local Gomi Office demo:
+Run the local workbench demo:
 
 ```bash
 npm run dev
-```
-
-Build the project:
-
-```bash
-npm run build
 ```
 
 Run tests:
@@ -223,61 +269,82 @@ Run TypeScript checks:
 npm run typecheck
 ```
 
-## Current MVP Status
+Build:
 
-Implemented:
+```bash
+npm run build
+```
 
-- Gomi IDE branding scaffold.
-- Open VSX product metadata.
-- Gomi workbench module skeleton.
-- React workbench shell.
-- Phaser 2D office simulation.
-- Animated game-style agent avatars.
-- Memory board and chat bubbles above agents.
-- CEO Agent task planning simulation.
-- Agent status stream and task queue.
-- Final report and patch proposal events.
-- Patch approval UI with raw unified diff preview.
-- Approve, reject, and apply-gated patch state transitions.
-- Node-side workspace reader for real project context.
-- Shared project memory with lexical and vector-style retrieval.
-- Communication policy that avoids broadcasting low-importance agent updates.
-- Unit tests for runtime, planner, message bus, workspace reader, and patch approval state.
+## Verification
 
-Not yet implemented:
+The current verification suite covers:
 
-- Full upstream Code - OSS fork integration.
-- Native workbench contribution registration inside a complete Code - OSS source tree.
-- Real LLM provider adapter.
-- Real local model adapter.
-- Real filesystem workspace indexing inside the browser demo.
-- Full desktop packaging pipeline.
+- Runtime session flow.
+- Message bus publish/subscribe.
+- Task planner output.
+- Patch approval state transitions.
+- Node workspace context reading.
+- Project context indexing.
+- Shared project memory.
+- Vector-style retrieval.
 
-## Code - OSS Integration Path
+Current known build note: Phaser increases the production JavaScript chunk size. This is expected for the visual office prototype and should be optimized with code splitting before a packaged release.
 
-When this module is merged into the full fork, the expected work is:
+## Branding And Marketplace
 
-1. Fork Code - OSS.
-2. Replace product metadata and resources with Gomi branding.
-3. Register the Gomi Office view container in the Activity Bar.
-4. Load the Gomi Office webview bundle inside the workbench.
-5. Connect `gomiBridge.ts` to the workbench/webview message boundary.
-6. Replace demo runtime calls with the node-side agent runtime service.
-7. Connect workspace files, selected code, terminal output, git diff, and diagnostics to the project context reader.
-8. Add a review-first patch application flow using the editor diff surface.
-9. Package the fork as Gomi IDE for Windows, macOS, and Linux.
+The standalone product should not ship with Visual Studio Code or Microsoft branding.
+
+Current product metadata:
+
+```json
+{
+  "nameShort": "Gomi",
+  "nameLong": "Gomi IDE",
+  "applicationName": "gomi-ide",
+  "dataFolderName": ".gomi-ide",
+  "win32MutexName": "gomiide",
+  "licenseName": "MIT"
+}
+```
+
+The current extension gallery metadata points to Open VSX Registry. A commercial distribution may keep Open VSX, add a Gomi marketplace, or support both depending on licensing and product strategy.
+
+## Commercialization Roadmap
+
+Recommended next milestones:
+
+1. Import the module into a real Code - OSS fork.
+2. Complete Gomi branding assets across Windows, macOS, and Linux.
+3. Add provider adapters for OpenAI-compatible APIs and local model runtimes.
+4. Add persistent memory using SQLite and optional vector database support.
+5. Connect real workspace context: open editors, selections, terminal output, diagnostics, and git diff.
+6. Implement patch application through the workbench diff/editor APIs.
+7. Add settings for model provider, privacy mode, memory retention, and approval policy.
+8. Add packaging, signing, update channel, and release automation.
+9. Define licensing, commercial terms, and enterprise deployment policy.
+
+## Trust, Privacy, And Control
+
+Commercial Gomi builds should preserve these principles:
+
+- Users can review generated changes before apply.
+- Workspace memory is scoped and controllable.
+- Provider routing is explicit.
+- Local model mode should be available for private projects.
+- Telemetry, if added, must be documented and configurable.
+- Secrets such as `.env` values must never be indexed or committed by default.
 
 ## Technology Stack
 
-- Base direction: Code - OSS fork
+- Base product direction: Code - OSS fork
 - Language: TypeScript
-- Runtime: Electron + Node.js in the final IDE target
+- Final runtime target: Electron + Node.js
 - Demo UI: React + Vite
 - Office simulation: Phaser
 - Icons: Lucide React
 - Testing: Vitest
 - Extension registry direction: Open VSX Registry
 
-## License
+## License And Distribution Notes
 
-This scaffold is prepared as a Gomi IDE project foundation. Validate upstream Code - OSS license obligations and third-party asset usage before distributing packaged builds.
+This repository is a Gomi IDE product foundation. Before commercial distribution, review Code - OSS license obligations, third-party dependency licenses, marketplace terms, branding rules, and generated asset rights.

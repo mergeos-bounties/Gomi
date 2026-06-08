@@ -42,13 +42,15 @@ export async function readNodeWorkspaceSnapshot(
   const importantFiles = sortImportantFiles(files);
   const gitSummary = await readGitSummary(workspaceRoot);
   const manifestSummary = await readManifestSummary(workspaceRoot);
+  const contentSnippets = await readContentSnippets(workspaceRoot, importantFiles.slice(0, 16));
 
   return {
     rootName,
     files: [...importantFiles, ...files.filter((file) => !importantFiles.includes(file))].slice(0, maxFiles),
     openEditors: options.openEditors ?? importantFiles.slice(0, 4),
     gitSummary,
-    terminalSummary: manifestSummary
+    terminalSummary: manifestSummary,
+    contentSnippets
   };
 }
 
@@ -105,6 +107,37 @@ function sortImportantFiles(files: string[]): string[] {
     .slice(0, 24);
 }
 
+async function readContentSnippets(
+  root: string,
+  files: string[]
+): Promise<GomiWorkspaceSnapshot['contentSnippets']> {
+  const snippets: NonNullable<GomiWorkspaceSnapshot['contentSnippets']> = [];
+
+  for (const file of files) {
+    const absolutePath = path.join(root, file);
+
+    try {
+      const stat = await fs.stat(absolutePath);
+
+      if (!stat.isFile() || stat.size > 120_000) {
+        continue;
+      }
+
+      const content = await fs.readFile(absolutePath, 'utf8');
+      snippets.push({
+        filePath: file,
+        content: content.slice(0, 12_000),
+        language: languageFromPath(file),
+        source: 'workspace'
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  return snippets;
+}
+
 async function readGitSummary(root: string): Promise<string> {
   try {
     const [{ stdout: branch }, { stdout: status }] = await Promise.all([
@@ -158,4 +191,25 @@ async function readManifestSummary(root: string): Promise<string> {
 
 function normalizePath(value: string): string {
   return value.split(path.sep).join('/');
+}
+
+function languageFromPath(filePath: string): string {
+  const extension = filePath.split('.').pop()?.toLowerCase();
+
+  if (!extension) {
+    return 'text';
+  }
+
+  const languageMap: Record<string, string> = {
+    js: 'javascript',
+    jsx: 'javascript',
+    ts: 'typescript',
+    tsx: 'typescript',
+    json: 'json',
+    md: 'markdown',
+    css: 'css',
+    html: 'html'
+  };
+
+  return languageMap[extension] ?? extension;
 }

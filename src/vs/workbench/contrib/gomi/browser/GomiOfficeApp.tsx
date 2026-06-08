@@ -6,25 +6,50 @@ import {
   ClipboardList,
   Code2,
   Database,
+  Bed,
   FileDiff,
   Files,
   GitBranch,
+  Maximize2,
+  Minimize2,
+  Moon,
+  PanelBottomClose,
+  PanelBottomOpen,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  Palette,
   Play,
+  RotateCcw,
   Search,
   Send,
   Settings,
   ShieldCheck,
   Sparkles,
   Terminal,
+  UserX,
   Users,
   XCircle
 } from 'lucide-react';
 import { BASE_GOMI_AGENTS, GOMI_SAMPLE_REQUEST } from '../common/gomiConstants';
+import {
+  DEFAULT_GOMI_OFFICE_SETTINGS,
+  GOMI_AGENT_CLI_PROVIDERS,
+  assignSeatProvider,
+  fireEmployee,
+  getProviderLabel,
+  getSeatForAgent,
+  setSeatWorkMode
+} from '../common/gomiOfficeSettings';
 import type {
   GomiAgent,
+  GomiAgentCliProviderId,
   GomiAgentId,
+  GomiAgentSeat,
   GomiChatMessage,
   GomiFinalReport,
+  GomiOfficeSettings,
   GomiTask,
   GomiWorkspaceSnapshot
 } from '../common/gomiTypes';
@@ -51,15 +76,55 @@ const activityItems = [
 ];
 
 export function GomiOfficeApp() {
-  const runtime = useMemo(() => new GomiAgentRuntime({ delayMs: 360 }), []);
+  const [officeSettings, setOfficeSettings] = useState<GomiOfficeSettings>(
+    DEFAULT_GOMI_OFFICE_SETTINGS
+  );
+  const runtime = useMemo(
+    () =>
+      new GomiAgentRuntime({
+        delayMs: 360,
+        officeSettings
+      }),
+    [officeSettings]
+  );
   const [request, setRequest] = useState(GOMI_SAMPLE_REQUEST);
   const [isRunning, setIsRunning] = useState(false);
-  const [agents, setAgents] = useState<GomiAgent[]>(BASE_GOMI_AGENTS);
+  const [agents, setAgents] = useState<GomiAgent[]>(() =>
+    applyOfficeSettingsToAgents(BASE_GOMI_AGENTS, officeSettings)
+  );
   const [tasks, setTasks] = useState<GomiTask[]>([]);
   const [messages, setMessages] = useState<GomiChatMessage[]>([]);
   const [report, setReport] = useState<GomiFinalReport | undefined>();
   const [patchReview, setPatchReview] = useState<GomiPatchReviewState | undefined>();
   const [workspace, setWorkspace] = useState<GomiWorkspaceSnapshot | undefined>();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const [bottomCollapsed, setBottomCollapsed] = useState(false);
+  const [officeFocus, setOfficeFocus] = useState(false);
+  const visualAgents = useMemo(
+    () => applyOfficeSettingsToAgents(agents, officeSettings),
+    [agents, officeSettings]
+  );
+  const workbenchClassName = [
+    'gomi-workbench',
+    sidebarCollapsed || officeFocus ? 'is-sidebar-collapsed' : '',
+    rightPanelCollapsed || officeFocus ? 'is-right-collapsed' : ''
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const mainClassName = [
+    'gomi-main',
+    bottomCollapsed || officeFocus ? 'is-bottom-collapsed' : '',
+    officeFocus ? 'is-office-focus' : ''
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const officeLayoutToken = [
+    sidebarCollapsed,
+    rightPanelCollapsed,
+    bottomCollapsed,
+    officeFocus
+  ].join(':');
 
   async function runOfficeSession() {
     const trimmedRequest = request.trim();
@@ -69,7 +134,7 @@ export function GomiOfficeApp() {
     }
 
     setIsRunning(true);
-    setAgents(BASE_GOMI_AGENTS);
+    setAgents(applyOfficeSettingsToAgents(BASE_GOMI_AGENTS, officeSettings));
     setTasks([]);
     setMessages([]);
     setReport(undefined);
@@ -134,6 +199,24 @@ export function GomiOfficeApp() {
     });
   }
 
+  function assignProvider(seatId: string, providerId: GomiAgentCliProviderId) {
+    setOfficeSettings((currentSettings) => assignSeatProvider(currentSettings, seatId, providerId));
+  }
+
+  function toggleSeatSleep(seat: GomiAgentSeat) {
+    setOfficeSettings((currentSettings) =>
+      setSeatWorkMode(currentSettings, seat.id, seat.workMode === 'sleeping' ? 'active' : 'sleeping')
+    );
+  }
+
+  function fireOfficeEmployee(seatId: string) {
+    setOfficeSettings((currentSettings) => fireEmployee(currentSettings, seatId));
+  }
+
+  function restoreOfficeEmployee(seatId: string) {
+    setOfficeSettings((currentSettings) => setSeatWorkMode(currentSettings, seatId, 'active'));
+  }
+
   return (
     <div className="gomi-shell">
       <header className="gomi-titlebar">
@@ -154,15 +237,49 @@ export function GomiOfficeApp() {
         </div>
       </header>
 
-      <div className="gomi-workbench">
+      <div className={workbenchClassName}>
         <ActivityBar />
         <ProjectSidebar workspace={workspace} />
 
-        <main className="gomi-main">
+        <main className={mainClassName}>
           <div className="gomi-tabs">
             <div className="gomi-tab">
               <Bot size={16} />
               <span>Gomi Office</span>
+            </div>
+            <div className="gomi-view-controls" aria-label="Gomi Office view controls">
+              <button
+                className="gomi-icon-button"
+                onClick={() => setSidebarCollapsed((isCollapsed) => !isCollapsed)}
+                title={sidebarCollapsed || officeFocus ? 'Expand project sidebar' : 'Collapse project sidebar'}
+                aria-label={sidebarCollapsed || officeFocus ? 'Expand project sidebar' : 'Collapse project sidebar'}
+              >
+                {sidebarCollapsed || officeFocus ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+              </button>
+              <button
+                className="gomi-icon-button"
+                onClick={() => setBottomCollapsed((isCollapsed) => !isCollapsed)}
+                title={bottomCollapsed || officeFocus ? 'Expand chat and report' : 'Collapse chat and report'}
+                aria-label={bottomCollapsed || officeFocus ? 'Expand chat and report' : 'Collapse chat and report'}
+              >
+                {bottomCollapsed || officeFocus ? <PanelBottomOpen size={18} /> : <PanelBottomClose size={18} />}
+              </button>
+              <button
+                className="gomi-icon-button"
+                onClick={() => setRightPanelCollapsed((isCollapsed) => !isCollapsed)}
+                title={rightPanelCollapsed || officeFocus ? 'Expand agent panel' : 'Collapse agent panel'}
+                aria-label={rightPanelCollapsed || officeFocus ? 'Expand agent panel' : 'Collapse agent panel'}
+              >
+                {rightPanelCollapsed || officeFocus ? <PanelRightOpen size={18} /> : <PanelRightClose size={18} />}
+              </button>
+              <button
+                className={`gomi-icon-button ${officeFocus ? 'is-active' : ''}`}
+                onClick={() => setOfficeFocus((isFocused) => !isFocused)}
+                title={officeFocus ? 'Exit Office Focus' : 'Focus Office'}
+                aria-label={officeFocus ? 'Exit Office Focus' : 'Focus Office'}
+              >
+                {officeFocus ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+              </button>
             </div>
           </div>
 
@@ -180,7 +297,12 @@ export function GomiOfficeApp() {
           </section>
 
           <section className="gomi-office-stage" aria-label="Gomi Office Simulation">
-            <PhaserOffice agents={agents} tasks={tasks} messages={messages} />
+            <PhaserOffice
+              agents={visualAgents}
+              tasks={tasks}
+              messages={messages}
+              layoutToken={officeLayoutToken}
+            />
           </section>
 
           <section className="gomi-bottom">
@@ -195,7 +317,16 @@ export function GomiOfficeApp() {
           </section>
         </main>
 
-        <RightPanel agents={agents} tasks={tasks} report={report} />
+        <RightPanel
+          agents={visualAgents}
+          tasks={tasks}
+          report={report}
+          officeSettings={officeSettings}
+          onProviderChange={assignProvider}
+          onToggleSeatSleep={toggleSeatSleep}
+          onFireEmployee={fireOfficeEmployee}
+          onRestoreEmployee={restoreOfficeEmployee}
+        />
       </div>
 
       <footer className="gomi-statusbar">
@@ -269,11 +400,21 @@ function ProjectSidebar({ workspace }: { workspace?: GomiWorkspaceSnapshot }) {
 function RightPanel({
   agents,
   tasks,
-  report
+  report,
+  officeSettings,
+  onProviderChange,
+  onToggleSeatSleep,
+  onFireEmployee,
+  onRestoreEmployee
 }: {
   agents: GomiAgent[];
   tasks: GomiTask[];
   report?: GomiFinalReport;
+  officeSettings: GomiOfficeSettings;
+  onProviderChange: (seatId: string, providerId: GomiAgentCliProviderId) => void;
+  onToggleSeatSleep: (seat: GomiAgentSeat) => void;
+  onFireEmployee: (seatId: string) => void;
+  onRestoreEmployee: (seatId: string) => void;
 }) {
   return (
     <aside className="gomi-right-panel" aria-label="Agent Status Panel">
@@ -307,13 +448,21 @@ function RightPanel({
             {report?.summary ?? 'Waiting for CEO Agent synthesis.'}
           </div>
         </div>
+
+        <OfficeSettingsPanel
+          officeSettings={officeSettings}
+          onProviderChange={onProviderChange}
+          onToggleSeatSleep={onToggleSeatSleep}
+          onFireEmployee={onFireEmployee}
+          onRestoreEmployee={onRestoreEmployee}
+        />
       </div>
     </aside>
   );
 }
 
 function AgentRow({ agent }: { agent: GomiAgent }) {
-  const Icon = iconForAgent(agent.id);
+  const Icon = agent.status === 'sleeping' ? Bed : iconForAgent(agent.id);
 
   return (
     <div className="gomi-agent-row">
@@ -343,6 +492,111 @@ function TaskRow({ task }: { task: GomiTask }) {
         {task.status}
       </span>
     </div>
+  );
+}
+
+function OfficeSettingsPanel({
+  officeSettings,
+  onProviderChange,
+  onToggleSeatSleep,
+  onFireEmployee,
+  onRestoreEmployee
+}: {
+  officeSettings: GomiOfficeSettings;
+  onProviderChange: (seatId: string, providerId: GomiAgentCliProviderId) => void;
+  onToggleSeatSleep: (seat: GomiAgentSeat) => void;
+  onFireEmployee: (seatId: string) => void;
+  onRestoreEmployee: (seatId: string) => void;
+}) {
+  const leaders = officeSettings.seats.filter((seat) => seat.seatKind !== 'employee');
+  const employees = officeSettings.seats.filter((seat) => seat.seatKind === 'employee');
+
+  return (
+    <section className="gomi-settings-panel" aria-label="Office Settings">
+      <div className="gomi-panel-header">
+        <span>Office Settings</span>
+        <Settings size={16} />
+      </div>
+
+      <div className="gomi-settings-group">
+        <div className="gomi-settings-title">CEO And Department Heads</div>
+        {leaders.map((seat) => (
+          <div className="gomi-seat-row" key={seat.id}>
+            <div className="gomi-seat-row__head">
+              <div>
+                <div className="gomi-agent-name">{seat.name}</div>
+                <div className="gomi-agent-role">{seat.role}</div>
+              </div>
+              <span className="gomi-status" data-status={seat.workMode}>
+                {seat.workMode}
+              </span>
+            </div>
+
+            <label className="gomi-field">
+              <span>CLI</span>
+              <select
+                value={seat.providerId}
+                onChange={(event) =>
+                  onProviderChange(seat.id, event.target.value as GomiAgentCliProviderId)
+                }
+              >
+                {GOMI_AGENT_CLI_PROVIDERS.map((provider) => (
+                  <option value={provider.id} key={provider.id}>
+                    {provider.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {seat.canSleep ? (
+              <button className="gomi-action-button" onClick={() => onToggleSeatSleep(seat)}>
+                {seat.workMode === 'sleeping' ? <RotateCcw size={14} /> : <Moon size={14} />}
+                <span>{seat.workMode === 'sleeping' ? 'Wake' : 'Sleep'}</span>
+              </button>
+            ) : (
+              <div className="gomi-seat-note">
+                CEO is always retained. CLI route: {getProviderLabel(seat.providerId)}.
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="gomi-settings-group">
+        <div className="gomi-settings-title">Employees</div>
+        {employees.map((seat) => (
+          <div className="gomi-employee-row" data-mode={seat.workMode} key={seat.id}>
+            <div>
+              <div className="gomi-agent-name">{seat.name}</div>
+              <div className="gomi-agent-role">
+                {seat.role} - {seat.departmentId}
+              </div>
+            </div>
+            <span className="gomi-status" data-status={seat.workMode}>
+              {seat.workMode}
+            </span>
+            {seat.workMode === 'fired' ? (
+              <button className="gomi-icon-button" onClick={() => onRestoreEmployee(seat.id)} title="Restore employee" aria-label="Restore employee">
+                <RotateCcw size={16} />
+              </button>
+            ) : (
+              <button className="gomi-icon-button is-danger" onClick={() => onFireEmployee(seat.id)} title="Fire employee" aria-label="Fire employee">
+                <UserX size={16} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="gomi-settings-group">
+        <div className="gomi-settings-title">Shared Memory</div>
+        <div className="gomi-memory-summary">
+          <span>{officeSettings.memory.retrievalMode}</span>
+          <span>{`broadcast >= ${Math.round(officeSettings.memory.broadcastThreshold * 100)}%`}</span>
+          <span>{officeSettings.memory.requirePatchApproval ? 'approval required' : 'auto apply allowed'}</span>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -514,6 +768,25 @@ function upsertTask(tasks: GomiTask[], nextTask: GomiTask): GomiTask[] {
   return tasks.map((task) => (task.id === nextTask.id ? nextTask : task));
 }
 
+function applyOfficeSettingsToAgents(
+  agents: GomiAgent[],
+  officeSettings: GomiOfficeSettings
+): GomiAgent[] {
+  return agents.map((agent) => {
+    const seat = getSeatForAgent(officeSettings, agent.id);
+
+    if (seat?.workMode === 'sleeping') {
+      return {
+        ...agent,
+        status: 'sleeping',
+        currentTaskId: undefined
+      };
+    }
+
+    return agent;
+  });
+}
+
 function iconForAgent(agentId: GomiAgentId) {
   if (agentId === 'backend') {
     return Braces;
@@ -521,6 +794,10 @@ function iconForAgent(agentId: GomiAgentId) {
 
   if (agentId === 'frontend') {
     return Code2;
+  }
+
+  if (agentId === 'designer') {
+    return Palette;
   }
 
   if (agentId === 'database') {

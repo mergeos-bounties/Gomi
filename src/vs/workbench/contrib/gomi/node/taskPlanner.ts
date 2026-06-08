@@ -17,6 +17,10 @@ const agentTaskTemplates: Record<GomiAgentId, { title: string; detail: string }>
     title: 'Design workbench experience',
     detail: 'Prepare Gomi Office panel, agent statuses, task queue, and report layout.'
   },
+  designer: {
+    title: 'Shape product design direction',
+    detail: 'Define UX flow, visual language, office atmosphere, avatar style, and interaction states.'
+  },
   database: {
     title: 'Check data model',
     detail: 'Review schema, migrations, storage needs, and memory persistence.'
@@ -34,7 +38,7 @@ const agentTaskTemplates: Record<GomiAgentId, { title: string; detail: string }>
 export class GomiTaskPlanner {
   createPlan(request: string, workspace: GomiWorkspaceSnapshot): GomiTask[] {
     const normalizedRequest = request.toLowerCase();
-    const selectedAgents = new Set<GomiAgentId>(['system-analyst', 'frontend', 'qa']);
+    const selectedAgents = new Set<GomiAgentId>(['system-analyst', 'frontend', 'designer', 'qa']);
 
     if (this.matchesAny(normalizedRequest, ['api', 'backend', 'controller', 'service', 'login'])) {
       selectedAgents.add('backend');
@@ -42,6 +46,22 @@ export class GomiTaskPlanner {
 
     if (this.matchesAny(normalizedRequest, ['database', 'schema', 'migration', 'sqlite', 'model'])) {
       selectedAgents.add('database');
+    }
+
+    if (
+      this.matchesAny(normalizedRequest, [
+        'design',
+        'designer',
+        'ux',
+        'ui',
+        'office',
+        'avatar',
+        'animation',
+        'cute',
+        'game'
+      ])
+    ) {
+      selectedAgents.add('designer');
     }
 
     if (this.matchesAny(normalizedRequest, ['deploy', 'build', 'docker', 'ci', 'package'])) {

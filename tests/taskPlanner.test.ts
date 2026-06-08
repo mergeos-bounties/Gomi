@@ -13,6 +13,7 @@ describe('GomiTaskPlanner', () => {
 
     expect(agentIds).toContain('system-analyst');
     expect(agentIds).toContain('backend');
+    expect(agentIds).toContain('designer');
     expect(agentIds).toContain('database');
     expect(agentIds).toContain('devops');
     expect(agentIds).toContain('qa');

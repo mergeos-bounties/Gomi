@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import {
+  DEFAULT_GOMI_OFFICE_SETTINGS,
+  setSeatWorkMode
+} from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
 import { GomiAgentRuntime } from '../src/vs/workbench/contrib/gomi/node/agentRuntime';
 
 describe('GomiAgentRuntime', () => {
@@ -47,5 +51,31 @@ describe('GomiAgentRuntime', () => {
     }
 
     expect(rootNames).toEqual(['InjectedWorkspace']);
+  });
+
+  it('keeps sleeping department heads seated while skipping their task', async () => {
+    const runtime = new GomiAgentRuntime({
+      delayMs: 0,
+      officeSettings: setSeatWorkMode(DEFAULT_GOMI_OFFICE_SETTINGS, 'head-backend', 'sleeping')
+    });
+    const backendStatuses: string[] = [];
+    const backendResults: string[] = [];
+    const blockedTasks: string[] = [];
+
+    for await (const event of runtime.run('Build a backend API')) {
+      if (event.type === 'agent_status' && event.agentId === 'backend') {
+        backendStatuses.push(event.status);
+      }
+      if (event.type === 'agent_result' && event.result.agentId === 'backend') {
+        backendResults.push(event.result.taskId);
+      }
+      if (event.type === 'task_update' && event.task.agentId === 'backend') {
+        blockedTasks.push(event.task.status);
+      }
+    }
+
+    expect(backendStatuses).toContain('sleeping');
+    expect(backendResults).toHaveLength(0);
+    expect(blockedTasks).toContain('blocked');
   });
 });

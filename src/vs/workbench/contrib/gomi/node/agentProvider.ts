@@ -1,5 +1,6 @@
 import type {
   GomiAgentId,
+  GomiAgentCliProviderId,
   GomiAgentResult,
   GomiMemoryEntry,
   GomiTask,
@@ -49,6 +50,11 @@ export interface GomiAgentRunContext {
   task: GomiTask;
   memory: GomiMemoryEntry[];
   sharedMemory: GomiMemoryHit[];
+  agentCli?: {
+    providerId: GomiAgentCliProviderId;
+    label: string;
+    command: string;
+  };
 }
 
 export interface GomiAgentProvider {
@@ -65,6 +71,7 @@ const roleFocus: Record<GomiAgentId, string> = {
   'system-analyst': 'requirements, modules, dependencies, and acceptance criteria',
   backend: 'API, controller, service, model, and server-side logic',
   frontend: 'workbench views, webview UI, state, and user interaction',
+  designer: 'UX flow, visual hierarchy, office atmosphere, avatar style, and interaction polish',
   database: 'schema, migration, relationship, and persistence design',
   qa: 'logic risks, test coverage, regression gates, and edge cases',
   devops: 'build, package, environment, registry, and CI/CD readiness'
@@ -126,10 +133,11 @@ export class DemoGomiAgentProvider implements GomiAgentProvider {
     return {
       agentId: context.task.agentId,
       taskId: context.task.id,
-      summary: `${context.task.title}: reviewed ${role} using ${context.workspace.files.length} workspace files. ${response.text}`,
+      summary: `${context.task.title}: reviewed ${role} through ${context.agentCli?.label ?? this.label} using ${context.workspace.files.length} workspace files. ${response.text}`,
       findings: [
         `Request focus: ${this.shorten(context.request, 96)}`,
         `Workspace root: ${context.workspace.rootName}`,
+        `CLI route: ${context.agentCli?.command ?? this.id}`,
         `Context includes: ${proposedFiles.slice(0, 3).join(', ') || 'no focused files'}`,
         `Shared memory hits: ${context.sharedMemory.map((hit) => hit.key).slice(0, 3).join(', ') || 'none'}`
       ],
@@ -149,6 +157,7 @@ export class DemoGomiAgentProvider implements GomiAgentProvider {
       'system-analyst': ['README', 'gomiTypes', 'taskPlanner'],
       backend: ['agentRuntime', 'agentProvider', 'messageBus', 'patchApplier'],
       frontend: ['GomiOfficeApp', 'PhaserOffice', 'styles'],
+      designer: ['GomiOfficeApp', 'PhaserOffice', 'styles', 'README', 'images'],
       database: ['memory', 'workspaceReader', 'schema', 'migration'],
       qa: ['test', 'spec', 'vitest'],
       devops: ['package', 'vite', 'tsconfig', 'product']
