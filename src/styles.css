@@ -650,7 +650,8 @@ button {
   text-transform: uppercase;
 }
 
-.gomi-field select {
+.gomi-field select,
+.gomi-field input {
   width: 100%;
   min-height: 34px;
   border: 1px solid #334155;
@@ -662,9 +663,26 @@ button {
   text-transform: none;
 }
 
-.gomi-field select:focus {
+.gomi-field select:focus,
+.gomi-field input:focus {
   border-color: #2dd4bf;
   box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.16);
+}
+
+.gomi-toggle-field {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.gomi-toggle-field input {
+  width: 16px;
+  height: 16px;
+  accent-color: #2dd4bf;
 }
 
 .gomi-range-field {
@@ -700,6 +718,12 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.gomi-memory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .gomi-memory-summary span {

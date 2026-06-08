@@ -59,8 +59,10 @@ This repository is the current product foundation and technical prototype. It is
 - **Department head sleep mode** to pause a leader without removing the role from the organization.
 - **Employee lifecycle controls** for removing or restoring non-lead staff seats.
 - **Configurable agent communication policy** that keeps routine updates in memory and only broadcasts findings above the selected importance threshold.
+- **Novelty-aware agent communication** that checks recalled shared memory before showing another chat bubble for repeated routine findings.
 - **Hybrid project memory** using lexical search plus vector-style retrieval.
 - **Persistent workspace memory storage** for lexical and vector records under `.gomi-ide/memory`.
+- **Memory privacy and retention controls** for shared-memory enablement, workspace indexing, strict privacy mode, secret redaction, retention days, max project memory items, and patch approval policy.
 - **Project context indexing** for file tree, manifests, open editor snippets, selected code, terminal output, diagnostics, SCM/git diff previews, and optional error logs.
 - **Patch review workflow** with webview diff preview, native Code - OSS diff preview hook, approve/reject controls, and apply gating.
 - **Safe node-side patch application core** for approved unified diffs inside the workspace root.
@@ -147,7 +149,9 @@ The current implementation uses hybrid retrieval:
 - **Agent result memory** so specialist agents can build on prior findings.
 - **Project context indexing** so workspace metadata and content snippets can be retrieved by task.
 - **Workspace persistence** through file-backed lexical and vector memory stores when running from the workbench controller.
-- **Communication policy** so low-importance findings are stored silently while high-importance findings become visible messages and chat bubbles. The Office Settings panel exposes the broadcast threshold, and the runtime uses that value when deciding whether an agent should speak or only update shared memory.
+- **Communication policy** so low-importance findings are stored silently while high-importance findings become visible messages and chat bubbles. The runtime also checks recalled project memory so repeated routine findings stay quiet unless a new risk, blocker, or low-confidence concern appears.
+- **Privacy guard** that filters sensitive file paths, keeps safe templates such as `.env.example`, redacts secret-looking values, and removes terminal/error-log snippets from indexing in strict mode.
+- **Retention policy** that prunes old lexical and vector memory records and caps the number of stored project memory items per workspace scope.
 - **Memory board events** so the visual office can display the actual request, workspace facts, retrieved project context, and agent findings stored in shared memory.
 
 For the MVP, vector retrieval uses a local hashing embedding provider. It does not require an API key and keeps tests deterministic. The workbench controller persists lexical and vector memory records in workspace storage so future sessions can reuse project context. In a production build, this storage can be replaced by SQLite, a local vector database, OpenAI embeddings, a local embedding model, or an enterprise embedding service without changing the runtime contract.
@@ -323,14 +327,15 @@ Implemented in this repository:
 - Node-side CLI provider router with command execution, JSON/plain-text output mapping, and demo fallback.
 - Hybrid project memory with lexical and vector-style retrieval.
 - File-backed persistent project memory for workbench sessions.
+- Memory privacy guard with secret redaction, strict mode, shared-memory toggles, retention days, and max project memory controls.
 - Project context chunking and indexing.
-- Configurable communication policy for selective agent broadcast.
+- Configurable novelty-aware communication policy for selective agent broadcast.
 - Node workspace reader for real project metadata and content snippets.
 - Patch proposal, webview diff preview, native diff preview hook, approve/reject, and apply gating.
 - Safe unified-diff patch application core for approved workspace edits.
 - Code - OSS integration manifest and validation/apply script.
 - GitHub Actions build/release workflow and Windows Code - OSS packaging script.
-- Tests for runtime memory updates, CLI routing, planner, message bus, patch approval, patch application, Code - OSS workspace service adaptation, workspace reader, project context indexing, shared memory, and vector memory.
+- Tests for runtime memory updates, CLI routing, planner, message bus, patch approval, patch application, Code - OSS workspace service adaptation, workspace reader, project context indexing, shared memory, privacy guard, persistent memory pruning, and vector memory.
 
 Not yet implemented:
 
@@ -425,7 +430,7 @@ Recommended next milestones:
 4. Add persistent memory using SQLite and optional vector database support.
 5. Deepen native workspace context with durable terminal scrollback and workbench log/output-channel readers.
 6. Validate and polish the native diff preview inside a real Code - OSS fork.
-7. Add settings for model provider, privacy mode, memory retention, and approval policy.
+7. Harden enterprise settings for model provider governance, workspace trust, privacy policy, memory retention, and approval policy.
 8. Add packaging, signing, update channel, and release automation.
 9. Define licensing, commercial terms, and enterprise deployment policy.
 

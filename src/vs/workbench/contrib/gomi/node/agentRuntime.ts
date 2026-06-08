@@ -20,6 +20,10 @@ import type {
 import { createDemoGomiAgentProvider, type GomiAgentProvider } from './agentProvider';
 import { evaluateAgentCommunication } from './communicationPolicy';
 import {
+  applyWorkspaceMemoryPolicy,
+  createMemoryPrivacySummary
+} from './memoryPrivacy';
+import {
   createAgentResultMemoryEntry,
   createInMemoryGomiMemoryStore,
   createMemoryContent,
@@ -84,19 +88,28 @@ export class GomiAgentRuntime {
 
   async *run(request: string): AsyncGenerator<GomiRuntimeEvent> {
     const sessionId = `gomi-${Date.now()}`;
-    const workspace = await this.workspaceReader();
+    const rawWorkspace = await this.workspaceReader();
+    const memoryScope = {
+      workspaceId: rawWorkspace.rootName
+    };
+    const sharedMemoryEnabled = this.officeSettings.memory.sharedMemoryEnabled;
+
+    this.memoryStore.prune(memoryScope, this.officeSettings.memory);
+    this.vectorMemoryStore.prune(memoryScope, this.officeSettings.memory);
+
+    const memoryPolicyResult = applyWorkspaceMemoryPolicy(rawWorkspace, this.officeSettings.memory);
+    const workspace = memoryPolicyResult.workspace;
     const plannedTasks = this.planner.createPlan(request, workspace);
     const tasks = plannedTasks.map((task) => this.applyOfficeAvailability(task));
     const agentResults: GomiAgentResult[] = [];
-    const memoryScope = {
-      workspaceId: workspace.rootName
-    };
-    const sharedProjectMemory = new GomiSharedProjectMemory(
-      this.memoryStore,
-      memoryScope,
-      this.vectorMemoryStore
-    );
-    const indexResult = this.officeSettings.memory.indexWorkspaceContext
+    const sharedProjectMemory = sharedMemoryEnabled
+      ? new GomiSharedProjectMemory(
+          this.memoryStore,
+          memoryScope,
+          this.vectorMemoryStore
+        )
+      : undefined;
+    const indexResult = sharedMemoryEnabled && this.officeSettings.memory.indexWorkspaceContext
       ? await this.projectContextIndexer.indexWorkspace(workspace, memoryScope, {
           memoryStore: this.memoryStore,
           vectorMemoryStore: this.vectorMemoryStore
@@ -119,7 +132,17 @@ export class GomiAgentRuntime {
         `${workspace.rootName}: indexed ${indexResult.chunkCount} context chunks from ${indexResult.indexedPaths.length} paths. ${workspace.files.slice(0, 12).join(', ')}`
       )
     });
-    const workspaceMemoryItems = await sharedProjectMemory.rememberWorkspace(workspace);
+    const memoryPrivacySessionMemory = this.memoryStore.add({
+      sessionId,
+      kind: 'workspace',
+      content: createMemoryContent(
+        'workspace',
+        `Memory privacy guard: ${createMemoryPrivacySummary(memoryPolicyResult.audit)}`
+      )
+    });
+    const workspaceMemoryItems = sharedProjectMemory
+      ? await sharedProjectMemory.rememberWorkspace(workspace)
+      : [];
 
     yield* this.emit({
       type: 'session_started',
@@ -129,6 +152,7 @@ export class GomiAgentRuntime {
     });
     yield* this.memoryUpdate(this.sessionMemoryToBoardItem(requestMemory, 'Project Request'));
     yield* this.memoryUpdate(this.sessionMemoryToBoardItem(workspaceSessionMemory, 'Workspace Context'));
+    yield* this.memoryUpdate(this.sessionMemoryToBoardItem(memoryPrivacySessionMemory, 'Memory Privacy Guard'));
     for (const memoryItem of workspaceMemoryItems) {
       yield* this.memoryUpdate(this.projectMemoryToBoardItem(memoryItem, this.memoryTitleForKey(memoryItem.key)));
     }
@@ -157,7 +181,9 @@ export class GomiAgentRuntime {
         continue;
       }
 
-      const sharedMemory = await sharedProjectMemory.searchForTask(task, request);
+      const sharedMemory = sharedProjectMemory
+        ? await sharedProjectMemory.searchForTask(task, request)
+        : [];
       yield* this.status(task.agentId, 'working', task.id);
       yield* this.updateTask(task, 'running', 42);
       const agentResult = await this.agentProvider.runAgentTask({
@@ -170,7 +196,8 @@ export class GomiAgentRuntime {
         agentCli: this.getAgentCli(task.agentId)
       });
       const communicationDecision = evaluateAgentCommunication(agentResult, {
-        broadcastThreshold: this.officeSettings.memory.broadcastThreshold
+        broadcastThreshold: this.officeSettings.memory.broadcastThreshold,
+        recalledMemory: sharedMemory
       });
       agentResults.push(agentResult);
       const resultMemory = this.memoryStore.add(
@@ -181,23 +208,27 @@ export class GomiAgentRuntime {
           summary: agentResult.summary
         })
       );
-      const projectMemoryItem = await sharedProjectMemory.rememberAgentResult(
-        agentResult,
-        communicationDecision.importance
-      );
+      const projectMemoryItem = sharedProjectMemory
+        ? await sharedProjectMemory.rememberAgentResult(
+            agentResult,
+            communicationDecision.importance
+          )
+        : undefined;
       yield* this.emit({ type: 'agent_result', result: agentResult });
       yield* this.memoryUpdate(
         this.sessionMemoryToBoardItem(resultMemory, `${this.agentName(agentResult.agentId)} Result`, {
           shouldBroadcast: communicationDecision.shouldBroadcast
         })
       );
-      yield* this.memoryUpdate(
-        this.projectMemoryToBoardItem(projectMemoryItem, `${this.agentName(agentResult.agentId)} Memory`, {
-          agentId: agentResult.agentId,
-          taskId: agentResult.taskId,
-          shouldBroadcast: communicationDecision.shouldBroadcast
-        })
-      );
+      if (projectMemoryItem) {
+        yield* this.memoryUpdate(
+          this.projectMemoryToBoardItem(projectMemoryItem, `${this.agentName(agentResult.agentId)} Memory`, {
+            agentId: agentResult.agentId,
+            taskId: agentResult.taskId,
+            shouldBroadcast: communicationDecision.shouldBroadcast
+          })
+        );
+      }
       if (communicationDecision.shouldBroadcast) {
         yield* this.say(
           task.agentId,

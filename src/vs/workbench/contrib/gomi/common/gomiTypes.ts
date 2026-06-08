@@ -28,6 +28,7 @@ export type GomiPatchApprovalStatus =
   | 'failed';
 export type GomiPatchRiskLevel = 'low' | 'medium' | 'high';
 export type GomiMemoryKind = 'request' | 'workspace' | 'agent_result' | 'patch' | 'report';
+export type GomiMemoryPrivacyMode = 'standard' | 'strict';
 export type GomiAgentCliProviderId =
   | 'codex-cli'
   | 'claude-code'
@@ -63,6 +64,10 @@ export interface GomiOfficeMemorySettings {
   retrievalMode: 'hybrid-vector';
   sharedMemoryEnabled: boolean;
   indexWorkspaceContext: boolean;
+  privacyMode: GomiMemoryPrivacyMode;
+  redactSecrets: boolean;
+  retentionDays: number;
+  maxProjectMemoryItems: number;
   broadcastThreshold: number;
   requirePatchApproval: boolean;
 }

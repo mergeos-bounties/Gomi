@@ -4,10 +4,13 @@ import type {
   GomiAgentId,
   GomiAgentSeat,
   GomiAgentWorkMode,
+  GomiMemoryPrivacyMode,
   GomiOfficeSettings
 } from './gomiTypes';
 
 export const GOMI_DEFAULT_MEMORY_BROADCAST_THRESHOLD = 0.74;
+export const GOMI_DEFAULT_MEMORY_RETENTION_DAYS = 30;
+export const GOMI_DEFAULT_MAX_PROJECT_MEMORY_ITEMS = 420;
 
 export const GOMI_AGENT_CLI_PROVIDERS: GomiAgentCliProvider[] = [
   {
@@ -83,6 +86,10 @@ export const DEFAULT_GOMI_OFFICE_SETTINGS: GomiOfficeSettings = {
     retrievalMode: 'hybrid-vector',
     sharedMemoryEnabled: true,
     indexWorkspaceContext: true,
+    privacyMode: 'standard',
+    redactSecrets: true,
+    retentionDays: GOMI_DEFAULT_MEMORY_RETENTION_DAYS,
+    maxProjectMemoryItems: GOMI_DEFAULT_MAX_PROJECT_MEMORY_ITEMS,
     broadcastThreshold: GOMI_DEFAULT_MEMORY_BROADCAST_THRESHOLD,
     requirePatchApproval: true
   }
@@ -137,6 +144,75 @@ export function setMemoryBroadcastThreshold(
   };
 }
 
+export function setSharedMemoryEnabled(
+  settings: GomiOfficeSettings,
+  sharedMemoryEnabled: boolean
+): GomiOfficeSettings {
+  return updateMemorySettings(settings, {
+    sharedMemoryEnabled
+  });
+}
+
+export function setWorkspaceContextIndexing(
+  settings: GomiOfficeSettings,
+  indexWorkspaceContext: boolean
+): GomiOfficeSettings {
+  return updateMemorySettings(settings, {
+    indexWorkspaceContext
+  });
+}
+
+export function setMemoryPrivacyMode(
+  settings: GomiOfficeSettings,
+  privacyMode: GomiMemoryPrivacyMode
+): GomiOfficeSettings {
+  return updateMemorySettings(settings, {
+    privacyMode,
+    redactSecrets: privacyMode === 'strict' ? true : settings.memory.redactSecrets
+  });
+}
+
+export function setSecretRedactionEnabled(
+  settings: GomiOfficeSettings,
+  redactSecrets: boolean
+): GomiOfficeSettings {
+  return updateMemorySettings(settings, {
+    redactSecrets: settings.memory.privacyMode === 'strict' ? true : redactSecrets
+  });
+}
+
+export function setMemoryRetentionDays(
+  settings: GomiOfficeSettings,
+  retentionDays: number
+): GomiOfficeSettings {
+  return updateMemorySettings(settings, {
+    retentionDays: clampInteger(retentionDays, 1, 365, GOMI_DEFAULT_MEMORY_RETENTION_DAYS)
+  });
+}
+
+export function setMaxProjectMemoryItems(
+  settings: GomiOfficeSettings,
+  maxProjectMemoryItems: number
+): GomiOfficeSettings {
+  return updateMemorySettings(settings, {
+    maxProjectMemoryItems: clampInteger(
+      maxProjectMemoryItems,
+      40,
+      5000,
+      GOMI_DEFAULT_MAX_PROJECT_MEMORY_ITEMS
+    )
+  });
+}
+
+export function setPatchApprovalRequired(
+  settings: GomiOfficeSettings,
+  requirePatchApproval: boolean
+): GomiOfficeSettings {
+  return updateMemorySettings(settings, {
+    requirePatchApproval
+  });
+}
+
 export function getSeatForAgent(
   settings: GomiOfficeSettings,
   agentId: GomiAgentId
@@ -167,12 +243,33 @@ function updateSeat(
   };
 }
 
+function updateMemorySettings(
+  settings: GomiOfficeSettings,
+  memoryPatch: Partial<GomiOfficeSettings['memory']>
+): GomiOfficeSettings {
+  return {
+    ...settings,
+    memory: {
+      ...settings.memory,
+      ...memoryPatch
+    }
+  };
+}
+
 function clampBroadcastThreshold(value: number): number {
   if (!Number.isFinite(value)) {
     return GOMI_DEFAULT_MEMORY_BROADCAST_THRESHOLD;
   }
 
   return Math.min(0.95, Math.max(0.45, value));
+}
+
+function clampInteger(value: number, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, Math.round(value)));
 }
 
 function createDepartmentHeadSeat(

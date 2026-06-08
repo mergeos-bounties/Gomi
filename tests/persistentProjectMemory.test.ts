@@ -93,4 +93,134 @@ describe('persistent project memory', () => {
     expect(await store.search(gomiScope, 'source tree', 3)).toHaveLength(0);
     expect((await store.search(otherScope, 'project tree', 3))[0]?.key).toBe('workspace:file-tree');
   });
+
+  it('prunes expired lexical memory and caps scoped project memory', async () => {
+    const filePath = path.join(tempDirectory, 'lexical-memory.json');
+    const scope: GomiMemoryScope = { workspaceId: 'Gomi' };
+    const scopePrefix = 'Gomi:anonymous:default:';
+    const expiredDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString();
+    const recentDate = new Date().toISOString();
+
+    await fs.writeFile(
+      filePath,
+      JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            id: 'memory-old',
+            sessionId: 'session-1',
+            kind: 'request',
+            content: 'Old request',
+            createdAt: expiredDate
+          },
+          {
+            id: 'memory-new',
+            sessionId: 'session-1',
+            kind: 'request',
+            content: 'Fresh request',
+            createdAt: recentDate
+          }
+        ],
+        scopedItems: [
+          [
+            `${scopePrefix}old`,
+            {
+              key: 'old',
+              value: 'Expired context',
+              createdAt: expiredDate
+            }
+          ],
+          [
+            `${scopePrefix}newer`,
+            {
+              key: 'newer',
+              value: 'Fresh context',
+              createdAt: recentDate
+            }
+          ],
+          [
+            `${scopePrefix}newest`,
+            {
+              key: 'newest',
+              value: 'Freshest context',
+              createdAt: new Date(Date.now() + 1000).toISOString()
+            }
+          ]
+        ]
+      }),
+      'utf8'
+    );
+
+    const store = new FileBackedGomiMemoryStore(filePath);
+    store.prune(scope, {
+      retentionDays: 30,
+      maxProjectMemoryItems: 1
+    });
+
+    expect(await store.get(scope, 'old')).toBeNull();
+    expect(await store.get(scope, 'newer')).toBeNull();
+    expect((await store.get(scope, 'newest'))?.value).toBe('Freshest context');
+    expect(store.list('session-1').map((entry) => entry.content)).toEqual(['Fresh request']);
+  });
+
+  it('prunes vector memory by scope retention and max project items', async () => {
+    const filePath = path.join(tempDirectory, 'vector-memory.json');
+    const scope: GomiMemoryScope = { workspaceId: 'Gomi' };
+    const scopePrefix = 'Gomi:anonymous:default:';
+    const expiredDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString();
+    const recentDate = new Date().toISOString();
+
+    await fs.writeFile(
+      filePath,
+      JSON.stringify({
+        version: 1,
+        records: [
+          [
+            `${scopePrefix}old`,
+            {
+              key: 'old',
+              value: 'Expired vector context',
+              tags: ['old'],
+              importance: 0.7,
+              createdAt: expiredDate,
+              vector: [1, 0, 0]
+            }
+          ],
+          [
+            `${scopePrefix}newer`,
+            {
+              key: 'newer',
+              value: 'Fresh vector context',
+              tags: ['newer'],
+              importance: 0.7,
+              createdAt: recentDate,
+              vector: [0, 1, 0]
+            }
+          ],
+          [
+            `${scopePrefix}newest`,
+            {
+              key: 'newest',
+              value: 'Freshest vector context',
+              tags: ['newest'],
+              importance: 0.9,
+              createdAt: new Date(Date.now() + 1000).toISOString(),
+              vector: [0, 0, 1]
+            }
+          ]
+        ]
+      }),
+      'utf8'
+    );
+
+    const store = new FileBackedVectorMemoryStore(filePath);
+    store.prune(scope, {
+      retentionDays: 30,
+      maxProjectMemoryItems: 1
+    });
+
+    const hits = await store.search(scope, 'vector context', 5);
+
+    expect(hits.map((hit) => hit.key)).toEqual(['newest']);
+  });
 });

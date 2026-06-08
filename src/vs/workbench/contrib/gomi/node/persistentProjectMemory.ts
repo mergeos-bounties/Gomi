@@ -1,7 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { GomiMemoryEntry } from '../common/gomiTypes';
-import type { GomiMemoryHit, GomiMemoryItem, GomiMemoryScope, GomiMemoryStore } from './memoryStore';
+import type {
+  GomiMemoryHit,
+  GomiMemoryItem,
+  GomiMemoryRetentionPolicy,
+  GomiMemoryScope,
+  GomiMemoryStore
+} from './memoryStore';
 import {
   cosineSimilarity,
   HashingEmbeddingProvider,
@@ -61,6 +67,31 @@ export class FileBackedGomiMemoryStore implements GomiMemoryStore {
       .filter((item) => item.score > 0)
       .sort((left, right) => right.score - left.score)
       .slice(0, limit);
+  }
+
+  prune(scope: GomiMemoryScope, policy: GomiMemoryRetentionPolicy): void {
+    const scopePrefix = this.scopePrefix(scope);
+    const cutoffTime = Date.now() - policy.retentionDays * 24 * 60 * 60 * 1000;
+    const scopedItems = Array.from(this.scopedItems.entries())
+      .filter(([key]) => key.startsWith(scopePrefix))
+      .sort((left, right) => memoryTimestamp(right[1]) - memoryTimestamp(left[1]));
+
+    for (const [key, item] of scopedItems) {
+      if (memoryTimestamp(item) < cutoffTime) {
+        this.scopedItems.delete(key);
+      }
+    }
+
+    const retainedScopedItems = Array.from(this.scopedItems.entries())
+      .filter(([key]) => key.startsWith(scopePrefix))
+      .sort((left, right) => memoryTimestamp(right[1]) - memoryTimestamp(left[1]));
+
+    for (const [key] of retainedScopedItems.slice(policy.maxProjectMemoryItems)) {
+      this.scopedItems.delete(key);
+    }
+
+    this.entries = this.entries.filter((entry) => Date.parse(entry.createdAt) >= cutoffTime);
+    this.persist();
   }
 
   add(entry: Omit<GomiMemoryEntry, 'id' | 'createdAt'>): GomiMemoryEntry {
@@ -183,6 +214,30 @@ export class FileBackedVectorMemoryStore implements GomiVectorMemoryStore {
       .slice(0, limit);
   }
 
+  prune(scope: GomiMemoryScope, policy: GomiMemoryRetentionPolicy): void {
+    const scopePrefix = this.scopePrefix(scope);
+    const cutoffTime = Date.now() - policy.retentionDays * 24 * 60 * 60 * 1000;
+    const scopedRecords = Array.from(this.records.entries())
+      .filter(([key]) => key.startsWith(scopePrefix))
+      .sort((left, right) => memoryTimestamp(right[1]) - memoryTimestamp(left[1]));
+
+    for (const [key, record] of scopedRecords) {
+      if (memoryTimestamp(record) < cutoffTime) {
+        this.records.delete(key);
+      }
+    }
+
+    const retainedScopedRecords = Array.from(this.records.entries())
+      .filter(([key]) => key.startsWith(scopePrefix))
+      .sort((left, right) => memoryTimestamp(right[1]) - memoryTimestamp(left[1]));
+
+    for (const [key] of retainedScopedRecords.slice(policy.maxProjectMemoryItems)) {
+      this.records.delete(key);
+    }
+
+    this.persist();
+  }
+
   clear(scope?: GomiMemoryScope): void {
     if (!scope) {
       this.records.clear();
@@ -264,4 +319,8 @@ function scoreMemoryItem(item: GomiMemoryItem, normalizedQuery: string): number 
 
 function memorySearchText(item: GomiMemoryItem): string {
   return [item.key, item.value, ...(item.tags ?? [])].join('\n');
+}
+
+function memoryTimestamp(item: Pick<GomiMemoryItem, 'createdAt' | 'updatedAt'>): number {
+  return Date.parse(item.updatedAt ?? item.createdAt);
 }

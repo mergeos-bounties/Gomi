@@ -5,8 +5,15 @@ import {
   fireEmployee,
   getSeatForAgent,
   isAgentAvailableForTask,
+  setMaxProjectMemoryItems,
   setMemoryBroadcastThreshold,
-  setSeatWorkMode
+  setMemoryPrivacyMode,
+  setMemoryRetentionDays,
+  setPatchApprovalRequired,
+  setSecretRedactionEnabled,
+  setSeatWorkMode,
+  setSharedMemoryEnabled,
+  setWorkspaceContextIndexing
 } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
 
 describe('Gomi office settings', () => {
@@ -47,5 +54,30 @@ describe('Gomi office settings', () => {
     expect(setMemoryBroadcastThreshold(DEFAULT_GOMI_OFFICE_SETTINGS, 1.2).memory.broadcastThreshold).toBe(
       0.95
     );
+  });
+
+  it('updates memory privacy, retention, indexing, and approval settings', () => {
+    const strictSettings = setMemoryPrivacyMode(
+      setSecretRedactionEnabled(DEFAULT_GOMI_OFFICE_SETTINGS, false),
+      'strict'
+    );
+    const quietSettings = setWorkspaceContextIndexing(
+      setSharedMemoryEnabled(DEFAULT_GOMI_OFFICE_SETTINGS, false),
+      false
+    );
+    const relaxedApproval = setPatchApprovalRequired(DEFAULT_GOMI_OFFICE_SETTINGS, false);
+
+    expect(strictSettings.memory.privacyMode).toBe('strict');
+    expect(strictSettings.memory.redactSecrets).toBe(true);
+    expect(quietSettings.memory.sharedMemoryEnabled).toBe(false);
+    expect(quietSettings.memory.indexWorkspaceContext).toBe(false);
+    expect(relaxedApproval.memory.requirePatchApproval).toBe(false);
+  });
+
+  it('clamps project memory retention settings', () => {
+    expect(setMemoryRetentionDays(DEFAULT_GOMI_OFFICE_SETTINGS, 0).memory.retentionDays).toBe(1);
+    expect(setMemoryRetentionDays(DEFAULT_GOMI_OFFICE_SETTINGS, 999).memory.retentionDays).toBe(365);
+    expect(setMaxProjectMemoryItems(DEFAULT_GOMI_OFFICE_SETTINGS, 4).memory.maxProjectMemoryItems).toBe(40);
+    expect(setMaxProjectMemoryItems(DEFAULT_GOMI_OFFICE_SETTINGS, 9000).memory.maxProjectMemoryItems).toBe(5000);
   });
 });

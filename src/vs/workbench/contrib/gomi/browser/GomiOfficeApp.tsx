@@ -40,8 +40,15 @@ import {
   fireEmployee,
   getProviderLabel,
   getSeatForAgent,
+  setMaxProjectMemoryItems,
   setMemoryBroadcastThreshold,
-  setSeatWorkMode
+  setMemoryPrivacyMode,
+  setMemoryRetentionDays,
+  setPatchApprovalRequired,
+  setSeatWorkMode,
+  setSecretRedactionEnabled,
+  setSharedMemoryEnabled,
+  setWorkspaceContextIndexing
 } from '../common/gomiOfficeSettings';
 import type {
   GomiAgent,
@@ -51,6 +58,7 @@ import type {
   GomiChatMessage,
   GomiFinalReport,
   GomiMemoryBoardItem,
+  GomiMemoryPrivacyMode,
   GomiOfficeSettings,
   GomiRuntimeEvent,
   GomiTask,
@@ -353,6 +361,48 @@ export function GomiOfficeApp() {
     );
   }
 
+  function updateSharedMemoryEnabled(sharedMemoryEnabled: boolean) {
+    setOfficeSettings((currentSettings) =>
+      setSharedMemoryEnabled(currentSettings, sharedMemoryEnabled)
+    );
+  }
+
+  function updateWorkspaceContextIndexing(indexWorkspaceContext: boolean) {
+    setOfficeSettings((currentSettings) =>
+      setWorkspaceContextIndexing(currentSettings, indexWorkspaceContext)
+    );
+  }
+
+  function updateMemoryPrivacyMode(privacyMode: GomiMemoryPrivacyMode) {
+    setOfficeSettings((currentSettings) =>
+      setMemoryPrivacyMode(currentSettings, privacyMode)
+    );
+  }
+
+  function updateSecretRedaction(redactSecrets: boolean) {
+    setOfficeSettings((currentSettings) =>
+      setSecretRedactionEnabled(currentSettings, redactSecrets)
+    );
+  }
+
+  function updateMemoryRetentionDays(retentionDays: number) {
+    setOfficeSettings((currentSettings) =>
+      setMemoryRetentionDays(currentSettings, retentionDays)
+    );
+  }
+
+  function updateMaxProjectMemoryItems(maxProjectMemoryItems: number) {
+    setOfficeSettings((currentSettings) =>
+      setMaxProjectMemoryItems(currentSettings, maxProjectMemoryItems)
+    );
+  }
+
+  function updatePatchApprovalRequired(requirePatchApproval: boolean) {
+    setOfficeSettings((currentSettings) =>
+      setPatchApprovalRequired(currentSettings, requirePatchApproval)
+    );
+  }
+
   function setLayoutMode(mode: GomiOfficeViewMode) {
     setOfficeViewMode(mode);
 
@@ -511,6 +561,13 @@ export function GomiOfficeApp() {
           onFireEmployee={fireOfficeEmployee}
           onRestoreEmployee={restoreOfficeEmployee}
           onBroadcastThresholdChange={updateBroadcastThreshold}
+          onSharedMemoryEnabledChange={updateSharedMemoryEnabled}
+          onWorkspaceContextIndexingChange={updateWorkspaceContextIndexing}
+          onMemoryPrivacyModeChange={updateMemoryPrivacyMode}
+          onSecretRedactionChange={updateSecretRedaction}
+          onMemoryRetentionDaysChange={updateMemoryRetentionDays}
+          onMaxProjectMemoryItemsChange={updateMaxProjectMemoryItems}
+          onPatchApprovalRequiredChange={updatePatchApprovalRequired}
         />
       </div>
 
@@ -603,7 +660,14 @@ function RightPanel({
   onToggleSeatSleep,
   onFireEmployee,
   onRestoreEmployee,
-  onBroadcastThresholdChange
+  onBroadcastThresholdChange,
+  onSharedMemoryEnabledChange,
+  onWorkspaceContextIndexingChange,
+  onMemoryPrivacyModeChange,
+  onSecretRedactionChange,
+  onMemoryRetentionDaysChange,
+  onMaxProjectMemoryItemsChange,
+  onPatchApprovalRequiredChange
 }: {
   agents: GomiAgent[];
   tasks: GomiTask[];
@@ -615,6 +679,13 @@ function RightPanel({
   onFireEmployee: (seatId: string) => void;
   onRestoreEmployee: (seatId: string) => void;
   onBroadcastThresholdChange: (broadcastThreshold: number) => void;
+  onSharedMemoryEnabledChange: (sharedMemoryEnabled: boolean) => void;
+  onWorkspaceContextIndexingChange: (indexWorkspaceContext: boolean) => void;
+  onMemoryPrivacyModeChange: (privacyMode: GomiMemoryPrivacyMode) => void;
+  onSecretRedactionChange: (redactSecrets: boolean) => void;
+  onMemoryRetentionDaysChange: (retentionDays: number) => void;
+  onMaxProjectMemoryItemsChange: (maxProjectMemoryItems: number) => void;
+  onPatchApprovalRequiredChange: (requirePatchApproval: boolean) => void;
 }) {
   return (
     <aside className="gomi-right-panel" aria-label="Agent Status Panel">
@@ -657,6 +728,13 @@ function RightPanel({
           onFireEmployee={onFireEmployee}
           onRestoreEmployee={onRestoreEmployee}
           onBroadcastThresholdChange={onBroadcastThresholdChange}
+          onSharedMemoryEnabledChange={onSharedMemoryEnabledChange}
+          onWorkspaceContextIndexingChange={onWorkspaceContextIndexingChange}
+          onMemoryPrivacyModeChange={onMemoryPrivacyModeChange}
+          onSecretRedactionChange={onSecretRedactionChange}
+          onMemoryRetentionDaysChange={onMemoryRetentionDaysChange}
+          onMaxProjectMemoryItemsChange={onMaxProjectMemoryItemsChange}
+          onPatchApprovalRequiredChange={onPatchApprovalRequiredChange}
         />
       </div>
     </aside>
@@ -704,7 +782,14 @@ function OfficeSettingsPanel({
   onToggleSeatSleep,
   onFireEmployee,
   onRestoreEmployee,
-  onBroadcastThresholdChange
+  onBroadcastThresholdChange,
+  onSharedMemoryEnabledChange,
+  onWorkspaceContextIndexingChange,
+  onMemoryPrivacyModeChange,
+  onSecretRedactionChange,
+  onMemoryRetentionDaysChange,
+  onMaxProjectMemoryItemsChange,
+  onPatchApprovalRequiredChange
 }: {
   officeSettings: GomiOfficeSettings;
   memoryItems: GomiMemoryBoardItem[];
@@ -713,6 +798,13 @@ function OfficeSettingsPanel({
   onFireEmployee: (seatId: string) => void;
   onRestoreEmployee: (seatId: string) => void;
   onBroadcastThresholdChange: (broadcastThreshold: number) => void;
+  onSharedMemoryEnabledChange: (sharedMemoryEnabled: boolean) => void;
+  onWorkspaceContextIndexingChange: (indexWorkspaceContext: boolean) => void;
+  onMemoryPrivacyModeChange: (privacyMode: GomiMemoryPrivacyMode) => void;
+  onSecretRedactionChange: (redactSecrets: boolean) => void;
+  onMemoryRetentionDaysChange: (retentionDays: number) => void;
+  onMaxProjectMemoryItemsChange: (maxProjectMemoryItems: number) => void;
+  onPatchApprovalRequiredChange: (requirePatchApproval: boolean) => void;
 }) {
   const leaders = officeSettings.seats.filter((seat) => seat.seatKind !== 'employee');
   const employees = officeSettings.seats.filter((seat) => seat.seatKind === 'employee');
@@ -798,9 +890,48 @@ function OfficeSettingsPanel({
         <div className="gomi-settings-title">Shared Memory</div>
         <div className="gomi-memory-summary">
           <span>{officeSettings.memory.retrievalMode}</span>
+          <span>{officeSettings.memory.sharedMemoryEnabled ? 'shared on' : 'shared off'}</span>
+          <span>{officeSettings.memory.privacyMode}</span>
           <span>{`broadcast >= ${Math.round(officeSettings.memory.broadcastThreshold * 100)}%`}</span>
+          <span>{`${officeSettings.memory.retentionDays}d retention`}</span>
           <span>{officeSettings.memory.requirePatchApproval ? 'approval required' : 'auto apply allowed'}</span>
         </div>
+        <label className="gomi-toggle-field">
+          <input
+            type="checkbox"
+            checked={officeSettings.memory.sharedMemoryEnabled}
+            onChange={(event) => onSharedMemoryEnabledChange(event.target.checked)}
+          />
+          <span>Shared project memory</span>
+        </label>
+        <label className="gomi-toggle-field">
+          <input
+            type="checkbox"
+            checked={officeSettings.memory.indexWorkspaceContext}
+            onChange={(event) => onWorkspaceContextIndexingChange(event.target.checked)}
+            disabled={!officeSettings.memory.sharedMemoryEnabled}
+          />
+          <span>Index workspace context</span>
+        </label>
+        <label className="gomi-field">
+          <span>Privacy</span>
+          <select
+            value={officeSettings.memory.privacyMode}
+            onChange={(event) => onMemoryPrivacyModeChange(event.target.value as GomiMemoryPrivacyMode)}
+          >
+            <option value="standard">Standard</option>
+            <option value="strict">Strict</option>
+          </select>
+        </label>
+        <label className="gomi-toggle-field">
+          <input
+            type="checkbox"
+            checked={officeSettings.memory.redactSecrets}
+            onChange={(event) => onSecretRedactionChange(event.target.checked)}
+            disabled={officeSettings.memory.privacyMode === 'strict'}
+          />
+          <span>Secret redaction</span>
+        </label>
         <label className="gomi-range-field">
           <span>Broadcast threshold</span>
           <input
@@ -813,9 +944,37 @@ function OfficeSettingsPanel({
           />
           <strong>{Math.round(officeSettings.memory.broadcastThreshold * 100)}%</strong>
         </label>
-        <div className="gomi-seat-note">
-          Lower values make agents talk more often. Higher values keep routine findings on the shared memory board.
+        <div className="gomi-memory-grid">
+          <label className="gomi-field">
+            <span>Retention days</span>
+            <input
+              type="number"
+              min={1}
+              max={365}
+              value={officeSettings.memory.retentionDays}
+              onChange={(event) => onMemoryRetentionDaysChange(Number(event.target.value))}
+            />
+          </label>
+          <label className="gomi-field">
+            <span>Max memory items</span>
+            <input
+              type="number"
+              min={40}
+              max={5000}
+              step={10}
+              value={officeSettings.memory.maxProjectMemoryItems}
+              onChange={(event) => onMaxProjectMemoryItemsChange(Number(event.target.value))}
+            />
+          </label>
         </div>
+        <label className="gomi-toggle-field">
+          <input
+            type="checkbox"
+            checked={officeSettings.memory.requirePatchApproval}
+            onChange={(event) => onPatchApprovalRequiredChange(event.target.checked)}
+          />
+          <span>Patch approval required</span>
+        </label>
         <MemoryBoardPanel memoryItems={memoryItems} />
       </div>
     </section>

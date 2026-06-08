@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GOMI_OFFICE_SETTINGS,
+  setMemoryPrivacyMode,
   setMemoryBroadcastThreshold,
-  setSeatWorkMode
+  setSecretRedactionEnabled,
+  setSeatWorkMode,
+  setSharedMemoryEnabled
 } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
 import { GomiAgentRuntime } from '../src/vs/workbench/contrib/gomi/node/agentRuntime';
 
@@ -104,6 +107,79 @@ describe('GomiAgentRuntime', () => {
     const chattyAgentMessages = await countSpecialistMessages(chattyRuntime);
 
     expect(quietAgentMessages).toBeLessThan(chattyAgentMessages);
+  });
+
+  it('can disable shared project memory while preserving session memory updates', async () => {
+    const runtime = new GomiAgentRuntime({
+      delayMs: 0,
+      officeSettings: setSharedMemoryEnabled(DEFAULT_GOMI_OFFICE_SETTINGS, false)
+    });
+    const memorySources: string[] = [];
+
+    for await (const event of runtime.run('Review API UI database and deployment')) {
+      if (event.type === 'memory_update') {
+        memorySources.push(event.item.source);
+      }
+    }
+
+    expect(memorySources).toContain('session');
+    expect(memorySources).not.toContain('project');
+  });
+
+  it('sanitizes workspace context before indexing and planning', async () => {
+    const runtime = new GomiAgentRuntime({
+      delayMs: 0,
+      officeSettings: setMemoryPrivacyMode(
+        setSecretRedactionEnabled(DEFAULT_GOMI_OFFICE_SETTINGS, true),
+        'strict'
+      ),
+      workspaceReader: () => ({
+        rootName: 'SecretProject',
+        files: ['README.md', '.env', '.env.example', 'src/auth.ts'],
+        openEditors: ['.env', 'src/auth.ts'],
+        gitSummary: 'Git branch main, 0 changed files.',
+        terminalSummary: 'Bearer abcdefghijklmnopqrstuvwxyz',
+        contentSnippets: [
+          {
+            filePath: '.env',
+            content: 'API_KEY=super-secret-value',
+            language: 'text',
+            source: 'workspace'
+          },
+          {
+            filePath: 'src/auth.ts',
+            content: 'const API_KEY = "super-secret-value";',
+            language: 'typescript',
+            source: 'open_editor'
+          },
+          {
+            filePath: 'Terminal: build',
+            content: 'Bearer abcdefghijklmnopqrstuvwxyz',
+            language: 'text',
+            source: 'terminal'
+          }
+        ]
+      })
+    });
+    const sessionWorkspaces: string[][] = [];
+    const memoryContents: string[] = [];
+
+    for await (const event of runtime.run('Review secret project')) {
+      if (event.type === 'session_started') {
+        sessionWorkspaces.push(event.workspace.files);
+        memoryContents.push(...(event.workspace.contentSnippets?.map((snippet) => snippet.content) ?? []));
+      }
+
+      if (event.type === 'memory_update') {
+        memoryContents.push(event.item.content);
+      }
+    }
+
+    expect(sessionWorkspaces[0]).not.toContain('.env');
+    expect(sessionWorkspaces[0]).toContain('.env.example');
+    expect(memoryContents.join('\n')).toContain('[REDACTED]');
+    expect(memoryContents.join('\n')).not.toContain('super-secret-value');
+    expect(memoryContents.join('\n')).not.toContain('abcdefghijklmnopqrstuvwxyz');
   });
 });
 

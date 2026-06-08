@@ -91,4 +91,44 @@ describe('shared project memory and communication policy', () => {
     expect(quietDecision.shouldBroadcast).toBe(false);
     expect(chattyDecision.shouldBroadcast).toBe(true);
   });
+
+  it('keeps repeated findings quiet when recalled memory already covers them', async () => {
+    const memoryStore = createInMemoryGomiMemoryStore();
+    const sharedMemory = new GomiSharedProjectMemory(memoryStore, { workspaceId: 'Gomi' });
+
+    await sharedMemory.rememberAgentResult(result, 0.9);
+    const recalledMemory = await sharedMemory.searchForTask(task, 'shared memory layer');
+    const decision = evaluateAgentCommunication(result, {
+      recalledMemory
+    });
+
+    expect(recalledMemory.map((hit) => hit.key)).toContain(`agent:${result.agentId}:${result.taskId}`);
+    expect(decision.shouldBroadcast).toBe(false);
+    expect(decision.reason).toContain('Already covered');
+  });
+
+  it('still broadcasts a new risk that recalled memory does not cover', async () => {
+    const memoryStore = createInMemoryGomiMemoryStore();
+    const sharedMemory = new GomiSharedProjectMemory(memoryStore, { workspaceId: 'Gomi' });
+
+    await sharedMemory.rememberAgentResult(result, 0.9);
+    const recalledMemory = await sharedMemory.searchForTask(task, 'shared memory layer');
+    const decision = evaluateAgentCommunication(
+      {
+        ...result,
+        agentId: 'qa',
+        summary: 'Found a regression risk in login session invalidation.',
+        findings: ['Risk: stale login sessions can bypass logout.'],
+        recommendations: ['Add regression tests for session invalidation.'],
+        proposedFiles: ['tests/login-session.spec.ts'],
+        confidence: 0.84
+      },
+      {
+        recalledMemory
+      }
+    );
+
+    expect(decision.shouldBroadcast).toBe(true);
+    expect(decision.broadcastSummary).toContain('regression risk');
+  });
 });

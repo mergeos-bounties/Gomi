@@ -20,10 +20,16 @@ export interface GomiMemoryHit extends GomiMemoryItem {
   score: number;
 }
 
+export interface GomiMemoryRetentionPolicy {
+  retentionDays: number;
+  maxProjectMemoryItems: number;
+}
+
 export interface GomiMemoryStore {
   get(scope: GomiMemoryScope, key: string): Promise<GomiMemoryItem | null>;
   put(scope: GomiMemoryScope, item: Omit<GomiMemoryItem, 'createdAt' | 'updatedAt'>): Promise<GomiMemoryItem>;
   search(scope: GomiMemoryScope, query: string, limit?: number): Promise<GomiMemoryHit[]>;
+  prune(scope: GomiMemoryScope, policy: GomiMemoryRetentionPolicy): void;
   add(entry: Omit<GomiMemoryEntry, 'id' | 'createdAt'>): GomiMemoryEntry;
   list(sessionId: string): GomiMemoryEntry[];
   recent(sessionId: string, limit: number): GomiMemoryEntry[];
@@ -66,6 +72,30 @@ export class InMemoryGomiMemoryStore implements GomiMemoryStore {
       .filter((item) => item.score > 0)
       .sort((left, right) => right.score - left.score)
       .slice(0, limit);
+  }
+
+  prune(scope: GomiMemoryScope, policy: GomiMemoryRetentionPolicy): void {
+    const scopePrefix = this.scopePrefix(scope);
+    const cutoffTime = Date.now() - policy.retentionDays * 24 * 60 * 60 * 1000;
+    const scopedEntries = Array.from(this.scopedItems.entries())
+      .filter(([key]) => key.startsWith(scopePrefix))
+      .sort((left, right) => memoryTimestamp(right[1]) - memoryTimestamp(left[1]));
+
+    for (const [key, item] of scopedEntries) {
+      if (memoryTimestamp(item) < cutoffTime) {
+        this.scopedItems.delete(key);
+      }
+    }
+
+    const retainedScopedEntries = Array.from(this.scopedItems.entries())
+      .filter(([key]) => key.startsWith(scopePrefix))
+      .sort((left, right) => memoryTimestamp(right[1]) - memoryTimestamp(left[1]));
+
+    for (const [key] of retainedScopedEntries.slice(policy.maxProjectMemoryItems)) {
+      this.scopedItems.delete(key);
+    }
+
+    this.entries = this.entries.filter((entry) => Date.parse(entry.createdAt) >= cutoffTime);
   }
 
   add(entry: Omit<GomiMemoryEntry, 'id' | 'createdAt'>): GomiMemoryEntry {
@@ -143,4 +173,8 @@ export function createAgentResultMemoryEntry(input: {
     agentId: input.agentId,
     taskId: input.taskId
   };
+}
+
+function memoryTimestamp(item: Pick<GomiMemoryItem, 'createdAt' | 'updatedAt'>): number {
+  return Date.parse(item.updatedAt ?? item.createdAt);
 }

@@ -1,4 +1,9 @@
-import type { GomiMemoryHit, GomiMemoryItem, GomiMemoryScope } from './memoryStore';
+import type {
+  GomiMemoryHit,
+  GomiMemoryItem,
+  GomiMemoryRetentionPolicy,
+  GomiMemoryScope
+} from './memoryStore';
 import {
   cosineSimilarity,
   HashingEmbeddingProvider,
@@ -12,6 +17,7 @@ export interface GomiVectorMemoryRecord extends GomiMemoryItem {
 export interface GomiVectorMemoryStore {
   upsert(scope: GomiMemoryScope, item: Omit<GomiMemoryItem, 'createdAt' | 'updatedAt'>): Promise<GomiMemoryItem>;
   search(scope: GomiMemoryScope, query: string, limit?: number): Promise<GomiMemoryHit[]>;
+  prune(scope: GomiMemoryScope, policy: GomiMemoryRetentionPolicy): void;
   clear(scope?: GomiMemoryScope): void;
 }
 
@@ -62,6 +68,28 @@ export class InMemoryVectorMemoryStore implements GomiVectorMemoryStore {
       .slice(0, limit);
   }
 
+  prune(scope: GomiMemoryScope, policy: GomiMemoryRetentionPolicy): void {
+    const scopePrefix = this.scopePrefix(scope);
+    const cutoffTime = Date.now() - policy.retentionDays * 24 * 60 * 60 * 1000;
+    const scopedRecords = Array.from(this.records.entries())
+      .filter(([key]) => key.startsWith(scopePrefix))
+      .sort((left, right) => memoryTimestamp(right[1]) - memoryTimestamp(left[1]));
+
+    for (const [key, record] of scopedRecords) {
+      if (memoryTimestamp(record) < cutoffTime) {
+        this.records.delete(key);
+      }
+    }
+
+    const retainedScopedRecords = Array.from(this.records.entries())
+      .filter(([key]) => key.startsWith(scopePrefix))
+      .sort((left, right) => memoryTimestamp(right[1]) - memoryTimestamp(left[1]));
+
+    for (const [key] of retainedScopedRecords.slice(policy.maxProjectMemoryItems)) {
+      this.records.delete(key);
+    }
+  }
+
   clear(scope?: GomiMemoryScope): void {
     if (!scope) {
       this.records.clear();
@@ -94,4 +122,8 @@ export function createInMemoryVectorMemoryStore(
 
 function memorySearchText(item: GomiMemoryItem): string {
   return [item.key, item.value, ...(item.tags ?? [])].join('\n');
+}
+
+function memoryTimestamp(item: Pick<GomiMemoryItem, 'createdAt' | 'updatedAt'>): number {
+  return Date.parse(item.updatedAt ?? item.createdAt);
 }
