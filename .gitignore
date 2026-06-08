@@ -3,6 +3,7 @@ dist/
 .vite/
 .vitest/
 *.tsbuildinfo
+.gomi-ide/
 
 artifacts/
 *.log

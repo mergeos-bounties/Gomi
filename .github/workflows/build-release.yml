@@ -1,0 +1,178 @@
+name: Build and Release Gomi IDE
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create or update a GitHub release with produced artifacts'
+        required: true
+        default: true
+        type: boolean
+      build_code_oss_windows:
+        description: 'Checkout Code - OSS and build a Windows desktop package'
+        required: true
+        default: false
+        type: boolean
+      code_oss_repository:
+        description: 'Code - OSS fork/repository to package'
+        required: true
+        default: 'microsoft/vscode'
+        type: string
+      code_oss_ref:
+        description: 'Code - OSS branch, tag, or SHA'
+        required: true
+        default: 'main'
+        type: string
+      windows_platform:
+        description: 'Windows platform target'
+        required: true
+        default: 'win32-x64'
+        type: choice
+        options:
+          - win32-x64
+          - win32-arm64
+          - win32-ia32
+      build_setup_exe:
+        description: 'Attempt to run the Code - OSS Windows setup/installer gulp task'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  verify-prototype:
+    name: Verify Gomi scaffold
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Gomi
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build prototype webview bundle
+        run: npm run build
+
+      - name: Package prototype artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          Compress-Archive -Path dist\* -DestinationPath release\gomi-office-webview-prototype.zip -Force
+
+      - name: Upload prototype artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gomi-office-webview-prototype
+          path: release/gomi-office-webview-prototype.zip
+
+  code-oss-windows:
+    name: Build Code - OSS Windows package
+    runs-on: windows-latest
+    timeout-minutes: 180
+    if: github.event_name == 'workflow_dispatch' && inputs.build_code_oss_windows == true
+
+    steps:
+      - name: Checkout Gomi
+        uses: actions/checkout@v4
+        with:
+          path: gomi
+
+      - name: Checkout Code - OSS fork
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.code_oss_repository }}
+          ref: ${{ inputs.code_oss_ref }}
+          path: code-oss
+
+      - name: Setup Node from Code - OSS
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: code-oss/.nvmrc
+          cache: npm
+          cache-dependency-path: code-oss/package-lock.json
+
+      - name: Package Gomi IDE for Windows
+        shell: pwsh
+        run: |
+          $args = @(
+            '-CodeOssRoot', (Resolve-Path 'code-oss').Path,
+            '-Platform', '${{ inputs.windows_platform }}',
+            '-Minified'
+          )
+
+          if ('${{ inputs.build_setup_exe }}' -eq 'true') {
+            $args += '-BuildSetup'
+          }
+
+          & .\gomi\scripts\build-gomi-code-oss-windows.ps1 @args
+
+      - name: Collect Windows artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          $files = Get-ChildItem -Path code-oss\.build -Recurse -File -Include *.exe,*.msi,*.zip -ErrorAction SilentlyContinue
+
+          if (-not $files) {
+            $archiveRoot = Join-Path 'code-oss' ".build\${{ inputs.windows_platform }}"
+            if (Test-Path $archiveRoot) {
+              Compress-Archive -Path "$archiveRoot\*" -DestinationPath "release\gomi-ide-${{ inputs.windows_platform }}.zip" -Force
+            } else {
+              throw 'No Code - OSS Windows artifacts were found.'
+            }
+          } else {
+            foreach ($file in $files) {
+              Copy-Item -LiteralPath $file.FullName -Destination (Join-Path 'release' $file.Name) -Force
+            }
+          }
+
+      - name: Upload Windows desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gomi-ide-windows
+          path: release/*
+
+  release:
+    name: Publish GitHub release
+    runs-on: ubuntu-latest
+    needs:
+      - verify-prototype
+      - code-oss-windows
+    if: >
+      always() &&
+      needs.verify-prototype.result == 'success' &&
+      (needs.code-oss-windows.result == 'success' || needs.code-oss-windows.result == 'skipped') &&
+      (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true))
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('manual-{0}', github.run_number) }}
+          name: Gomi IDE ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('manual-{0}', github.run_number) }}
+          draft: false
+          prerelease: true
+          files: release-assets/**

@@ -12,7 +12,7 @@ Fork Code - OSS
 -> Customize the workbench
 -> Add the Gomi Multi-Agent Office
 -> Add the AI Agent Runtime
--> Package and distribute as a standalone IDE
+-> Package and distribute as a standalone IDE installer
 ```
 
 ![Gomi Office IDE interface](docs/images/gomi-office-cute-office.png)
@@ -35,6 +35,7 @@ Gomi IDE is designed to become a commercial-grade AI development environment wit
 - Human approval gates before code modification.
 - A path to cloud LLM providers, local models, or enterprise-managed model routing.
 - Open VSX or a dedicated extension marketplace strategy.
+- Windows desktop build and release automation for Code - OSS packaging.
 - Clear separation between product branding, editor core, AI runtime, and visual office UI.
 
 This repository is the current product foundation and technical prototype. It is not yet a fully packaged Code - OSS distribution.
@@ -60,6 +61,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Safe node-side patch application core** for approved unified diffs inside the workspace root.
 - **Runtime events** for session lifecycle, messages, task updates, agent results, patch proposals, and final reports.
 - **Workbench bridge controller** for routing webview messages to the runtime and approved patch applier.
+- **GitHub Actions release workflow** for verification, artifacts, and optional Windows Code - OSS packaging.
 - **Open VSX Registry metadata** instead of Microsoft Visual Studio Marketplace metadata.
 
 ## Multi-Agent Office
@@ -174,6 +176,18 @@ The intended product path is:
 10. Show generated changes through a diff-first approval flow.
 11. Package Gomi IDE for Windows, macOS, and Linux.
 
+## Windows Desktop Build
+
+Gomi IDE should be released as a desktop artifact from a Code - OSS fork, not as an `npm run dev` app.
+
+This repository includes:
+
+- `.github/workflows/build-release.yml` for verification, artifact upload, optional Code - OSS Windows packaging, and GitHub Releases.
+- `scripts/build-gomi-code-oss-windows.ps1` for local or CI packaging against a real Code - OSS fork.
+- `docs/windows-release.md` with the Windows build and release workflow.
+
+The prototype `npm` commands remain useful for developing and testing the Gomi Office module. The product distribution path is the Code - OSS packaging path, which can produce a packaged Windows build and, when the fork exposes a compatible setup task, a setup `.exe`.
+
 ## Repository Layout
 
 ```text
@@ -241,6 +255,7 @@ Implemented in this repository:
 - Node workspace reader for real project metadata and content snippets.
 - Patch proposal, diff preview, approve/reject, and apply gating.
 - Safe unified-diff patch application core for approved workspace edits.
+- GitHub Actions build/release workflow and Windows Code - OSS packaging script.
 - Tests for runtime, planner, message bus, patch approval, patch application, workspace reader, project context indexing, shared memory, and vector memory.
 
 Not yet implemented:
@@ -251,7 +266,7 @@ Not yet implemented:
 - Production local model provider.
 - Persistent database-backed memory.
 - Workbench-integrated patch application through Code - OSS editor and file service APIs.
-- Signed desktop packaging and release pipeline.
+- Signed desktop packaging assets and production release signing.
 - Enterprise settings, licensing, update channel, and telemetry policy.
 
 ## Getting Started
