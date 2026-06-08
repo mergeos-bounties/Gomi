@@ -54,6 +54,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Standard, Expanded, and Full Office layout modes** so side panels can collapse and the visual office can take over the workspace.
 - **2D office simulation** built with Phaser.
 - **Animated game-style agents** with visible status and chat bubbles.
+- **Responsive office layout model** with dedicated rooms, a shared memory board, a status wall, and route lines showing Gomi moving between active agents.
 - **Shared memory board** fed by real runtime memory updates for project context.
 - **CEO Agent planning flow** with specialist agent delegation.
 - **Office organization settings** for assigning CLI agent routes to the CEO and department heads.
@@ -127,6 +128,8 @@ Gomi IDE
 |   |-- Animation
 |   |-- Chat Bubbles
 |   |-- Memory Board
+|   |-- Status Wall
+|   |-- Gomi Route Lines
 |   `-- Task Status Panel
 |
 `-- AI Runtime
@@ -341,6 +344,7 @@ Implemented in this repository:
 - Workbench-compatible Gomi module skeleton.
 - React workbench shell.
 - Phaser 2D office simulation.
+- Responsive office layout model with deterministic room, seat, memory-board, status-wall, and Gomi-hub coordinates.
 - Animated office avatars and chat bubbles.
 - Memory board and task status UI backed by runtime `memory_update` events.
 - Collapsible side/bottom panels plus Standard, Expanded, and Full Office layout modes.

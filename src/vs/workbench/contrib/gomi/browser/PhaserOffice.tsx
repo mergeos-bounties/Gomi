@@ -6,6 +6,12 @@ import type {
   GomiMemoryBoardItem,
   GomiTask
 } from '../common/gomiTypes';
+import {
+  agentRoomIds,
+  createGomiOfficeLayout,
+  type GomiOfficeBoardLayout,
+  type GomiOfficeRoomLayout
+} from './gomiOfficeLayout';
 
 interface PhaserOfficeProps {
   agents: GomiAgent[];
@@ -105,28 +111,38 @@ export function PhaserOffice({
       ) {
         const width = this.game.canvas.width || this.scale.width || 640;
         const height = this.game.canvas.height || this.scale.height || 360;
+        const officeLayout = createGomiOfficeLayout(width, height);
         const latestSpeech = this.getLatestSpeechBySender(nextMessages);
 
         this.children.removeAll(true);
         this.tweens.killAll();
 
         const graphics = this.add.graphics();
-        this.drawOfficeShell(graphics, width, height);
-        this.drawMemoryBoard(graphics, width, height, nextTasks, nextMessages, nextMemoryItems);
+        this.drawOfficeShell(graphics, width, height, officeLayout.rooms);
+        this.drawMemoryBoard(graphics, officeLayout.memoryBoard, nextTasks, nextMessages, nextMemoryItems);
+        this.drawStatusWall(graphics, officeLayout.statusWall, nextAgents, nextTasks);
+        this.drawGomiRoute(graphics, officeLayout.gomiHub, officeLayout.seats, nextAgents);
 
         for (const agent of nextAgents) {
-          this.drawAgent(agent, width, height, latestSpeech.get(agent.id));
+          const seat = officeLayout.seats.find((candidate) => candidate.agentId === agent.id);
+          this.drawAgent(agent, width, height, latestSpeech.get(agent.id), seat);
         }
 
         this.drawGomiGuide(
+          officeLayout.gomiHub.x,
+          officeLayout.gomiHub.y,
           width,
-          height,
           nextTasks.some((task) => task.status === 'running'),
           latestSpeech.get('pet-gomi')
         );
       }
 
-      private drawOfficeShell(graphics: Phaser.GameObjects.Graphics, width: number, height: number) {
+      private drawOfficeShell(
+        graphics: Phaser.GameObjects.Graphics,
+        width: number,
+        height: number,
+        rooms: GomiOfficeRoomLayout[]
+      ) {
         graphics.fillStyle(0x0f172a, 1);
         graphics.fillRect(0, 0, width, height);
         graphics.fillStyle(0x172033, 1);
@@ -137,35 +153,11 @@ export function PhaserOffice({
         graphics.lineStyle(2, 0x334155, 1);
         graphics.strokeRoundedRect(18, 18, width - 36, height - 36, 14);
 
-        this.drawRoom(graphics, width * 0.05, height * 0.1, width * 0.25, height * 0.28, 'CEO Office');
-        this.drawRoom(
-          graphics,
-          width * 0.36,
-          height * 0.1,
-          width * 0.25,
-          height * 0.28,
-          'Analysis Bay'
-        );
-        this.drawRoom(
-          graphics,
-          width * 0.64,
-          height * 0.1,
-          width * 0.16,
-          height * 0.28,
-          'Frontend Studio'
-        );
-        this.drawRoom(
-          graphics,
-          width * 0.82,
-          height * 0.1,
-          width * 0.12,
-          height * 0.28,
-          'Design'
-        );
-        this.drawRoom(graphics, width * 0.05, height * 0.58, width * 0.25, height * 0.28, 'Data Lab');
-        this.drawRoom(graphics, width * 0.38, height * 0.58, width * 0.25, height * 0.28, 'QA Desk');
-        this.drawRoom(graphics, width * 0.71, height * 0.58, width * 0.23, height * 0.28, 'DevOps Pod');
-        this.drawFurniture(graphics, width, height);
+        for (const roomLayout of rooms) {
+          this.drawRoom(graphics, roomLayout);
+        }
+
+        this.drawFurniture(graphics, width, height, rooms);
       }
 
       private drawFloorGrid(graphics: Phaser.GameObjects.Graphics, width: number, height: number) {
@@ -185,12 +177,10 @@ export function PhaserOffice({
 
       private drawRoom(
         graphics: Phaser.GameObjects.Graphics,
-        x: number,
-        y: number,
-        width: number,
-        height: number,
-        label: string
+        roomLayout: GomiOfficeRoomLayout
       ) {
+        const { x, y, width, height, label } = roomLayout;
+
         graphics.fillStyle(0x1b2638, 0.96);
         graphics.fillRoundedRect(x, y, width, height, 10);
         graphics.lineStyle(1, 0x475569, 1);
@@ -203,26 +193,27 @@ export function PhaserOffice({
         });
       }
 
-      private drawFurniture(graphics: Phaser.GameObjects.Graphics, width: number, height: number) {
-        const desks = [
-          { x: width * 0.11, y: height * 0.28 },
-          { x: width * 0.43, y: height * 0.28 },
-          { x: width * 0.68, y: height * 0.28 },
-          { x: width * 0.83, y: height * 0.28 },
-          { x: width * 0.11, y: height * 0.75 },
-          { x: width * 0.45, y: height * 0.75 },
-          { x: width * 0.76, y: height * 0.75 }
-        ];
+      private drawFurniture(
+        graphics: Phaser.GameObjects.Graphics,
+        width: number,
+        height: number,
+        rooms: GomiOfficeRoomLayout[]
+      ) {
+        for (const roomLayout of rooms) {
+          const desk = {
+            x: roomLayout.x + Math.max(10, roomLayout.width * 0.16),
+            y: roomLayout.y + roomLayout.height * 0.62
+          };
+          const deskWidth = Math.min(92, Math.max(48, roomLayout.width * 0.58));
 
-        for (const desk of desks) {
           graphics.fillStyle(0x8b5e34, 1);
-          graphics.fillRoundedRect(desk.x, desk.y, 92, 34, 8);
+          graphics.fillRoundedRect(desk.x, desk.y, deskWidth, 34, 8);
           graphics.fillStyle(0x334155, 1);
           graphics.fillRoundedRect(desk.x + 10, desk.y + 7, 32, 18, 4);
           graphics.fillStyle(0xe2e8f0, 1);
-          graphics.fillRoundedRect(desk.x + 54, desk.y + 8, 20, 14, 3);
+          graphics.fillRoundedRect(desk.x + deskWidth - 32, desk.y + 8, 20, 14, 3);
           graphics.fillStyle(0x475569, 1);
-          graphics.fillRoundedRect(desk.x + 29, desk.y + 40, 34, 14, 6);
+          graphics.fillRoundedRect(desk.x + deskWidth * 0.35, desk.y + 40, 34, 14, 6);
         }
 
         graphics.fillStyle(0x0f766e, 1);
@@ -239,16 +230,12 @@ export function PhaserOffice({
 
       private drawMemoryBoard(
         graphics: Phaser.GameObjects.Graphics,
-        width: number,
-        height: number,
+        boardLayout: GomiOfficeBoardLayout,
         tasks: GomiTask[],
         messages: GomiChatMessage[],
         memoryItems: GomiMemoryBoardItem[]
       ) {
-        const boardWidth = Math.min(270, width * 0.34);
-        const boardHeight = Math.min(118, height * 0.28);
-        const x = width * 0.33;
-        const y = height * 0.14;
+        const { x, y, width: boardWidth, height: boardHeight } = boardLayout;
         const notes = this.createMemoryNotes(tasks, messages, memoryItems);
 
         graphics.fillStyle(0x422006, 1);
@@ -277,6 +264,50 @@ export function PhaserOffice({
             fontFamily: 'Inter, Arial',
             fontSize: '10px',
             wordWrap: { width: boardWidth * 0.43 - 12 }
+          });
+        });
+      }
+
+      private drawStatusWall(
+        graphics: Phaser.GameObjects.Graphics,
+        wallLayout: GomiOfficeBoardLayout,
+        agents: GomiAgent[],
+        tasks: GomiTask[]
+      ) {
+        const { x, y, width, height } = wallLayout;
+        const runningCount = tasks.filter((task) => task.status === 'running').length;
+        const doneCount = tasks.filter((task) => task.status === 'done').length;
+        const blockedCount = agents.filter((agent) => agent.status === 'blocked').length;
+        const sleepingCount = agents.filter((agent) => agent.status === 'sleeping').length;
+        const rows = [
+          `Active ${runningCount}`,
+          `Done ${doneCount}/${Math.max(tasks.length, 1)}`,
+          blockedCount > 0 ? `Blocked ${blockedCount}` : `Sleep ${sleepingCount}`,
+          `Memory ${tasks.length > 0 ? 'live' : 'ready'}`
+        ];
+
+        graphics.fillStyle(0x0f172a, 0.94);
+        graphics.fillRoundedRect(x, y, width, height, 10);
+        graphics.lineStyle(2, 0x2dd4bf, 0.9);
+        graphics.strokeRoundedRect(x, y, width, height, 10);
+
+        this.add.text(x + 12, y + 10, 'Status Wall', {
+          color: '#ccfbf1',
+          fontFamily: 'Inter, Arial',
+          fontSize: '13px',
+          fontStyle: '700'
+        });
+
+        rows.forEach((row, index) => {
+          const rowY = y + 34 + index * 20;
+          const color = [0x2dd4bf, 0x22c55e, 0x818cf8, 0xfbbf24][index];
+
+          graphics.fillStyle(color, 0.85);
+          graphics.fillCircle(x + 14, rowY + 6, 4);
+          this.add.text(x + 24, rowY, row, {
+            color: '#e5e7eb',
+            fontFamily: 'Inter, Arial',
+            fontSize: '11px'
           });
         });
       }
@@ -310,9 +341,15 @@ export function PhaserOffice({
         ];
       }
 
-      private drawAgent(agent: GomiAgent, width: number, height: number, bubbleText?: string) {
-        const x = (agent.position.x / 100) * width;
-        const y = (agent.position.y / 100) * height;
+      private drawAgent(
+        agent: GomiAgent,
+        width: number,
+        height: number,
+        bubbleText?: string,
+        seat?: { x: number; y: number }
+      ) {
+        const x = seat?.x ?? (agent.position.x / 100) * width;
+        const y = seat?.y ?? (agent.position.y / 100) * height;
 
         if (agent.status === 'sleeping') {
           this.drawSleepingAgent(agent, x, y, width);
@@ -372,6 +409,36 @@ export function PhaserOffice({
         }
       }
 
+      private drawGomiRoute(
+        graphics: Phaser.GameObjects.Graphics,
+        hub: { x: number; y: number },
+        seats: Array<{ agentId: GomiAgent['id']; roomId: string; x: number; y: number }>,
+        agents: GomiAgent[]
+      ) {
+        const activeAgents = agents.filter((agent) =>
+          ['planning', 'working', 'reviewing', 'blocked'].includes(agent.status)
+        );
+
+        if (activeAgents.length === 0) {
+          return;
+        }
+
+        graphics.lineStyle(3, 0x2dd4bf, 0.42);
+
+        for (const agent of activeAgents.slice(0, 3)) {
+          const roomId = agentRoomIds[agent.id];
+          const target = seats.find((seat) => seat.roomId === roomId);
+
+          if (!target) {
+            continue;
+          }
+
+          graphics.lineBetween(hub.x, hub.y, target.x, target.y);
+          graphics.fillStyle(statusColors[agent.status], 0.85);
+          graphics.fillCircle((hub.x + target.x) / 2, (hub.y + target.y) / 2, 5);
+        }
+      }
+
       private drawSleepingAgent(agent: GomiAgent, x: number, y: number, sceneWidth: number) {
         const group = this.add.container(x, y);
         const color = roleColors[agent.id];
@@ -412,9 +479,7 @@ export function PhaserOffice({
         this.drawSpeechBubble(x, y - 82, 'Sleeping. Seat retained.', sceneWidth);
       }
 
-      private drawGomiGuide(width: number, height: number, isMoving: boolean, bubbleText?: string) {
-        const x = width * 0.5;
-        const y = height * 0.48;
+      private drawGomiGuide(x: number, y: number, sceneWidth: number, isMoving: boolean, bubbleText?: string) {
         const group = this.add.container(x, y);
 
         group.add(this.add.ellipse(0, 25, 42, 14, 0x020617, 0.22));
@@ -447,7 +512,7 @@ export function PhaserOffice({
         }
 
         if (bubbleText) {
-          this.drawSpeechBubble(x, y - 62, this.shorten(bubbleText, 48), width);
+          this.drawSpeechBubble(x, y - 62, this.shorten(bubbleText, 48), sceneWidth);
         }
       }
 
