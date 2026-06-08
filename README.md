@@ -198,7 +198,7 @@ Gomi IDE should be released as a desktop artifact from a Code - OSS fork, not as
 
 This repository includes:
 
-- `.github/workflows/build-release.yml` for verification, artifact upload, optional Code - OSS Windows packaging, and GitHub Releases.
+- `.github/workflows/build-release.yml` for verification, versioned artifact upload, optional Code - OSS Windows packaging, release notes, and GitHub Releases.
 - `build/gomi-code-oss.integration.json` for declaring the Gomi files and workbench import to apply to a Code - OSS checkout.
 - `build/code-oss-templates/gomiContribution.ts` for overlaying the native Code - OSS view/container registration during fork integration.
 - `npm run build:webview` for generating the bundled Gomi Office webview assets copied into the Code - OSS workbench module.
@@ -207,6 +207,13 @@ This repository includes:
 - `docs/windows-release.md` with the Windows build and release workflow.
 
 The prototype `npm` commands remain useful for developing and testing the Gomi Office module. The product distribution path is the Code - OSS packaging path: the packaging script applies Gomi metadata and workbench files to a Code - OSS checkout, then invokes the upstream gulp packaging tasks to produce a packaged Windows build and, when the fork exposes a compatible setup task, a setup `.exe`.
+
+GitHub Actions release behavior:
+
+- Pushes to `master` verify the scaffold and upload the Gomi Office prototype/webview bundle.
+- Tags matching `v*` run the Windows Code - OSS packaging job and publish a prerelease.
+- Manual workflow runs can publish a release and optionally enable the heavy Windows desktop packaging job.
+- Produced Windows artifacts are collected from Code - OSS `.build` output as `.exe`, `.msi`, or `.zip` files, with a generated `ARTIFACTS.md` manifest.
 
 The desktop packaging script builds the React/Phaser office bundle into `build/gomi-office-webview`, copies it to `src/vs/workbench/contrib/gomi/browser/media/office` inside the Code - OSS fork, and the native contribution template mounts that bundle through an internal workbench webview.
 

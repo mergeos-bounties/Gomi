@@ -1,4 +1,5 @@
 name: Build and Release Gomi IDE
+run-name: Build Gomi IDE ${{ github.ref_name }}
 
 on:
   push:
@@ -46,6 +47,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: gomi-ide-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   verify-prototype:
     name: Verify Gomi scaffold
@@ -54,6 +59,8 @@ jobs:
     steps:
       - name: Checkout Gomi
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -73,17 +80,39 @@ jobs:
       - name: Build prototype webview bundle
         run: npm run build
 
+      - name: Build Code - OSS webview bundle
+        run: npm run build:webview
+
       - name: Package prototype artifact
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release | Out-Null
-          Compress-Archive -Path dist\* -DestinationPath release\gomi-office-webview-prototype.zip -Force
+          New-Item -ItemType Directory -Force -Path release\prototype\preview | Out-Null
+          New-Item -ItemType Directory -Force -Path release\prototype\code-oss-webview | Out-Null
+
+          Copy-Item -Path dist\* -Destination release\prototype\preview -Recurse -Force
+          Copy-Item -Path build\gomi-office-webview\* -Destination release\prototype\code-oss-webview -Recurse -Force
+
+          @(
+            'Gomi IDE prototype artifact',
+            '',
+            "Commit: $env:GITHUB_SHA",
+            "Ref: $env:GITHUB_REF_NAME",
+            '',
+            'preview/',
+            '  Standalone Vite preview build for the current Gomi Office prototype.',
+            '',
+            'code-oss-webview/',
+            '  Webview bundle intended to be copied into the Code - OSS workbench module.'
+          ) | Set-Content -Path release\prototype\README.txt -Encoding UTF8
+
+          Compress-Archive -Path release\prototype\* -DestinationPath "release\gomi-office-webview-prototype-$env:GITHUB_SHA.zip" -Force
 
       - name: Upload prototype artifact
         uses: actions/upload-artifact@v4
         with:
           name: gomi-office-webview-prototype
-          path: release/gomi-office-webview-prototype.zip
+          path: release/gomi-office-webview-prototype-*.zip
 
   code-oss-windows:
     name: Build Code - OSS Windows package
@@ -91,16 +120,17 @@ jobs:
     timeout-minutes: 180
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_code_oss_windows == true)
     env:
-      GOMI_CODE_OSS_REPOSITORY: ${{ inputs.code_oss_repository || vars.GOMI_CODE_OSS_REPOSITORY || 'microsoft/vscode' }}
-      GOMI_CODE_OSS_REF: ${{ inputs.code_oss_ref || vars.GOMI_CODE_OSS_REF || 'main' }}
-      GOMI_WINDOWS_PLATFORM: ${{ inputs.windows_platform || vars.GOMI_WINDOWS_PLATFORM || 'win32-x64' }}
-      GOMI_BUILD_SETUP_EXE: ${{ inputs.build_setup_exe || (github.event_name != 'workflow_dispatch' && vars.GOMI_BUILD_SETUP_EXE != 'false') }}
+      GOMI_CODE_OSS_REPOSITORY: ${{ github.event_name == 'workflow_dispatch' && inputs.code_oss_repository || vars.GOMI_CODE_OSS_REPOSITORY || 'microsoft/vscode' }}
+      GOMI_CODE_OSS_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.code_oss_ref || vars.GOMI_CODE_OSS_REF || 'main' }}
+      GOMI_WINDOWS_PLATFORM: ${{ github.event_name == 'workflow_dispatch' && inputs.windows_platform || vars.GOMI_WINDOWS_PLATFORM || 'win32-x64' }}
+      GOMI_BUILD_SETUP_EXE: ${{ github.event_name == 'workflow_dispatch' && inputs.build_setup_exe || (github.event_name != 'workflow_dispatch' && vars.GOMI_BUILD_SETUP_EXE != 'false') }}
 
     steps:
       - name: Checkout Gomi
         uses: actions/checkout@v4
         with:
           path: gomi
+          fetch-depth: 0
 
       - name: Checkout Code - OSS fork
         uses: actions/checkout@v4
@@ -150,10 +180,33 @@ jobs:
             }
           }
 
+          $releaseFiles = Get-ChildItem -Path release -File -ErrorAction SilentlyContinue
+          if (-not $releaseFiles) {
+            throw 'The Windows packaging job completed without producing release files.'
+          }
+
+          $manifest = @(
+            '# Gomi IDE Windows Artifacts',
+            '',
+            "Commit: $env:GITHUB_SHA",
+            "Ref: $env:GITHUB_REF_NAME",
+            "Code - OSS source: $env:GOMI_CODE_OSS_REPOSITORY@$env:GOMI_CODE_OSS_REF",
+            "Platform: $env:GOMI_WINDOWS_PLATFORM",
+            "Setup installer requested: $env:GOMI_BUILD_SETUP_EXE",
+            '',
+            'Files:'
+          )
+
+          foreach ($file in $releaseFiles | Sort-Object Name) {
+            $manifest += "- $($file.Name) ($([Math]::Round($file.Length / 1MB, 2)) MB)"
+          }
+
+          $manifest | Set-Content -Path release\ARTIFACTS.md -Encoding UTF8
+
       - name: Upload Windows desktop artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: gomi-ide-windows
+          name: gomi-ide-windows-${{ env.GOMI_WINDOWS_PLATFORM }}
           path: release/*
 
   release:
@@ -175,6 +228,25 @@ jobs:
           path: release-assets
           merge-multiple: true
 
+      - name: Create release notes
+        shell: bash
+        run: |
+          {
+            echo "## Gomi IDE Release"
+            echo
+            echo "This release is produced by the Gomi IDE GitHub Actions pipeline."
+            echo
+            echo "- Ref: \`${GITHUB_REF_NAME}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Workflow run: \`${GITHUB_RUN_ID}\`"
+            echo
+            echo "### Included artifacts"
+            echo
+            find release-assets -maxdepth 2 -type f -print | sort | sed 's#^release-assets/#- #'
+            echo
+            echo "Tagged releases can include the full Windows Code - OSS desktop package when the Code - OSS packaging job is enabled or the tag workflow runs with a configured fork."
+          } > release-notes.md
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
@@ -182,4 +254,5 @@ jobs:
           name: Gomi IDE ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('manual-{0}', github.run_number) }}
           draft: false
           prerelease: true
+          body_path: release-notes.md
           files: release-assets/**

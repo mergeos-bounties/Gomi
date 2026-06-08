@@ -17,13 +17,13 @@ Gomi repository
 
 The repository includes `.github/workflows/build-release.yml`.
 
-Pushes to `master` run the verification job and upload the prototype artifact. Release tags named `v*` run the Windows Code - OSS packaging job and publish the produced artifacts to a GitHub prerelease. Manual runs can also publish a release, with or without the heavy Windows desktop packaging step.
+Pushes to `master` run the verification job and upload a prototype artifact. Release tags named `v*` run the Windows Code - OSS packaging job and publish the produced artifacts to a GitHub prerelease. Manual runs can also publish a release, with or without the heavy Windows desktop packaging step.
 
 It has three jobs:
 
-- `verify-prototype`: installs dependencies, runs typecheck/tests, builds the current Gomi Office webview prototype, and uploads `gomi-office-webview-prototype.zip`.
-- `code-oss-windows`: checks out a Code - OSS fork, applies the Gomi integration manifest, and packages Gomi for Windows. It runs automatically for `v*` tags and can be enabled manually with `build_code_oss_windows`.
-- `release`: publishes artifacts to a GitHub Release for `v*` tags or manual runs with `create_release` enabled.
+- `verify-prototype`: installs dependencies, runs typecheck/tests, builds the standalone preview and Code - OSS webview bundle, then uploads a versioned `gomi-office-webview-prototype-<commit>.zip`.
+- `code-oss-windows`: checks out a Code - OSS fork, applies the Gomi integration manifest, packages Gomi for Windows, collects `.exe`, `.msi`, and `.zip` outputs when present, and writes an `ARTIFACTS.md` manifest. It runs automatically for `v*` tags and can be enabled manually with `build_code_oss_windows`.
+- `release`: downloads all artifacts, generates release notes, and publishes artifacts to a GitHub Release for `v*` tags or manual runs with `create_release` enabled.
 
 For tagged releases, the Code - OSS source defaults to `microsoft/vscode` at `main`. In production, configure repository variables before tagging:
 
@@ -39,6 +39,17 @@ git tag v0.1.0-alpha.1
 git push origin v0.1.0-alpha.1
 ```
 
+For tag-based desktop releases, configure the repository variables first so the workflow packages the Gomi Code - OSS fork instead of the upstream development default:
+
+```text
+GOMI_CODE_OSS_REPOSITORY=mergeos-bounties/gomi-code-oss
+GOMI_CODE_OSS_REF=main
+GOMI_WINDOWS_PLATFORM=win32-x64
+GOMI_BUILD_SETUP_EXE=true
+```
+
+If the fork does not yet expose a compatible Windows setup task, set `GOMI_BUILD_SETUP_EXE=false`. The workflow will still upload the packaged Windows folder as a ZIP when the Code - OSS packaging task succeeds.
+
 To run the full Windows desktop packaging workflow:
 
 1. Open GitHub Actions.
@@ -50,6 +61,8 @@ To run the full Windows desktop packaging workflow:
 7. Enable `build_setup_exe` when the fork has a compatible Windows setup gulp task.
 
 The Windows packaging job runs `scripts/build-gomi-code-oss-windows.ps1`. That script validates the Code - OSS checkout, builds the Gomi Office React/Phaser webview bundle, applies `build/gomi-code-oss.integration.json`, copies Gomi branding/module files into the fork, overlays the native Gomi workbench registration template, copies the generated webview assets into the workbench module, appends the Gomi workbench import when needed, and then runs the Code - OSS gulp package task.
+
+The workflow intentionally keeps the heavy Code - OSS packaging job separate from the normal `master` verification path. Normal pushes verify the Gomi module quickly. Tags or manual release runs produce desktop artifacts.
 
 ## Local Windows Packaging
 
