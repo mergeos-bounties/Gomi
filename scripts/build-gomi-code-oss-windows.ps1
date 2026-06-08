@@ -75,6 +75,7 @@ foreach ($relativePath in $requiredCodeOssPaths) {
 }
 
 $integrationScript = Resolve-RequiredPath -PathValue (Join-Path $repoRoot 'scripts/apply-gomi-code-oss-integration.ps1') -Description 'Gomi integration script'
+$brandAssetScript = Resolve-RequiredPath -PathValue (Join-Path $repoRoot 'scripts/generate-gomi-brand-assets.mjs') -Description 'Gomi brand asset generator'
 
 Write-Host "Preparing Gomi IDE Windows package from Code - OSS root: $codeRoot" -ForegroundColor Green
 Write-Host "Platform: $Platform" -ForegroundColor Green
@@ -88,6 +89,8 @@ $backupProductJson = Join-Path $codeRoot 'product.gomi-backup.json'
 if (-not $DryRun -and -not (Test-Path -LiteralPath $backupProductJson)) {
   Copy-Item -LiteralPath $targetProductJson -Destination $backupProductJson -Force
 }
+
+Invoke-GomiBuildCommand -FilePath 'node.exe' -ArgumentList @($brandAssetScript) -WorkingDirectory $repoRoot
 
 if (-not $SkipWebviewBundle) {
   if (-not (Test-Path -LiteralPath (Join-Path $repoRoot 'node_modules'))) {

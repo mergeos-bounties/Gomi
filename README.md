@@ -45,6 +45,7 @@ This repository is the current product foundation and technical prototype. It is
 ## Key Capabilities
 
 - **Gomi-branded product metadata** through `product.json`.
+- **Generated desktop branding assets** for Code - OSS app icons, Windows tile icons, installer bitmaps, Linux icon, and macOS icon bundle.
 - **Workbench-compatible module structure** under `src/vs/workbench/contrib/gomi`.
 - **Code - OSS integration manifest** for copying branding, resources, and the Gomi workbench module into a real fork before packaging.
 - **Native Code - OSS workbench contribution template** that registers the Gomi Office Activity Bar container and view through workbench registries.
@@ -227,6 +228,7 @@ This repository includes:
 - `build/gomi-code-oss.integration.json` for declaring the Gomi files, product metadata overlay, resources, and workbench import to apply to a Code - OSS checkout.
 - `build/code-oss-templates/gomiContribution.ts` for overlaying the native Code - OSS view/container registration during fork integration.
 - `npm run build:webview` for generating the bundled Gomi Office webview assets copied into the Code - OSS workbench module.
+- `npm run generate:brand-assets` for generating the Gomi desktop icon, Windows installer bitmaps, Linux icon, and macOS icon bundle copied into the Code - OSS packaging resource paths.
 - `scripts/apply-gomi-code-oss-integration.ps1` for applying or validating Gomi branding/module integration against a Code - OSS fork.
 - `scripts/build-gomi-code-oss-windows.ps1` for local or CI packaging against a real Code - OSS fork.
 - `docs/windows-release.md` with the Windows build and release workflow.
@@ -311,7 +313,19 @@ build/
 
 scripts/
 |-- apply-gomi-code-oss-integration.ps1
+|-- generate-gomi-brand-assets.mjs
 `-- build-gomi-code-oss-windows.ps1
+
+resources/gomi-branding/
+|-- win32/
+|   |-- gomi.ico
+|   |-- gomi_70x70.png
+|   |-- gomi_150x150.png
+|   `-- inno-*.bmp
+|-- linux/
+|   `-- gomi.png
+`-- darwin/
+    `-- gomi.icns
 
 .github/workflows/
 `-- build-release.yml
@@ -322,6 +336,7 @@ scripts/
 Implemented in this repository:
 
 - Gomi product metadata with merge-safe Code - OSS overlay integration.
+- Generated Gomi desktop branding assets for Windows, Linux, and macOS Code - OSS packaging resource paths.
 - Workbench-compatible Gomi module skeleton.
 - React workbench shell.
 - Phaser 2D office simulation.
@@ -393,6 +408,12 @@ Run TypeScript checks:
 
 ```bash
 npm run typecheck
+```
+
+Generate desktop branding assets:
+
+```bash
+npm run generate:brand-assets
 ```
 
 Run release-readiness checks:

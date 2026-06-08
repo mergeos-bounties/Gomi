@@ -48,6 +48,24 @@ async function isDirectory(relativePath: string): Promise<boolean> {
   return (await stat(path.join(root, relativePath))).isDirectory();
 }
 
+function readPngSize(buffer: Buffer): { width: number; height: number } {
+  expect(buffer.subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20)
+  };
+}
+
+function readBmpSize(buffer: Buffer): { width: number; height: number } {
+  expect(buffer.subarray(0, 2).toString('ascii')).toBe('BM');
+
+  return {
+    width: buffer.readInt32LE(18),
+    height: buffer.readInt32LE(22)
+  };
+}
+
 describe('release readiness', () => {
   it('keeps product branding independent from Visual Studio Code and Microsoft marketplace defaults', async () => {
     const product = await readJson<ProductJson>('product.json');
@@ -87,6 +105,11 @@ describe('release readiness', () => {
       copy.target.endsWith('src/vs/workbench/contrib/gomi/browser/media/office')
     );
     const gomiIcon = manifest.resourceCopies?.find((copy) => copy.target === 'resources/gomi-icon.svg');
+    const win32Icon = manifest.resourceCopies?.find((copy) => copy.target === 'resources/win32/code.ico');
+    const win32Tile70 = manifest.resourceCopies?.find((copy) => copy.target === 'resources/win32/code_70x70.png');
+    const win32Tile150 = manifest.resourceCopies?.find((copy) => copy.target === 'resources/win32/code_150x150.png');
+    const linuxIcon = manifest.resourceCopies?.find((copy) => copy.target === 'resources/linux/code.png');
+    const macIcon = manifest.resourceCopies?.find((copy) => copy.target === 'resources/darwin/code.icns');
     const workbenchImport = manifest.workbenchImports?.find((entry) =>
       entry.import.includes("vs/workbench/contrib/gomi/browser/gomiContribution")
     );
@@ -100,6 +123,11 @@ describe('release readiness', () => {
     expect(contributionTemplate?.source).toBe('build/code-oss-templates/gomiContribution.ts');
     expect(webviewAssets?.source).toBe('build/gomi-office-webview');
     expect(gomiIcon?.source).toBe('resources/gomi-icon.svg');
+    expect(win32Icon?.source).toBe('resources/gomi-branding/win32/gomi.ico');
+    expect(win32Tile70?.source).toBe('resources/gomi-branding/win32/gomi_70x70.png');
+    expect(win32Tile150?.source).toBe('resources/gomi-branding/win32/gomi_150x150.png');
+    expect(linuxIcon?.source).toBe('resources/gomi-branding/linux/gomi.png');
+    expect(macIcon?.source).toBe('resources/gomi-branding/darwin/gomi.icns');
     expect(workbenchImport?.target).toBe('src/vs/workbench/workbench.common.main.ts');
     expect(manifest.activityBar).toMatchObject({
       viewContainerId: 'workbench.view.gomiOffice',
@@ -113,6 +141,39 @@ describe('release readiness', () => {
     expect(await isDirectory(moduleCopy?.source ?? '')).toBe(true);
     expect(await exists(contributionTemplate?.source ?? '')).toBe(true);
     expect(await exists(gomiIcon?.source ?? '')).toBe(true);
+    expect(await exists(win32Icon?.source ?? '')).toBe(true);
+    expect(await exists(win32Tile70?.source ?? '')).toBe(true);
+    expect(await exists(win32Tile150?.source ?? '')).toBe(true);
+    expect(await exists(linuxIcon?.source ?? '')).toBe(true);
+    expect(await exists(macIcon?.source ?? '')).toBe(true);
+
+    const installerBitmaps = manifest.resourceCopies?.filter((copy) => copy.target.startsWith('resources/win32/inno-')) ?? [];
+    expect(installerBitmaps).toHaveLength(14);
+
+    for (const bitmap of installerBitmaps) {
+      expect(await exists(bitmap.source)).toBe(true);
+    }
+  });
+
+  it('generates valid desktop branding assets for Code - OSS packaging paths', async () => {
+    const win32Icon = await readFile(path.join(root, 'resources/gomi-branding/win32/gomi.ico'));
+    const tile70 = await readFile(path.join(root, 'resources/gomi-branding/win32/gomi_70x70.png'));
+    const tile150 = await readFile(path.join(root, 'resources/gomi-branding/win32/gomi_150x150.png'));
+    const linuxIcon = await readFile(path.join(root, 'resources/gomi-branding/linux/gomi.png'));
+    const macIcon = await readFile(path.join(root, 'resources/gomi-branding/darwin/gomi.icns'));
+    const installerBig100 = await readFile(path.join(root, 'resources/gomi-branding/win32/inno-big-100.bmp'));
+    const installerSmall100 = await readFile(path.join(root, 'resources/gomi-branding/win32/inno-small-100.bmp'));
+
+    expect(win32Icon.readUInt16LE(0)).toBe(0);
+    expect(win32Icon.readUInt16LE(2)).toBe(1);
+    expect(win32Icon.readUInt16LE(4)).toBeGreaterThanOrEqual(7);
+    expect(readPngSize(tile70)).toEqual({ width: 70, height: 70 });
+    expect(readPngSize(tile150)).toEqual({ width: 150, height: 150 });
+    expect(readPngSize(linuxIcon)).toEqual({ width: 512, height: 512 });
+    expect(macIcon.subarray(0, 4).toString('ascii')).toBe('icns');
+    expect(macIcon.readUInt32BE(4)).toBe(macIcon.length);
+    expect(readBmpSize(installerBig100)).toEqual({ width: 164, height: 314 });
+    expect(readBmpSize(installerSmall100)).toEqual({ width: 55, height: 55 });
   });
 
   it('keeps GitHub Actions wired for verification, optional Windows packaging, and release publishing', async () => {
@@ -131,6 +192,7 @@ describe('release readiness', () => {
     expect(workflow).toContain('verify-prototype:');
     expect(workflow).toContain('code-oss-windows:');
     expect(workflow).toContain('release:');
+    expect(workflow).toContain('npm run generate:brand-assets');
     expect(workflow).toContain('npm run verify:release');
     expect(workflow).toContain('Build Code - OSS Windows package');
     expect(workflow).toContain('scripts\\build-gomi-code-oss-windows.ps1');
@@ -155,8 +217,10 @@ describe('release readiness', () => {
     expect(readme).toContain('not as an `npm run dev` app');
     expect(readme).toContain('GitHub Actions release workflow');
     expect(readme).toContain('Windows Code - OSS packaging script');
+    expect(readme).toContain('Generated desktop branding assets');
     expect(readme).toContain('Manual workflow runs can publish a release only when the Windows desktop packaging job is enabled and succeeds.');
     expect(windowsRelease).toContain('## Why EXE, Not NPM');
+    expect(windowsRelease).toContain('Generate Gomi desktop branding assets');
     expect(windowsRelease).toContain('GitHub Releases do not present the prototype bundle as the final IDE');
     expect(windowsRelease).toContain('End users should not run Gomi IDE with `npm run dev`.');
     expect(windowsRelease).toContain('Inno Setup `.exe` installer');

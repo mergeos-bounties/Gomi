@@ -29,6 +29,82 @@
     {
       "source": "resources/gomi-icon.svg",
       "target": "resources/gomi-icon.svg"
+    },
+    {
+      "source": "resources/gomi-branding/win32/gomi.ico",
+      "target": "resources/win32/code.ico"
+    },
+    {
+      "source": "resources/gomi-branding/win32/gomi_70x70.png",
+      "target": "resources/win32/code_70x70.png"
+    },
+    {
+      "source": "resources/gomi-branding/win32/gomi_150x150.png",
+      "target": "resources/win32/code_150x150.png"
+    },
+    {
+      "source": "resources/gomi-branding/win32/inno-big-100.bmp",
+      "target": "resources/win32/inno-big-100.bmp"
+    },
+    {
+      "source": "resources/gomi-branding/win32/inno-big-125.bmp",
+      "target": "resources/win32/inno-big-125.bmp"
+    },
+    {
+      "source": "resources/gomi-branding/win32/inno-big-150.bmp",
+      "target": "resources/win32/inno-big-150.bmp"
+    },
+    {
+      "source": "resources/gomi-branding/win32/inno-big-175.bmp",
+      "target": "resources/win32/inno-big-175.bmp"
+    },
+    {
+      "source": "resources/gomi-branding/win32/inno-big-200.bmp",
+      "target": "resources/win32/inno-big-200.bmp"
+    },
+    {
+      "source": "resources/gomi-branding/win32/inno-big-225.bmp",
+      "target": "resources/win32/inno-big-225.bmp"
+    },
+    {
+      "source": "resources/gomi-branding/win32/inno-big-250.bmp",
+      "target": "resources/win32/inno-big-250.bmp"
+    },
+    {
+      "source": "resources/gomi-branding/win32/inno-small-100.bmp",
+      "target": "resources/win32/inno-small-100.bmp"
+    },
+    {
+      "source": "resources/gomi-branding/win32/inno-small-125.bmp",
+      "target": "resources/win32/inno-small-125.bmp"
+    },
+    {
+      "source": "resources/gomi-branding/win32/inno-small-150.bmp",
+      "target": "resources/win32/inno-small-150.bmp"
+    },
+    {
+      "source": "resources/gomi-branding/win32/inno-small-175.bmp",
+      "target": "resources/win32/inno-small-175.bmp"
+    },
+    {
+      "source": "resources/gomi-branding/win32/inno-small-200.bmp",
+      "target": "resources/win32/inno-small-200.bmp"
+    },
+    {
+      "source": "resources/gomi-branding/win32/inno-small-225.bmp",
+      "target": "resources/win32/inno-small-225.bmp"
+    },
+    {
+      "source": "resources/gomi-branding/win32/inno-small-250.bmp",
+      "target": "resources/win32/inno-small-250.bmp"
+    },
+    {
+      "source": "resources/gomi-branding/linux/gomi.png",
+      "target": "resources/linux/code.png"
+    },
+    {
+      "source": "resources/gomi-branding/darwin/gomi.icns",
+      "target": "resources/darwin/code.icns"
     }
   ],
   "workbenchImports": [

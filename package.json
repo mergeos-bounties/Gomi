@@ -8,6 +8,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "build:webview": "tsc -b && vite build --outDir build/gomi-office-webview --emptyOutDir",
+    "generate:brand-assets": "node scripts/generate-gomi-brand-assets.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "typecheck": "tsc -b",

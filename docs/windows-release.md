@@ -6,6 +6,7 @@ The Windows release path is:
 
 ```text
 Gomi repository
+-> Generate Gomi desktop branding assets
 -> Build Gomi Office webview bundle
 -> Code - OSS fork checkout
 -> Apply Gomi product metadata and Gomi workbench module
@@ -21,7 +22,7 @@ Pushes to `master` run the verification job and upload a prototype artifact. Rel
 
 It has three jobs:
 
-- `verify-prototype`: installs dependencies, runs typecheck/tests/release-readiness checks, builds the standalone preview and Code - OSS webview bundle, then uploads a versioned `gomi-office-webview-prototype-<commit>.zip` with a SHA-256 checksum.
+- `verify-prototype`: installs dependencies, generates branded desktop assets, runs typecheck/tests/release-readiness checks, builds the standalone preview and Code - OSS webview bundle, then uploads a versioned `gomi-office-webview-prototype-<commit>.zip` with a SHA-256 checksum.
 - `code-oss-windows`: checks out a Code - OSS fork, applies the Gomi integration manifest, packages Gomi for Windows, collects `.exe`, `.msi`, and `.zip` outputs when present, and writes an `ARTIFACTS.md` manifest. It runs automatically for `v*` tags and can be enabled manually with `build_code_oss_windows`.
 - `release`: downloads all artifacts, generates release notes, and publishes artifacts to a GitHub Release only after the Windows desktop packaging job succeeds.
 
@@ -60,7 +61,7 @@ To run the full Windows desktop packaging workflow:
 6. Choose `win32-x64`, `win32-arm64`, or `win32-ia32`.
 7. Enable `build_setup_exe` when the fork has a compatible Windows setup gulp task.
 
-The Windows packaging job runs `scripts/build-gomi-code-oss-windows.ps1`. That script validates the Code - OSS checkout, builds the Gomi Office React/Phaser webview bundle, applies `build/gomi-code-oss.integration.json`, merges Gomi product metadata over the fork's existing `product.json`, copies Gomi branding/module files into the fork, overlays the native Gomi workbench registration template, copies the generated webview assets into the workbench module, appends the Gomi workbench import when needed, and then runs the Code - OSS gulp package task.
+The Windows packaging job runs `scripts/build-gomi-code-oss-windows.ps1`. That script validates the Code - OSS checkout, generates Gomi desktop branding assets, builds the Gomi Office React/Phaser webview bundle, applies `build/gomi-code-oss.integration.json`, merges Gomi product metadata over the fork's existing `product.json`, copies Gomi branding/module files into the fork, overlays the native Gomi workbench registration template, copies the generated webview assets into the workbench module, appends the Gomi workbench import when needed, and then runs the Code - OSS gulp package task.
 
 The workflow intentionally keeps the heavy Code - OSS packaging job separate from the normal `master` verification path. Normal pushes verify the Gomi module quickly. Tags or manual release runs produce desktop artifacts.
 
@@ -84,7 +85,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-gomi-code-oss-windows.p
   -BuildSetup
 ```
 
-The local packaging script runs `npm run build:webview` before applying the manifest. The generated assets are written to `build/gomi-office-webview` locally and copied into `src/vs/workbench/contrib/gomi/browser/media/office` inside the Code - OSS checkout.
+The local packaging script runs the Gomi brand asset generator and `npm run build:webview` before applying the manifest. The generated webview assets are written to `build/gomi-office-webview` locally and copied into `src/vs/workbench/contrib/gomi/browser/media/office` inside the Code - OSS checkout. The generated desktop branding assets are written under `resources/gomi-branding` and copied over Code - OSS packaging resources such as `resources/win32/code.ico`, `resources/win32/code_70x70.png`, `resources/win32/code_150x150.png`, `resources/win32/inno-*.bmp`, `resources/linux/code.png`, and `resources/darwin/code.icns`.
 
 For a faster packaged folder build without installer:
 

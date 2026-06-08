@@ -71,6 +71,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate branded desktop assets
+        run: npm run generate:brand-assets
+
       - name: Typecheck
         run: npm run typecheck
 
