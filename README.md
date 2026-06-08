@@ -17,6 +17,8 @@ Fork Code - OSS
 
 ![Gomi Office IDE interface](docs/images/gomi-office-cute-office.png)
 
+![Gomi Office full layout](docs/images/gomi-office-full-office.png)
+
 ## Product Vision
 
 Modern AI coding tools often compress all collaboration into a single chat surface. Gomi takes a different approach: it turns project work into a visible, structured office.
@@ -48,7 +50,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Native Code - OSS workbench contribution template** that registers the Gomi Office Activity Bar container and view through workbench registries.
 - **Generated Gomi Office webview bundle pipeline** for mounting the React/Phaser office inside the native Code - OSS view pane.
 - **Gomi Office panel UI** built with React.
-- **Collapsible workbench views and Office Focus mode** so the visual office can expand across the workspace.
+- **Standard, Expanded, and Full Office layout modes** so side panels can collapse and the visual office can take over the workspace.
 - **2D office simulation** built with Phaser.
 - **Animated game-style agents** with visible status and chat bubbles.
 - **Shared memory board** fed by real runtime memory updates for project context.
@@ -304,7 +306,7 @@ Implemented in this repository:
 - Phaser 2D office simulation.
 - Animated office avatars and chat bubbles.
 - Memory board and task status UI backed by runtime `memory_update` events.
-- Collapsible side/bottom panels and Office Focus mode.
+- Collapsible side/bottom panels plus Standard, Expanded, and Full Office layout modes.
 - CEO Agent planning simulation.
 - Specialist agent runtime flow.
 - Designer Agent role for UX, visual language, office atmosphere, and avatar direction.

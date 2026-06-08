@@ -82,6 +82,18 @@ const activityItems = [
   { id: 'settings', label: 'Settings', Icon: Settings }
 ];
 
+type GomiOfficeViewMode = 'standard' | 'expanded' | 'full-office';
+
+const officeViewModes = [
+  { id: 'standard', label: 'Standard office layout', Icon: Minimize2 },
+  { id: 'expanded', label: 'Expanded office layout', Icon: PanelLeftClose },
+  { id: 'full-office', label: 'Full office layout', Icon: Maximize2 }
+] satisfies Array<{
+  id: GomiOfficeViewMode;
+  label: string;
+  Icon: typeof Minimize2;
+}>;
+
 export function GomiOfficeApp() {
   const [officeSettings, setOfficeSettings] = useState<GomiOfficeSettings>(
     DEFAULT_GOMI_OFFICE_SETTINGS
@@ -109,30 +121,45 @@ export function GomiOfficeApp() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   const [bottomCollapsed, setBottomCollapsed] = useState(false);
-  const [officeFocus, setOfficeFocus] = useState(false);
+  const [officeViewMode, setOfficeViewMode] = useState<GomiOfficeViewMode>('standard');
+  const sidePanelsAutoCollapsed = officeViewMode !== 'standard';
+  const bottomAutoCollapsed = officeViewMode === 'full-office';
+  const effectiveSidebarCollapsed = sidebarCollapsed || sidePanelsAutoCollapsed;
+  const effectiveRightPanelCollapsed = rightPanelCollapsed || sidePanelsAutoCollapsed;
+  const effectiveBottomCollapsed = bottomCollapsed || bottomAutoCollapsed;
+  const isFullOffice = officeViewMode === 'full-office';
   const visualAgents = useMemo(
     () => applyOfficeSettingsToAgents(agents, officeSettings),
     [agents, officeSettings]
   );
+  const shellClassName = [
+    'gomi-shell',
+    isFullOffice ? 'is-full-office' : ''
+  ]
+    .filter(Boolean)
+    .join(' ');
   const workbenchClassName = [
     'gomi-workbench',
-    sidebarCollapsed || officeFocus ? 'is-sidebar-collapsed' : '',
-    rightPanelCollapsed || officeFocus ? 'is-right-collapsed' : ''
+    effectiveSidebarCollapsed ? 'is-sidebar-collapsed' : '',
+    effectiveRightPanelCollapsed ? 'is-right-collapsed' : '',
+    officeViewMode === 'expanded' ? 'is-view-expanded' : '',
+    isFullOffice ? 'is-view-full-office' : ''
   ]
     .filter(Boolean)
     .join(' ');
   const mainClassName = [
     'gomi-main',
-    bottomCollapsed || officeFocus ? 'is-bottom-collapsed' : '',
-    officeFocus ? 'is-office-focus' : ''
+    effectiveBottomCollapsed ? 'is-bottom-collapsed' : '',
+    officeViewMode === 'expanded' ? 'is-view-expanded' : '',
+    isFullOffice ? 'is-view-full-office' : ''
   ]
     .filter(Boolean)
     .join(' ');
   const officeLayoutToken = [
-    sidebarCollapsed,
-    rightPanelCollapsed,
-    bottomCollapsed,
-    officeFocus
+    effectiveSidebarCollapsed,
+    effectiveRightPanelCollapsed,
+    effectiveBottomCollapsed,
+    officeViewMode
   ].join(':');
 
   useEffect(() => {
@@ -319,8 +346,48 @@ export function GomiOfficeApp() {
     setOfficeSettings((currentSettings) => setSeatWorkMode(currentSettings, seatId, 'active'));
   }
 
+  function setLayoutMode(mode: GomiOfficeViewMode) {
+    setOfficeViewMode(mode);
+
+    if (mode === 'standard') {
+      setSidebarCollapsed(false);
+      setRightPanelCollapsed(false);
+      setBottomCollapsed(false);
+    }
+  }
+
+  function toggleSidebarPanel() {
+    if (effectiveSidebarCollapsed) {
+      setOfficeViewMode('standard');
+      setSidebarCollapsed(false);
+      return;
+    }
+
+    setSidebarCollapsed(true);
+  }
+
+  function toggleRightPanel() {
+    if (effectiveRightPanelCollapsed) {
+      setOfficeViewMode('standard');
+      setRightPanelCollapsed(false);
+      return;
+    }
+
+    setRightPanelCollapsed(true);
+  }
+
+  function toggleBottomPanel() {
+    if (effectiveBottomCollapsed) {
+      setOfficeViewMode('standard');
+      setBottomCollapsed(false);
+      return;
+    }
+
+    setBottomCollapsed(true);
+  }
+
   return (
-    <div className="gomi-shell">
+    <div className={shellClassName}>
       <header className="gomi-titlebar">
         <div className="gomi-titlebar__brand">
           <span className="gomi-logo">G</span>
@@ -352,36 +419,41 @@ export function GomiOfficeApp() {
             <div className="gomi-view-controls" aria-label="Gomi Office view controls">
               <button
                 className="gomi-icon-button"
-                onClick={() => setSidebarCollapsed((isCollapsed) => !isCollapsed)}
-                title={sidebarCollapsed || officeFocus ? 'Expand project sidebar' : 'Collapse project sidebar'}
-                aria-label={sidebarCollapsed || officeFocus ? 'Expand project sidebar' : 'Collapse project sidebar'}
+                onClick={toggleSidebarPanel}
+                title={effectiveSidebarCollapsed ? 'Expand project sidebar' : 'Collapse project sidebar'}
+                aria-label={effectiveSidebarCollapsed ? 'Expand project sidebar' : 'Collapse project sidebar'}
               >
-                {sidebarCollapsed || officeFocus ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+                {effectiveSidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
               </button>
               <button
                 className="gomi-icon-button"
-                onClick={() => setBottomCollapsed((isCollapsed) => !isCollapsed)}
-                title={bottomCollapsed || officeFocus ? 'Expand chat and report' : 'Collapse chat and report'}
-                aria-label={bottomCollapsed || officeFocus ? 'Expand chat and report' : 'Collapse chat and report'}
+                onClick={toggleBottomPanel}
+                title={effectiveBottomCollapsed ? 'Expand chat and report' : 'Collapse chat and report'}
+                aria-label={effectiveBottomCollapsed ? 'Expand chat and report' : 'Collapse chat and report'}
               >
-                {bottomCollapsed || officeFocus ? <PanelBottomOpen size={18} /> : <PanelBottomClose size={18} />}
+                {effectiveBottomCollapsed ? <PanelBottomOpen size={18} /> : <PanelBottomClose size={18} />}
               </button>
               <button
                 className="gomi-icon-button"
-                onClick={() => setRightPanelCollapsed((isCollapsed) => !isCollapsed)}
-                title={rightPanelCollapsed || officeFocus ? 'Expand agent panel' : 'Collapse agent panel'}
-                aria-label={rightPanelCollapsed || officeFocus ? 'Expand agent panel' : 'Collapse agent panel'}
+                onClick={toggleRightPanel}
+                title={effectiveRightPanelCollapsed ? 'Expand agent panel' : 'Collapse agent panel'}
+                aria-label={effectiveRightPanelCollapsed ? 'Expand agent panel' : 'Collapse agent panel'}
               >
-                {rightPanelCollapsed || officeFocus ? <PanelRightOpen size={18} /> : <PanelRightClose size={18} />}
+                {effectiveRightPanelCollapsed ? <PanelRightOpen size={18} /> : <PanelRightClose size={18} />}
               </button>
-              <button
-                className={`gomi-icon-button ${officeFocus ? 'is-active' : ''}`}
-                onClick={() => setOfficeFocus((isFocused) => !isFocused)}
-                title={officeFocus ? 'Exit Office Focus' : 'Focus Office'}
-                aria-label={officeFocus ? 'Exit Office Focus' : 'Focus Office'}
-              >
-                {officeFocus ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-              </button>
+              <div className="gomi-view-mode-controls" role="group" aria-label="Office layout mode">
+                {officeViewModes.map(({ id, label, Icon }) => (
+                  <button
+                    className={`gomi-icon-button ${officeViewMode === id ? 'is-active' : ''}`}
+                    onClick={() => setLayoutMode(id)}
+                    title={label}
+                    aria-label={label}
+                    key={id}
+                  >
+                    <Icon size={17} />
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
