@@ -6,8 +6,10 @@ import type { GomiBridgeMessage, GomiWorkbenchBridge } from '../src/vs/workbench
 import type { GomiPatchProposal } from '../src/vs/workbench/contrib/gomi/common/gomiTypes';
 import {
   DEFAULT_GOMI_OFFICE_SETTINGS,
+  setCliProvidersEnabled,
   setMemoryBroadcastThreshold,
-  setSeatWorkMode
+  setSeatWorkMode,
+  setWorkspaceTrustState
 } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
 import { GomiAgentRuntime } from '../src/vs/workbench/contrib/gomi/node/agentRuntime';
 import type { GomiCliCommandInvocation } from '../src/vs/workbench/contrib/gomi/node/cliAgentProvider';
@@ -270,7 +272,11 @@ describe('GomiWorkbenchController', () => {
 
     await controller.handleMessage({
       type: 'gomi.run',
-      request: 'Review build package path'
+      request: 'Review build package path',
+      officeSettings: setCliProvidersEnabled(
+        setWorkspaceTrustState(DEFAULT_GOMI_OFFICE_SETTINGS, 'trusted'),
+        true
+      )
     });
 
     const resultSummaries = bridge.outbox

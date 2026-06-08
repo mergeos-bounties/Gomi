@@ -11,8 +11,13 @@ import {
   setMemoryPrivacyMode,
   setMemoryRetentionDays,
   setPatchApprovalRequired,
+  setCliProvidersEnabled,
+  setHttpProvidersEnabled,
+  setLiveProviderMode,
+  setLiveProviderPatchApprovalRequired,
   setSecretRedactionEnabled,
   setSeatWorkMode,
+  setWorkspaceTrustState,
   setSharedMemoryEnabled,
   setWorkspaceContextIndexing
 } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
@@ -82,6 +87,28 @@ describe('Gomi office settings', () => {
     expect(quietSettings.memory.sharedMemoryEnabled).toBe(false);
     expect(quietSettings.memory.indexWorkspaceContext).toBe(false);
     expect(relaxedApproval.memory.requirePatchApproval).toBe(false);
+  });
+
+  it('updates live provider execution policy controls', () => {
+    const settings = setLiveProviderPatchApprovalRequired(
+      setHttpProvidersEnabled(
+        setCliProvidersEnabled(
+          setLiveProviderMode(
+            setWorkspaceTrustState(DEFAULT_GOMI_OFFICE_SETTINGS, 'trusted'),
+            'allow-all'
+          ),
+          true
+        ),
+        true
+      ),
+      false
+    );
+
+    expect(settings.execution.workspaceTrust).toBe('trusted');
+    expect(settings.execution.liveProviderMode).toBe('allow-all');
+    expect(settings.execution.allowCliProviders).toBe(true);
+    expect(settings.execution.allowHttpProviders).toBe(true);
+    expect(settings.execution.requirePatchApprovalForLiveProviders).toBe(false);
   });
 
   it('clamps project memory retention settings', () => {

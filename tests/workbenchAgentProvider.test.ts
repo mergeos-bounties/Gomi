@@ -83,11 +83,102 @@ describe('Workbench agent provider router', () => {
 
     expect(result.summary).toContain('Demo provider response');
   });
+
+  it('falls back to demo when a live provider is selected but host execution is disabled', async () => {
+    let cliWasCalled = false;
+    const provider = createWorkbenchGomiAgentProvider({
+      enableCliAgentExecution: false,
+      cliAgentCommandRunner: async () => {
+        cliWasCalled = true;
+        return {
+          stdout: '{}',
+          stderr: '',
+          exitCode: 0
+        };
+      }
+    });
+
+    const result = await provider.runAgentTask(
+      createRunContext('backend', 'codex-cli', {
+        workspaceTrust: 'untrusted',
+        liveProviderMode: 'trusted-workspaces',
+        allowCliProviders: false,
+        allowHttpProviders: false,
+        requirePatchApprovalForLiveProviders: true,
+        patchApprovalRequired: true
+      })
+    );
+
+    expect(cliWasCalled).toBe(false);
+    expect(result.summary).toContain('Demo provider response');
+    expect(result.summary).not.toContain('Trust this workspace');
+  });
+
+  it('blocks live providers when workspace trust policy is not satisfied', async () => {
+    let cliWasCalled = false;
+    const provider = createWorkbenchGomiAgentProvider({
+      enableCliAgentExecution: true,
+      cliAgentCommandRunner: async () => {
+        cliWasCalled = true;
+        return {
+          stdout: '{}',
+          stderr: '',
+          exitCode: 0
+        };
+      }
+    });
+
+    const result = await provider.runAgentTask(
+      createRunContext('backend', 'codex-cli', {
+        workspaceTrust: 'untrusted',
+        liveProviderMode: 'trusted-workspaces',
+        allowCliProviders: true,
+        allowHttpProviders: false,
+        requirePatchApprovalForLiveProviders: true,
+        patchApprovalRequired: true
+      })
+    );
+
+    expect(cliWasCalled).toBe(false);
+    expect(result.summary).toContain('Trust this workspace');
+    expect(result.confidence).toBeLessThan(0.3);
+  });
+
+  it('blocks live providers when patch approval is disabled by memory settings', async () => {
+    const provider = createWorkbenchGomiAgentProvider({
+      enableHttpAgentExecution: true,
+      httpFetch: async () => new Response('{}', { status: 200 }),
+      env: {
+        GOMI_CLOUD_LLM_ENDPOINT: 'https://llm.example.test/v1/chat/completions'
+      }
+    });
+
+    const result = await provider.runAgentTask(
+      createRunContext('designer', 'openai-compatible-api', {
+        workspaceTrust: 'trusted',
+        liveProviderMode: 'trusted-workspaces',
+        allowCliProviders: false,
+        allowHttpProviders: true,
+        requirePatchApprovalForLiveProviders: true,
+        patchApprovalRequired: false
+      })
+    );
+
+    expect(result.summary).toContain('Patch approval must stay enabled');
+  });
 });
 
 function createRunContext(
   agentId: GomiAgentId,
-  providerId: GomiAgentCliProviderId
+  providerId: GomiAgentCliProviderId,
+  executionPolicy: NonNullable<GomiAgentRunContext['executionPolicy']> = {
+    workspaceTrust: 'trusted',
+    liveProviderMode: 'trusted-workspaces',
+    allowCliProviders: true,
+    allowHttpProviders: true,
+    requirePatchApprovalForLiveProviders: true,
+    patchApprovalRequired: true
+  }
 ): GomiAgentRunContext {
   const task: GomiTask = {
     id: `task-${agentId}`,
@@ -115,6 +206,7 @@ function createRunContext(
       providerId,
       label: providerId,
       command: providerId === 'codex-cli' ? 'codex' : providerId
-    }
+    },
+    executionPolicy
   };
 }

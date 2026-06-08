@@ -40,6 +40,10 @@ import {
   fireEmployee,
   getProviderLabel,
   getSeatForAgent,
+  setCliProvidersEnabled,
+  setHttpProvidersEnabled,
+  setLiveProviderMode,
+  setLiveProviderPatchApprovalRequired,
   setMaxProjectMemoryItems,
   setMemoryBroadcastThreshold,
   setMemoryPrivacyMode,
@@ -48,6 +52,7 @@ import {
   setSeatWorkMode,
   setSecretRedactionEnabled,
   setSharedMemoryEnabled,
+  setWorkspaceTrustState,
   setWorkspaceContextIndexing
 } from '../common/gomiOfficeSettings';
 import type {
@@ -57,11 +62,13 @@ import type {
   GomiAgentSeat,
   GomiChatMessage,
   GomiFinalReport,
+  GomiLiveProviderMode,
   GomiMemoryBoardItem,
   GomiMemoryPrivacyMode,
   GomiOfficeSettings,
   GomiRuntimeEvent,
   GomiTask,
+  GomiWorkspaceTrustState,
   GomiWorkspaceSnapshot
 } from '../common/gomiTypes';
 import { GomiAgentRuntime } from '../node/agentRuntime';
@@ -403,6 +410,36 @@ export function GomiOfficeApp() {
     );
   }
 
+  function updateWorkspaceTrust(workspaceTrust: GomiWorkspaceTrustState) {
+    setOfficeSettings((currentSettings) =>
+      setWorkspaceTrustState(currentSettings, workspaceTrust)
+    );
+  }
+
+  function updateLiveProviderMode(liveProviderMode: GomiLiveProviderMode) {
+    setOfficeSettings((currentSettings) =>
+      setLiveProviderMode(currentSettings, liveProviderMode)
+    );
+  }
+
+  function updateCliProvidersEnabled(allowCliProviders: boolean) {
+    setOfficeSettings((currentSettings) =>
+      setCliProvidersEnabled(currentSettings, allowCliProviders)
+    );
+  }
+
+  function updateHttpProvidersEnabled(allowHttpProviders: boolean) {
+    setOfficeSettings((currentSettings) =>
+      setHttpProvidersEnabled(currentSettings, allowHttpProviders)
+    );
+  }
+
+  function updateLiveProviderPatchApprovalRequired(requirePatchApprovalForLiveProviders: boolean) {
+    setOfficeSettings((currentSettings) =>
+      setLiveProviderPatchApprovalRequired(currentSettings, requirePatchApprovalForLiveProviders)
+    );
+  }
+
   function setLayoutMode(mode: GomiOfficeViewMode) {
     setOfficeViewMode(mode);
 
@@ -568,6 +605,11 @@ export function GomiOfficeApp() {
           onMemoryRetentionDaysChange={updateMemoryRetentionDays}
           onMaxProjectMemoryItemsChange={updateMaxProjectMemoryItems}
           onPatchApprovalRequiredChange={updatePatchApprovalRequired}
+          onWorkspaceTrustChange={updateWorkspaceTrust}
+          onLiveProviderModeChange={updateLiveProviderMode}
+          onCliProvidersEnabledChange={updateCliProvidersEnabled}
+          onHttpProvidersEnabledChange={updateHttpProvidersEnabled}
+          onLiveProviderPatchApprovalRequiredChange={updateLiveProviderPatchApprovalRequired}
         />
       </div>
 
@@ -667,7 +709,12 @@ function RightPanel({
   onSecretRedactionChange,
   onMemoryRetentionDaysChange,
   onMaxProjectMemoryItemsChange,
-  onPatchApprovalRequiredChange
+  onPatchApprovalRequiredChange,
+  onWorkspaceTrustChange,
+  onLiveProviderModeChange,
+  onCliProvidersEnabledChange,
+  onHttpProvidersEnabledChange,
+  onLiveProviderPatchApprovalRequiredChange
 }: {
   agents: GomiAgent[];
   tasks: GomiTask[];
@@ -686,6 +733,11 @@ function RightPanel({
   onMemoryRetentionDaysChange: (retentionDays: number) => void;
   onMaxProjectMemoryItemsChange: (maxProjectMemoryItems: number) => void;
   onPatchApprovalRequiredChange: (requirePatchApproval: boolean) => void;
+  onWorkspaceTrustChange: (workspaceTrust: GomiWorkspaceTrustState) => void;
+  onLiveProviderModeChange: (liveProviderMode: GomiLiveProviderMode) => void;
+  onCliProvidersEnabledChange: (allowCliProviders: boolean) => void;
+  onHttpProvidersEnabledChange: (allowHttpProviders: boolean) => void;
+  onLiveProviderPatchApprovalRequiredChange: (requirePatchApprovalForLiveProviders: boolean) => void;
 }) {
   return (
     <aside className="gomi-right-panel" aria-label="Agent Status Panel">
@@ -735,6 +787,11 @@ function RightPanel({
           onMemoryRetentionDaysChange={onMemoryRetentionDaysChange}
           onMaxProjectMemoryItemsChange={onMaxProjectMemoryItemsChange}
           onPatchApprovalRequiredChange={onPatchApprovalRequiredChange}
+          onWorkspaceTrustChange={onWorkspaceTrustChange}
+          onLiveProviderModeChange={onLiveProviderModeChange}
+          onCliProvidersEnabledChange={onCliProvidersEnabledChange}
+          onHttpProvidersEnabledChange={onHttpProvidersEnabledChange}
+          onLiveProviderPatchApprovalRequiredChange={onLiveProviderPatchApprovalRequiredChange}
         />
       </div>
     </aside>
@@ -789,7 +846,12 @@ function OfficeSettingsPanel({
   onSecretRedactionChange,
   onMemoryRetentionDaysChange,
   onMaxProjectMemoryItemsChange,
-  onPatchApprovalRequiredChange
+  onPatchApprovalRequiredChange,
+  onWorkspaceTrustChange,
+  onLiveProviderModeChange,
+  onCliProvidersEnabledChange,
+  onHttpProvidersEnabledChange,
+  onLiveProviderPatchApprovalRequiredChange
 }: {
   officeSettings: GomiOfficeSettings;
   memoryItems: GomiMemoryBoardItem[];
@@ -805,6 +867,11 @@ function OfficeSettingsPanel({
   onMemoryRetentionDaysChange: (retentionDays: number) => void;
   onMaxProjectMemoryItemsChange: (maxProjectMemoryItems: number) => void;
   onPatchApprovalRequiredChange: (requirePatchApproval: boolean) => void;
+  onWorkspaceTrustChange: (workspaceTrust: GomiWorkspaceTrustState) => void;
+  onLiveProviderModeChange: (liveProviderMode: GomiLiveProviderMode) => void;
+  onCliProvidersEnabledChange: (allowCliProviders: boolean) => void;
+  onHttpProvidersEnabledChange: (allowHttpProviders: boolean) => void;
+  onLiveProviderPatchApprovalRequiredChange: (requirePatchApprovalForLiveProviders: boolean) => void;
 }) {
   const leaders = officeSettings.seats.filter((seat) => seat.seatKind !== 'employee');
   const employees = officeSettings.seats.filter((seat) => seat.seatKind === 'employee');
@@ -976,6 +1043,61 @@ function OfficeSettingsPanel({
           <span>Patch approval required</span>
         </label>
         <MemoryBoardPanel memoryItems={memoryItems} />
+      </div>
+
+      <div className="gomi-settings-group">
+        <div className="gomi-settings-title">Execution Policy</div>
+        <div className="gomi-memory-summary">
+          <span>{officeSettings.execution.workspaceTrust}</span>
+          <span>{officeSettings.execution.liveProviderMode}</span>
+          <span>{officeSettings.execution.allowCliProviders ? 'CLI on' : 'CLI off'}</span>
+          <span>{officeSettings.execution.allowHttpProviders ? 'HTTP on' : 'HTTP off'}</span>
+        </div>
+        <label className="gomi-field">
+          <span>Workspace Trust</span>
+          <select
+            value={officeSettings.execution.workspaceTrust}
+            onChange={(event) => onWorkspaceTrustChange(event.target.value as GomiWorkspaceTrustState)}
+          >
+            <option value="untrusted">Untrusted</option>
+            <option value="trusted">Trusted</option>
+          </select>
+        </label>
+        <label className="gomi-field">
+          <span>Live Provider Mode</span>
+          <select
+            value={officeSettings.execution.liveProviderMode}
+            onChange={(event) => onLiveProviderModeChange(event.target.value as GomiLiveProviderMode)}
+          >
+            <option value="demo-only">Demo only</option>
+            <option value="trusted-workspaces">Trusted workspaces</option>
+            <option value="allow-all">Allow all</option>
+          </select>
+        </label>
+        <label className="gomi-toggle-field">
+          <input
+            type="checkbox"
+            checked={officeSettings.execution.allowCliProviders}
+            onChange={(event) => onCliProvidersEnabledChange(event.target.checked)}
+          />
+          <span>CLI providers</span>
+        </label>
+        <label className="gomi-toggle-field">
+          <input
+            type="checkbox"
+            checked={officeSettings.execution.allowHttpProviders}
+            onChange={(event) => onHttpProvidersEnabledChange(event.target.checked)}
+          />
+          <span>HTTP model providers</span>
+        </label>
+        <label className="gomi-toggle-field">
+          <input
+            type="checkbox"
+            checked={officeSettings.execution.requirePatchApprovalForLiveProviders}
+            onChange={(event) => onLiveProviderPatchApprovalRequiredChange(event.target.checked)}
+          />
+          <span>Approval required for live providers</span>
+        </label>
       </div>
     </section>
   );

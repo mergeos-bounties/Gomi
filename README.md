@@ -59,6 +59,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Department head sleep mode** to pause a leader without removing the role from the organization.
 - **Employee lifecycle controls** for removing or restoring non-lead staff seats.
 - **Workbench agent provider router** for demo, CLI, OpenAI-compatible HTTP, and Ollama-compatible local model routes.
+- **Live provider execution policy** with workspace trust state, demo-only/trusted-workspace/allow-all modes, CLI/HTTP transport toggles, and patch-approval enforcement.
 - **Configurable agent communication policy** that keeps routine updates in memory and only broadcasts findings above the selected importance threshold.
 - **Novelty-aware agent communication** that checks recalled shared memory before showing another chat bubble for repeated routine findings.
 - **Hybrid project memory** using lexical search plus vector-style retrieval.
@@ -163,7 +164,15 @@ Gomi separates office organization from agent execution.
 
 The Office Settings view lets the user assign providers to the CEO and each department head. The node-side workbench runtime includes a provider router that can dispatch work to deterministic demo mode, CLI agents, OpenAI-compatible HTTP chat APIs, or Ollama-compatible local chat APIs.
 
-CLI and HTTP execution are disabled by default in the prototype for safety and deterministic tests. A real Code - OSS workbench integration can enable them through `GomiWorkbenchController` once provider commands, endpoint/model/API-key environment variables, workspace trust, approval policy, and enterprise controls are configured. When disabled, the same route metadata still flows through the runtime and the demo provider remains the fallback.
+CLI and HTTP execution are disabled by default in the prototype for safety and deterministic tests. A real Code - OSS workbench integration can enable them through `GomiWorkbenchController` once provider commands, endpoint/model/API-key environment variables, workspace trust, approval policy, and enterprise controls are configured. When host execution is disabled, the same route metadata still flows through the runtime and the demo provider remains the fallback.
+
+Live provider execution is also gated by Office Settings:
+
+- `demo-only` keeps every non-demo route on deterministic fallback behavior.
+- `trusted-workspaces` allows live providers only after the workspace is marked trusted.
+- `allow-all` is available for controlled development and enterprise-managed environments.
+- CLI and HTTP transports can be enabled independently.
+- Patch approval can be required before any live provider route is allowed to run.
 
 Supported provider routes:
 
@@ -335,6 +344,7 @@ Implemented in this repository:
 - Node-side CLI provider router with command execution, JSON/plain-text output mapping, and demo fallback.
 - Workbench provider router for CLI, OpenAI-compatible HTTP, Ollama-compatible local HTTP, and demo routes.
 - HTTP agent provider adapter with endpoint/model/API-key environment routing and JSON/plain-text result mapping.
+- Workspace trust and live execution policy for CLI/HTTP providers.
 - Hybrid project memory with lexical and vector-style retrieval.
 - File-backed persistent project memory for workbench sessions.
 - Memory privacy guard with secret redaction, strict mode, shared-memory toggles, retention days, and max project memory controls.
@@ -354,7 +364,7 @@ Not yet implemented:
 - Durable terminal scrollback capture beyond the selected/current exposed terminal text.
 - Native output-channel/log-service integration beyond the current optional error-log provider hook.
 - Production provider secrets UI and enterprise model governance.
-- Workspace trust and enterprise policy UI for enabling live CLI execution.
+- Native Code - OSS workspace-trust service binding beyond the current settings-level trust state.
 - Persistent database-backed memory.
 - Signed desktop packaging assets and production release signing.
 - Enterprise settings, licensing, update channel, and telemetry policy.
@@ -435,11 +445,11 @@ Recommended next milestones:
 
 1. Import the module into a real Code - OSS fork.
 2. Complete Gomi branding assets across Windows, macOS, and Linux.
-3. Harden provider secrets UI, model governance, and workspace-trust gates for OpenAI-compatible APIs and local model runtimes.
+3. Harden provider secrets UI, model governance, and native workspace-trust binding for OpenAI-compatible APIs and local model runtimes.
 4. Add persistent memory using SQLite and optional vector database support.
 5. Deepen native workspace context with durable terminal scrollback and workbench log/output-channel readers.
 6. Validate and polish the native diff preview inside a real Code - OSS fork.
-7. Harden enterprise settings for model provider governance, workspace trust, privacy policy, memory retention, and approval policy.
+7. Harden enterprise settings for model provider governance, native workspace trust, privacy policy, memory retention, and approval policy.
 8. Add packaging, signing, update channel, and release automation.
 9. Define licensing, commercial terms, and enterprise deployment policy.
 

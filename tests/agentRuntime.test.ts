@@ -5,9 +5,12 @@ import {
   setMemoryBroadcastThreshold,
   setSecretRedactionEnabled,
   setSeatWorkMode,
-  setSharedMemoryEnabled
+  setSharedMemoryEnabled,
+  setWorkspaceTrustState,
+  setCliProvidersEnabled
 } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
 import { GomiAgentRuntime } from '../src/vs/workbench/contrib/gomi/node/agentRuntime';
+import { createDemoGomiAgentProvider, type GomiAgentRunContext } from '../src/vs/workbench/contrib/gomi/node/agentProvider';
 
 describe('GomiAgentRuntime', () => {
   it('streams a final report and patch proposal', async () => {
@@ -180,6 +183,41 @@ describe('GomiAgentRuntime', () => {
     expect(memoryContents.join('\n')).toContain('[REDACTED]');
     expect(memoryContents.join('\n')).not.toContain('super-secret-value');
     expect(memoryContents.join('\n')).not.toContain('abcdefghijklmnopqrstuvwxyz');
+  });
+
+  it('passes live provider execution policy into agent task context', async () => {
+    const capturedPolicies: Array<GomiAgentRunContext['executionPolicy']> = [];
+    const demoProvider = createDemoGomiAgentProvider();
+    const runtime = new GomiAgentRuntime({
+      delayMs: 0,
+      officeSettings: setCliProvidersEnabled(
+        setWorkspaceTrustState(DEFAULT_GOMI_OFFICE_SETTINGS, 'trusted'),
+        true
+      ),
+      agentProvider: {
+        id: demoProvider.id,
+        label: demoProvider.label,
+        kind: demoProvider.kind,
+        capabilities: demoProvider.capabilities,
+        complete: (request, signal) => demoProvider.complete(request, signal),
+        runAgentTask: async (context) => {
+          capturedPolicies.push(context.executionPolicy);
+          return demoProvider.runAgentTask(context);
+        }
+      }
+    });
+
+    for await (const event of runtime.run('Review provider policy')) {
+      if (event.type === 'session_completed') {
+        break;
+      }
+    }
+
+    expect(capturedPolicies[0]).toMatchObject({
+      workspaceTrust: 'trusted',
+      allowCliProviders: true,
+      patchApprovalRequired: true
+    });
   });
 });
 

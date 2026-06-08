@@ -193,7 +193,11 @@ export class GomiAgentRuntime {
         task,
         memory: this.memoryStore.recent(sessionId, 12),
         sharedMemory,
-        agentCli: this.getAgentCli(task.agentId)
+        agentCli: this.getAgentCli(task.agentId),
+        executionPolicy: {
+          ...this.officeSettings.execution,
+          patchApprovalRequired: this.officeSettings.memory.requirePatchApproval
+        }
       });
       const communicationDecision = evaluateAgentCommunication(agentResult, {
         broadcastThreshold: this.officeSettings.memory.broadcastThreshold,

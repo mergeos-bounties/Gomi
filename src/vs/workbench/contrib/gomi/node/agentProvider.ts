@@ -2,6 +2,7 @@ import type {
   GomiAgentId,
   GomiAgentCliProviderId,
   GomiAgentResult,
+  GomiOfficeExecutionSettings,
   GomiMemoryEntry,
   GomiTask,
   GomiWorkspaceSnapshot
@@ -54,6 +55,9 @@ export interface GomiAgentRunContext {
     providerId: GomiAgentCliProviderId;
     label: string;
     command: string;
+  };
+  executionPolicy?: GomiOfficeExecutionSettings & {
+    patchApprovalRequired: boolean;
   };
 }
 

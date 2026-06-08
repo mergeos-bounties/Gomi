@@ -1,5 +1,9 @@
 import { GOMI_AGENT_CLI_PROVIDERS } from '../common/gomiOfficeSettings';
-import type { GomiAgentCliProvider, GomiAgentProviderTransport } from '../common/gomiTypes';
+import type {
+  GomiAgentCliProvider,
+  GomiAgentProviderTransport,
+  GomiAgentResult
+} from '../common/gomiTypes';
 import {
   createDemoGomiAgentProvider,
   type GomiAgentProvider,
@@ -45,12 +49,16 @@ export class WorkbenchGomiAgentProvider implements GomiAgentProvider {
   private readonly demoProvider: GomiAgentProvider;
   private readonly cliProvider: GomiAgentProvider;
   private readonly httpProvider: GomiAgentProvider;
+  private readonly cliExecutionEnabled: boolean;
+  private readonly httpExecutionEnabled: boolean;
 
   constructor(options: WorkbenchGomiAgentProviderOptions = {}) {
     this.providerCatalog = options.providerCatalog ?? GOMI_AGENT_CLI_PROVIDERS;
     this.demoProvider = createDemoGomiAgentProvider();
+    this.cliExecutionEnabled = options.enableCliAgentExecution ?? false;
+    this.httpExecutionEnabled = options.enableHttpAgentExecution ?? false;
     this.cliProvider = createNodeCliGomiAgentProvider({
-      enabled: options.enableCliAgentExecution ?? false,
+      enabled: this.cliExecutionEnabled,
       providerCatalog: this.providerCatalog,
       fallbackProvider: this.demoProvider,
       commandRunner: options.cliAgentCommandRunner,
@@ -58,7 +66,7 @@ export class WorkbenchGomiAgentProvider implements GomiAgentProvider {
       cwd: options.cwd
     });
     this.httpProvider = createHttpGomiAgentProvider({
-      enabled: options.enableHttpAgentExecution ?? false,
+      enabled: this.httpExecutionEnabled,
       providerCatalog: this.providerCatalog,
       fallbackProvider: this.demoProvider,
       fetchImpl: options.httpFetch,
@@ -75,6 +83,16 @@ export class WorkbenchGomiAgentProvider implements GomiAgentProvider {
   runAgentTask(context: GomiAgentRunContext) {
     const provider = this.providerCatalog.find((candidate) => candidate.id === context.agentCli?.providerId);
     const transport = resolveTransport(provider);
+    const liveExecutionEnabled =
+      (transport === 'cli' && this.cliExecutionEnabled) ||
+      ((transport === 'openai-compatible' || transport === 'ollama-chat') && this.httpExecutionEnabled);
+    const blockReason = liveExecutionEnabled
+      ? getExecutionBlockReason(context, transport)
+      : undefined;
+
+    if (blockReason) {
+      return Promise.resolve(createBlockedExecutionResult(context, blockReason));
+    }
 
     if (transport === 'openai-compatible' || transport === 'ollama-chat') {
       return this.httpProvider.runAgentTask(context);
@@ -100,4 +118,64 @@ function resolveTransport(provider: GomiAgentCliProvider | undefined): GomiAgent
   }
 
   return provider.transport ?? (provider.id === 'demo-runtime' ? 'demo' : 'cli');
+}
+
+function getExecutionBlockReason(
+  context: GomiAgentRunContext,
+  transport: GomiAgentProviderTransport
+): string | undefined {
+  if (transport === 'demo') {
+    return undefined;
+  }
+
+  const policy = context.executionPolicy;
+
+  if (!policy) {
+    return 'Live provider execution requires an explicit Gomi execution policy.';
+  }
+
+  if (policy.liveProviderMode === 'demo-only') {
+    return 'Live provider execution is disabled by the current Gomi execution policy.';
+  }
+
+  if (policy.liveProviderMode === 'trusted-workspaces' && policy.workspaceTrust !== 'trusted') {
+    return 'Trust this workspace before running live CLI or HTTP agent providers.';
+  }
+
+  if (transport === 'cli' && !policy.allowCliProviders) {
+    return 'CLI agent execution is disabled by the current Gomi execution policy.';
+  }
+
+  if ((transport === 'openai-compatible' || transport === 'ollama-chat') && !policy.allowHttpProviders) {
+    return 'HTTP model provider execution is disabled by the current Gomi execution policy.';
+  }
+
+  if (policy.requirePatchApprovalForLiveProviders && !policy.patchApprovalRequired) {
+    return 'Patch approval must stay enabled before live providers can run.';
+  }
+
+  return undefined;
+}
+
+function createBlockedExecutionResult(
+  context: GomiAgentRunContext,
+  reason: string
+): GomiAgentResult {
+  return {
+    agentId: context.task.agentId,
+    taskId: context.task.id,
+    summary: `${context.task.title}: ${reason}`,
+    findings: [
+      reason,
+      `Requested provider route: ${context.agentCli?.label ?? context.agentCli?.providerId ?? 'unknown'}`,
+      'No live provider was executed and no code changes were applied.'
+    ],
+    recommendations: [
+      'Use Demo Runtime while workspace trust or enterprise policy is not configured.',
+      'Enable only the provider transports required for this workspace.',
+      'Keep patch approval required for live provider output.'
+    ],
+    proposedFiles: [],
+    confidence: 0.24
+  };
 }

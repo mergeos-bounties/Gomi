@@ -4,8 +4,10 @@ import type {
   GomiAgentId,
   GomiAgentSeat,
   GomiAgentWorkMode,
+  GomiLiveProviderMode,
   GomiMemoryPrivacyMode,
-  GomiOfficeSettings
+  GomiOfficeSettings,
+  GomiWorkspaceTrustState
 } from './gomiTypes';
 
 export const GOMI_DEFAULT_MEMORY_BROADCAST_THRESHOLD = 0.74;
@@ -118,6 +120,13 @@ export const DEFAULT_GOMI_OFFICE_SETTINGS: GomiOfficeSettings = {
     maxProjectMemoryItems: GOMI_DEFAULT_MAX_PROJECT_MEMORY_ITEMS,
     broadcastThreshold: GOMI_DEFAULT_MEMORY_BROADCAST_THRESHOLD,
     requirePatchApproval: true
+  },
+  execution: {
+    workspaceTrust: 'untrusted',
+    liveProviderMode: 'trusted-workspaces',
+    allowCliProviders: false,
+    allowHttpProviders: false,
+    requirePatchApprovalForLiveProviders: true
   }
 };
 
@@ -239,6 +248,51 @@ export function setPatchApprovalRequired(
   });
 }
 
+export function setWorkspaceTrustState(
+  settings: GomiOfficeSettings,
+  workspaceTrust: GomiWorkspaceTrustState
+): GomiOfficeSettings {
+  return updateExecutionSettings(settings, {
+    workspaceTrust
+  });
+}
+
+export function setLiveProviderMode(
+  settings: GomiOfficeSettings,
+  liveProviderMode: GomiLiveProviderMode
+): GomiOfficeSettings {
+  return updateExecutionSettings(settings, {
+    liveProviderMode
+  });
+}
+
+export function setCliProvidersEnabled(
+  settings: GomiOfficeSettings,
+  allowCliProviders: boolean
+): GomiOfficeSettings {
+  return updateExecutionSettings(settings, {
+    allowCliProviders
+  });
+}
+
+export function setHttpProvidersEnabled(
+  settings: GomiOfficeSettings,
+  allowHttpProviders: boolean
+): GomiOfficeSettings {
+  return updateExecutionSettings(settings, {
+    allowHttpProviders
+  });
+}
+
+export function setLiveProviderPatchApprovalRequired(
+  settings: GomiOfficeSettings,
+  requirePatchApprovalForLiveProviders: boolean
+): GomiOfficeSettings {
+  return updateExecutionSettings(settings, {
+    requirePatchApprovalForLiveProviders
+  });
+}
+
 export function getSeatForAgent(
   settings: GomiOfficeSettings,
   agentId: GomiAgentId
@@ -278,6 +332,19 @@ function updateMemorySettings(
     memory: {
       ...settings.memory,
       ...memoryPatch
+    }
+  };
+}
+
+function updateExecutionSettings(
+  settings: GomiOfficeSettings,
+  executionPatch: Partial<GomiOfficeSettings['execution']>
+): GomiOfficeSettings {
+  return {
+    ...settings,
+    execution: {
+      ...settings.execution,
+      ...executionPatch
     }
   };
 }

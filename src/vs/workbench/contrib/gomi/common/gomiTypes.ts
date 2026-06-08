@@ -46,6 +46,8 @@ export type GomiAgentProviderTransport =
   | 'openai-compatible'
   | 'ollama-chat'
   | 'demo';
+export type GomiWorkspaceTrustState = 'trusted' | 'untrusted';
+export type GomiLiveProviderMode = 'demo-only' | 'trusted-workspaces' | 'allow-all';
 
 export interface GomiAgentCliProvider {
   id: GomiAgentCliProviderId;
@@ -83,9 +85,18 @@ export interface GomiOfficeMemorySettings {
   requirePatchApproval: boolean;
 }
 
+export interface GomiOfficeExecutionSettings {
+  workspaceTrust: GomiWorkspaceTrustState;
+  liveProviderMode: GomiLiveProviderMode;
+  allowCliProviders: boolean;
+  allowHttpProviders: boolean;
+  requirePatchApprovalForLiveProviders: boolean;
+}
+
 export interface GomiOfficeSettings {
   seats: GomiAgentSeat[];
   memory: GomiOfficeMemorySettings;
+  execution: GomiOfficeExecutionSettings;
 }
 
 export interface GomiAgent {
