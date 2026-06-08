@@ -49,6 +49,7 @@ import type {
   GomiAgentSeat,
   GomiChatMessage,
   GomiFinalReport,
+  GomiMemoryBoardItem,
   GomiOfficeSettings,
   GomiRuntimeEvent,
   GomiTask,
@@ -101,6 +102,7 @@ export function GomiOfficeApp() {
   );
   const [tasks, setTasks] = useState<GomiTask[]>([]);
   const [messages, setMessages] = useState<GomiChatMessage[]>([]);
+  const [memoryItems, setMemoryItems] = useState<GomiMemoryBoardItem[]>([]);
   const [report, setReport] = useState<GomiFinalReport | undefined>();
   const [patchReview, setPatchReview] = useState<GomiPatchReviewState | undefined>();
   const [workspace, setWorkspace] = useState<GomiWorkspaceSnapshot | undefined>();
@@ -188,6 +190,7 @@ export function GomiOfficeApp() {
     setAgents(applyOfficeSettingsToAgents(BASE_GOMI_AGENTS, officeSettings));
     setTasks([]);
     setMessages([]);
+    setMemoryItems([]);
     setReport(undefined);
     setPatchReview(undefined);
     setWorkspace(undefined);
@@ -285,6 +288,10 @@ export function GomiOfficeApp() {
       setTasks((currentTasks) => upsertTask(currentTasks, event.task));
     }
 
+    if (event.type === 'memory_update') {
+      setMemoryItems((currentItems) => upsertMemoryBoardItem(currentItems, event.item));
+    }
+
     if (event.type === 'patch') {
       setPatchReview(createPatchReviewState(event.patch));
     }
@@ -334,7 +341,7 @@ export function GomiOfficeApp() {
 
       <div className={workbenchClassName}>
         <ActivityBar />
-        <ProjectSidebar workspace={workspace} />
+        <ProjectSidebar workspace={workspace} memoryItems={memoryItems} />
 
         <main className={mainClassName}>
           <div className="gomi-tabs">
@@ -396,6 +403,7 @@ export function GomiOfficeApp() {
               agents={visualAgents}
               tasks={tasks}
               messages={messages}
+              memoryItems={memoryItems}
               layoutToken={officeLayoutToken}
             />
           </section>
@@ -418,6 +426,7 @@ export function GomiOfficeApp() {
           tasks={tasks}
           report={report}
           officeSettings={officeSettings}
+          memoryItems={memoryItems}
           onProviderChange={assignProvider}
           onToggleSeatSleep={toggleSeatSleep}
           onFireEmployee={fireOfficeEmployee}
@@ -450,7 +459,13 @@ function ActivityBar() {
   );
 }
 
-function ProjectSidebar({ workspace }: { workspace?: GomiWorkspaceSnapshot }) {
+function ProjectSidebar({
+  workspace,
+  memoryItems
+}: {
+  workspace?: GomiWorkspaceSnapshot;
+  memoryItems: GomiMemoryBoardItem[];
+}) {
   const files = workspace?.files ?? [
     'product.json',
     'src/vs/workbench/contrib/gomi',
@@ -488,6 +503,11 @@ function ProjectSidebar({ workspace }: { workspace?: GomiWorkspaceSnapshot }) {
             CEO planner, message bus, event stream, patch proposal, final report.
           </div>
         </div>
+
+        <div className="gomi-project-row">
+          <div className="gomi-project-name">Shared Memory Board</div>
+          <MemoryBoardPanel memoryItems={memoryItems} compact />
+        </div>
       </div>
     </aside>
   );
@@ -498,6 +518,7 @@ function RightPanel({
   tasks,
   report,
   officeSettings,
+  memoryItems,
   onProviderChange,
   onToggleSeatSleep,
   onFireEmployee,
@@ -507,6 +528,7 @@ function RightPanel({
   tasks: GomiTask[];
   report?: GomiFinalReport;
   officeSettings: GomiOfficeSettings;
+  memoryItems: GomiMemoryBoardItem[];
   onProviderChange: (seatId: string, providerId: GomiAgentCliProviderId) => void;
   onToggleSeatSleep: (seat: GomiAgentSeat) => void;
   onFireEmployee: (seatId: string) => void;
@@ -547,6 +569,7 @@ function RightPanel({
 
         <OfficeSettingsPanel
           officeSettings={officeSettings}
+          memoryItems={memoryItems}
           onProviderChange={onProviderChange}
           onToggleSeatSleep={onToggleSeatSleep}
           onFireEmployee={onFireEmployee}
@@ -593,12 +616,14 @@ function TaskRow({ task }: { task: GomiTask }) {
 
 function OfficeSettingsPanel({
   officeSettings,
+  memoryItems,
   onProviderChange,
   onToggleSeatSleep,
   onFireEmployee,
   onRestoreEmployee
 }: {
   officeSettings: GomiOfficeSettings;
+  memoryItems: GomiMemoryBoardItem[];
   onProviderChange: (seatId: string, providerId: GomiAgentCliProviderId) => void;
   onToggleSeatSleep: (seat: GomiAgentSeat) => void;
   onFireEmployee: (seatId: string) => void;
@@ -691,8 +716,41 @@ function OfficeSettingsPanel({
           <span>{`broadcast >= ${Math.round(officeSettings.memory.broadcastThreshold * 100)}%`}</span>
           <span>{officeSettings.memory.requirePatchApproval ? 'approval required' : 'auto apply allowed'}</span>
         </div>
+        <MemoryBoardPanel memoryItems={memoryItems} />
       </div>
     </section>
+  );
+}
+
+function MemoryBoardPanel({
+  memoryItems,
+  compact = false
+}: {
+  memoryItems: GomiMemoryBoardItem[];
+  compact?: boolean;
+}) {
+  const visibleItems = memoryItems.slice(-5).reverse();
+
+  return (
+    <div className={`gomi-memory-board ${compact ? 'is-compact' : ''}`} aria-label="Shared Memory Board">
+      {visibleItems.length === 0 ? (
+        <div className="gomi-project-detail">Shared project facts will appear here.</div>
+      ) : (
+        visibleItems.map((item) => (
+          <div className="gomi-memory-card" data-source={item.source} key={item.id}>
+            <div className="gomi-memory-card__head">
+              <span>{item.title}</span>
+              <span>{item.source}</span>
+            </div>
+            <div className="gomi-memory-card__body">{shortenText(item.content, compact ? 96 : 142)}</div>
+            <div className="gomi-memory-card__meta">
+              <span>{item.key}</span>
+              {item.shouldBroadcast === false ? <span>stored quietly</span> : undefined}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
   );
 }
 
@@ -874,6 +932,29 @@ function upsertTask(tasks: GomiTask[], nextTask: GomiTask): GomiTask[] {
   }
 
   return tasks.map((task) => (task.id === nextTask.id ? nextTask : task));
+}
+
+function upsertMemoryBoardItem(
+  items: GomiMemoryBoardItem[],
+  nextItem: GomiMemoryBoardItem
+): GomiMemoryBoardItem[] {
+  const existingIndex = items.findIndex((item) => item.id === nextItem.id || item.key === nextItem.key);
+
+  if (existingIndex === -1) {
+    return [...items, nextItem].slice(-18);
+  }
+
+  return items.map((item, index) => (index === existingIndex ? nextItem : item));
+}
+
+function shortenText(value: string, maxLength: number): string {
+  const compactValue = value.replace(/\s+/g, ' ').trim();
+
+  if (compactValue.length <= maxLength) {
+    return compactValue;
+  }
+
+  return `${compactValue.slice(0, Math.max(0, maxLength - 3))}...`;
 }
 
 function applyOfficeSettingsToAgents(

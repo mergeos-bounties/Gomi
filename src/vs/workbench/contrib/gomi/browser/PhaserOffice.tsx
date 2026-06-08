@@ -1,11 +1,17 @@
 import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
-import type { GomiAgent, GomiChatMessage, GomiTask } from '../common/gomiTypes';
+import type {
+  GomiAgent,
+  GomiChatMessage,
+  GomiMemoryBoardItem,
+  GomiTask
+} from '../common/gomiTypes';
 
 interface PhaserOfficeProps {
   agents: GomiAgent[];
   tasks: GomiTask[];
   messages: GomiChatMessage[];
+  memoryItems?: GomiMemoryBoardItem[];
   layoutToken?: string;
 }
 
@@ -31,26 +37,39 @@ const roleColors: Record<GomiAgent['id'], number> = {
   devops: 0x34d399
 };
 
-export function PhaserOffice({ agents, tasks, messages, layoutToken }: PhaserOfficeProps) {
+export function PhaserOffice({
+  agents,
+  tasks,
+  messages,
+  memoryItems = [],
+  layoutToken
+}: PhaserOfficeProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const sceneRef = useRef<GomiOfficeScene | null>(null);
   const agentsRef = useRef(agents);
   const tasksRef = useRef(tasks);
   const messagesRef = useRef(messages);
+  const memoryItemsRef = useRef(memoryItems);
   const lastSizeRef = useRef({ width: 0, height: 0 });
 
   useEffect(() => {
     agentsRef.current = agents;
     tasksRef.current = tasks;
     messagesRef.current = messages;
-    sceneRef.current?.renderOffice(agents, tasks, messages);
-  }, [agents, tasks, messages]);
+    memoryItemsRef.current = memoryItems;
+    sceneRef.current?.renderOffice(agents, tasks, messages, memoryItems);
+  }, [agents, tasks, messages, memoryItems]);
 
   useEffect(() => {
     const frame = globalThis.requestAnimationFrame(() => {
       resizeGameToHost(hostRef.current, gameRef.current);
-      sceneRef.current?.renderOffice(agentsRef.current, tasksRef.current, messagesRef.current);
+      sceneRef.current?.renderOffice(
+        agentsRef.current,
+        tasksRef.current,
+        messagesRef.current,
+        memoryItemsRef.current
+      );
     });
 
     return () => {
@@ -70,13 +89,19 @@ export function PhaserOffice({ agents, tasks, messages, layoutToken }: PhaserOff
 
       create() {
         sceneRef.current = this;
-        this.renderOffice(agentsRef.current, tasksRef.current, messagesRef.current);
+        this.renderOffice(
+          agentsRef.current,
+          tasksRef.current,
+          messagesRef.current,
+          memoryItemsRef.current
+        );
       }
 
       renderOffice(
         nextAgents: GomiAgent[],
         nextTasks: GomiTask[],
-        nextMessages: GomiChatMessage[]
+        nextMessages: GomiChatMessage[],
+        nextMemoryItems: GomiMemoryBoardItem[]
       ) {
         const width = this.game.canvas.width || this.scale.width || 640;
         const height = this.game.canvas.height || this.scale.height || 360;
@@ -87,7 +112,7 @@ export function PhaserOffice({ agents, tasks, messages, layoutToken }: PhaserOff
 
         const graphics = this.add.graphics();
         this.drawOfficeShell(graphics, width, height);
-        this.drawMemoryBoard(graphics, width, height, nextTasks, nextMessages);
+        this.drawMemoryBoard(graphics, width, height, nextTasks, nextMessages, nextMemoryItems);
 
         for (const agent of nextAgents) {
           this.drawAgent(agent, width, height, latestSpeech.get(agent.id));
@@ -217,13 +242,14 @@ export function PhaserOffice({ agents, tasks, messages, layoutToken }: PhaserOff
         width: number,
         height: number,
         tasks: GomiTask[],
-        messages: GomiChatMessage[]
+        messages: GomiChatMessage[],
+        memoryItems: GomiMemoryBoardItem[]
       ) {
         const boardWidth = Math.min(270, width * 0.34);
         const boardHeight = Math.min(118, height * 0.28);
         const x = width * 0.33;
         const y = height * 0.14;
-        const notes = this.createMemoryNotes(tasks, messages);
+        const notes = this.createMemoryNotes(tasks, messages, memoryItems);
 
         graphics.fillStyle(0x422006, 1);
         graphics.fillRoundedRect(x - 8, y - 8, boardWidth + 16, boardHeight + 16, 10);
@@ -249,12 +275,29 @@ export function PhaserOffice({ agents, tasks, messages, layoutToken }: PhaserOff
           this.add.text(noteX + 6, noteY + 5, note, {
             color: '#111827',
             fontFamily: 'Inter, Arial',
-            fontSize: '10px'
+            fontSize: '10px',
+            wordWrap: { width: boardWidth * 0.43 - 12 }
           });
         });
       }
 
-      private createMemoryNotes(tasks: GomiTask[], messages: GomiChatMessage[]): string[] {
+      private createMemoryNotes(
+        tasks: GomiTask[],
+        messages: GomiChatMessage[],
+        memoryItems: GomiMemoryBoardItem[]
+      ): string[] {
+        if (memoryItems.length > 0) {
+          return memoryItems
+            .slice(-4)
+            .reverse()
+            .map((item) =>
+              this.shorten(
+                `${this.shorten(item.title, 12)}: ${item.content.replace(/\s+/g, ' ')}`,
+                34
+              )
+            );
+        }
+
         const runningTask = tasks.find((task) => task.status === 'running');
         const doneCount = tasks.filter((task) => task.status === 'done').length;
         const latestAgent = [...messages].reverse().find((message) => message.senderId !== 'user');
@@ -531,7 +574,12 @@ export function PhaserOffice({ agents, tasks, messages, layoutToken }: PhaserOff
 
       lastSizeRef.current = { width, height };
       resizeGameToHost(host, gameRef.current);
-      sceneRef.current?.renderOffice(agentsRef.current, tasksRef.current, messagesRef.current);
+      sceneRef.current?.renderOffice(
+        agentsRef.current,
+        tasksRef.current,
+        messagesRef.current,
+        memoryItemsRef.current
+      );
     });
 
     observer.observe(host);
@@ -562,5 +610,10 @@ function resizeGameToHost(host: HTMLDivElement | null, game: Phaser.Game | null)
 }
 
 interface GomiOfficeScene extends Phaser.Scene {
-  renderOffice(agents: GomiAgent[], tasks: GomiTask[], messages: GomiChatMessage[]): void;
+  renderOffice(
+    agents: GomiAgent[],
+    tasks: GomiTask[],
+    messages: GomiChatMessage[],
+    memoryItems: GomiMemoryBoardItem[]
+  ): void;
 }

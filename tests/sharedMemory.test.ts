@@ -36,11 +36,13 @@ describe('shared project memory and communication policy', () => {
     const memoryStore = createInMemoryGomiMemoryStore();
     const sharedMemory = new GomiSharedProjectMemory(memoryStore, { workspaceId: 'Gomi' });
 
-    await sharedMemory.rememberWorkspace(workspace);
-    await sharedMemory.rememberAgentResult(result, 0.9);
+    const workspaceItems = await sharedMemory.rememberWorkspace(workspace);
+    const agentItem = await sharedMemory.rememberAgentResult(result, 0.9);
 
     const hits = await sharedMemory.searchForTask(task, 'shared memory layer');
 
+    expect(workspaceItems.map((item) => item.key)).toEqual(['workspace:files', 'workspace:git']);
+    expect(agentItem.key).toBe(`agent:${result.agentId}:${result.taskId}`);
     expect(hits.map((hit) => hit.key)).toContain(`agent:${result.agentId}:${result.taskId}`);
   });
 

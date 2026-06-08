@@ -10,6 +10,8 @@ describe('GomiAgentRuntime', () => {
     const runtime = new GomiAgentRuntime({ delayMs: 0 });
     const eventTypes: string[] = [];
     let agentResultCount = 0;
+    let memoryUpdateCount = 0;
+    const memoryKeys: string[] = [];
     let messageCount = 0;
 
     for await (const event of runtime.run('Review API and UI')) {
@@ -17,16 +19,24 @@ describe('GomiAgentRuntime', () => {
       if (event.type === 'agent_result') {
         agentResultCount += 1;
       }
+      if (event.type === 'memory_update') {
+        memoryUpdateCount += 1;
+        memoryKeys.push(event.item.key);
+      }
       if (event.type === 'message') {
         messageCount += 1;
       }
     }
 
     expect(eventTypes).toContain('session_started');
+    expect(eventTypes).toContain('memory_update');
     expect(eventTypes).toContain('agent_result');
     expect(eventTypes).toContain('patch');
     expect(eventTypes).toContain('report');
     expect(agentResultCount).toBeGreaterThan(0);
+    expect(memoryUpdateCount).toBeGreaterThan(agentResultCount);
+    expect(memoryKeys).toContain('workspace:files');
+    expect(memoryKeys.some((key) => key.startsWith('agent:'))).toBe(true);
     expect(messageCount).toBeLessThan(agentResultCount + 4);
     expect(eventTypes.at(-1)).toBe('session_completed');
   });

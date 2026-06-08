@@ -11,6 +11,8 @@ import type {
   GomiAgentResult,
   GomiAgentStatus,
   GomiChatMessage,
+  GomiMemoryBoardItem,
+  GomiMemoryEntry,
   GomiOfficeSettings,
   GomiRuntimeEvent,
   GomiTask
@@ -21,6 +23,7 @@ import {
   createAgentResultMemoryEntry,
   createInMemoryGomiMemoryStore,
   createMemoryContent,
+  type GomiMemoryItem,
   type GomiMemoryStore
 } from './memoryStore';
 import { GomiMessageBus } from './messageBus';
@@ -103,12 +106,12 @@ export class GomiAgentRuntime {
           indexedPaths: []
         };
 
-    this.memoryStore.add({
+    const requestMemory = this.memoryStore.add({
       sessionId,
       kind: 'request',
       content: createMemoryContent('request', request)
     });
-    this.memoryStore.add({
+    const workspaceSessionMemory = this.memoryStore.add({
       sessionId,
       kind: 'workspace',
       content: createMemoryContent(
@@ -116,7 +119,7 @@ export class GomiAgentRuntime {
         `${workspace.rootName}: indexed ${indexResult.chunkCount} context chunks from ${indexResult.indexedPaths.length} paths. ${workspace.files.slice(0, 12).join(', ')}`
       )
     });
-    await sharedProjectMemory.rememberWorkspace(workspace);
+    const workspaceMemoryItems = await sharedProjectMemory.rememberWorkspace(workspace);
 
     yield* this.emit({
       type: 'session_started',
@@ -124,6 +127,11 @@ export class GomiAgentRuntime {
       request,
       workspace
     });
+    yield* this.memoryUpdate(this.sessionMemoryToBoardItem(requestMemory, 'Project Request'));
+    yield* this.memoryUpdate(this.sessionMemoryToBoardItem(workspaceSessionMemory, 'Workspace Context'));
+    for (const memoryItem of workspaceMemoryItems) {
+      yield* this.memoryUpdate(this.projectMemoryToBoardItem(memoryItem, this.memoryTitleForKey(memoryItem.key)));
+    }
 
     yield* this.say('user', 'User', request);
     yield* this.status('ceo', 'planning');
@@ -163,7 +171,7 @@ export class GomiAgentRuntime {
       });
       const communicationDecision = evaluateAgentCommunication(agentResult);
       agentResults.push(agentResult);
-      this.memoryStore.add(
+      const resultMemory = this.memoryStore.add(
         createAgentResultMemoryEntry({
           sessionId,
           agentId: agentResult.agentId,
@@ -171,8 +179,23 @@ export class GomiAgentRuntime {
           summary: agentResult.summary
         })
       );
-      await sharedProjectMemory.rememberAgentResult(agentResult, communicationDecision.importance);
+      const projectMemoryItem = await sharedProjectMemory.rememberAgentResult(
+        agentResult,
+        communicationDecision.importance
+      );
       yield* this.emit({ type: 'agent_result', result: agentResult });
+      yield* this.memoryUpdate(
+        this.sessionMemoryToBoardItem(resultMemory, `${this.agentName(agentResult.agentId)} Result`, {
+          shouldBroadcast: communicationDecision.shouldBroadcast
+        })
+      );
+      yield* this.memoryUpdate(
+        this.projectMemoryToBoardItem(projectMemoryItem, `${this.agentName(agentResult.agentId)} Memory`, {
+          agentId: agentResult.agentId,
+          taskId: agentResult.taskId,
+          shouldBroadcast: communicationDecision.shouldBroadcast
+        })
+      );
       if (communicationDecision.shouldBroadcast) {
         yield* this.say(
           task.agentId,
@@ -200,16 +223,18 @@ export class GomiAgentRuntime {
       memory: this.memoryStore.list(sessionId)
     });
 
-    this.memoryStore.add({
+    const patchMemory = this.memoryStore.add({
       sessionId,
       kind: 'patch',
       content: createMemoryContent('patch', `${patch.filePath}: ${patch.summary}`)
     });
-    this.memoryStore.add({
+    const reportMemory = this.memoryStore.add({
       sessionId,
       kind: 'report',
       content: createMemoryContent('report', report.summary)
     });
+    yield* this.memoryUpdate(this.sessionMemoryToBoardItem(patchMemory, 'Patch Proposal'));
+    yield* this.memoryUpdate(this.sessionMemoryToBoardItem(reportMemory, 'Final Report'));
 
     yield* this.emit({ type: 'patch', patch });
     yield* this.emit({ type: 'report', report });
@@ -265,6 +290,66 @@ export class GomiAgentRuntime {
         progress
       }
     });
+  }
+
+  private async *memoryUpdate(item: GomiMemoryBoardItem): AsyncGenerator<GomiRuntimeEvent> {
+    yield* this.emit({
+      type: 'memory_update',
+      item
+    });
+  }
+
+  private sessionMemoryToBoardItem(
+    entry: GomiMemoryEntry,
+    title: string,
+    options: Pick<GomiMemoryBoardItem, 'shouldBroadcast'> = {}
+  ): GomiMemoryBoardItem {
+    return {
+      id: entry.id,
+      key: entry.id,
+      title,
+      content: this.cleanMemoryContent(entry.content),
+      source: 'session',
+      kind: entry.kind,
+      createdAt: entry.createdAt,
+      agentId: entry.agentId,
+      taskId: entry.taskId,
+      ...options
+    };
+  }
+
+  private projectMemoryToBoardItem(
+    item: GomiMemoryItem,
+    title: string,
+    options: Pick<GomiMemoryBoardItem, 'agentId' | 'taskId' | 'shouldBroadcast'> = {}
+  ): GomiMemoryBoardItem {
+    return {
+      id: item.key,
+      key: item.key,
+      title,
+      content: item.value,
+      source: 'project',
+      kind: 'shared_project',
+      createdAt: item.updatedAt ?? item.createdAt,
+      importance: item.importance,
+      ...options
+    };
+  }
+
+  private memoryTitleForKey(key: string): string {
+    if (key === 'workspace:files') {
+      return 'Workspace Files';
+    }
+
+    if (key === 'workspace:git') {
+      return 'Git Context';
+    }
+
+    return key;
+  }
+
+  private cleanMemoryContent(content: string): string {
+    return content.replace(/^\[[^\]]+\]\s*/, '');
   }
 
   private agentName(agentId: GomiAgentId): string {

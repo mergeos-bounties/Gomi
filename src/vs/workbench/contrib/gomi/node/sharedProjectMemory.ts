@@ -1,5 +1,10 @@
 import type { GomiAgentResult, GomiTask, GomiWorkspaceSnapshot } from '../common/gomiTypes';
-import type { GomiMemoryHit, GomiMemoryScope, GomiMemoryStore } from './memoryStore';
+import type {
+  GomiMemoryHit,
+  GomiMemoryItem,
+  GomiMemoryScope,
+  GomiMemoryStore
+} from './memoryStore';
 import {
   createInMemoryVectorMemoryStore,
   type GomiVectorMemoryStore
@@ -12,8 +17,8 @@ export class GomiSharedProjectMemory {
     private readonly vectorMemoryStore: GomiVectorMemoryStore = createInMemoryVectorMemoryStore()
   ) {}
 
-  async rememberWorkspace(workspace: GomiWorkspaceSnapshot): Promise<void> {
-    await this.remember({
+  async rememberWorkspace(workspace: GomiWorkspaceSnapshot): Promise<GomiMemoryItem[]> {
+    const filesMemory = await this.remember({
       key: 'workspace:files',
       value: workspace.files.slice(0, 80).join('\n'),
       tags: ['workspace', 'files', workspace.rootName],
@@ -24,16 +29,18 @@ export class GomiSharedProjectMemory {
       }
     });
 
-    await this.remember({
+    const gitMemory = await this.remember({
       key: 'workspace:git',
       value: workspace.gitSummary,
       tags: ['workspace', 'git'],
       importance: 0.65
     });
+
+    return [filesMemory, gitMemory];
   }
 
-  async rememberAgentResult(result: GomiAgentResult, importance: number): Promise<void> {
-    await this.remember({
+  async rememberAgentResult(result: GomiAgentResult, importance: number): Promise<GomiMemoryItem> {
+    return this.remember({
       key: `agent:${result.agentId}:${result.taskId}`,
       value: [
         result.summary,
@@ -61,11 +68,13 @@ export class GomiSharedProjectMemory {
     return mergeMemoryHits(vectorHits, lexicalHits).slice(0, limit);
   }
 
-  private async remember(item: Parameters<GomiMemoryStore['put']>[1]): Promise<void> {
-    await Promise.all([
+  private async remember(item: Parameters<GomiMemoryStore['put']>[1]): Promise<GomiMemoryItem> {
+    const [memoryItem] = await Promise.all([
       this.memoryStore.put(this.scope, item),
       this.vectorMemoryStore.upsert(this.scope, item)
     ]);
+
+    return memoryItem;
   }
 }
 

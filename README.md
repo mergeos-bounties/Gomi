@@ -51,7 +51,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Collapsible workbench views and Office Focus mode** so the visual office can expand across the workspace.
 - **2D office simulation** built with Phaser.
 - **Animated game-style agents** with visible status and chat bubbles.
-- **Shared memory board** for project context.
+- **Shared memory board** fed by real runtime memory updates for project context.
 - **CEO Agent planning flow** with specialist agent delegation.
 - **Office organization settings** for assigning CLI agent routes to the CEO and department heads.
 - **Department head sleep mode** to pause a leader without removing the role from the organization.
@@ -62,7 +62,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Project context indexing** for file tree, manifests, open editor snippets, selected code, terminal output, diagnostics, SCM/git diff previews, and optional error logs.
 - **Patch review workflow** with webview diff preview, native Code - OSS diff preview hook, approve/reject controls, and apply gating.
 - **Safe node-side patch application core** for approved unified diffs inside the workspace root.
-- **Runtime events** for session lifecycle, messages, task updates, agent results, patch proposals, and final reports.
+- **Runtime events** for session lifecycle, messages, task updates, agent results, memory updates, patch proposals, and final reports.
 - **Workbench bridge controller** for routing webview messages to the runtime and approved patch applier.
 - **Webview bridge client** that can send run requests, office settings, and patch-apply messages from the React office to the native workbench host.
 - **Native webview host bridge and controller** for receiving `gomi.run` messages from the mounted office webview and streaming runtime events back into the UI.
@@ -146,6 +146,7 @@ The current implementation uses hybrid retrieval:
 - **Project context indexing** so workspace metadata and content snippets can be retrieved by task.
 - **Workspace persistence** through file-backed lexical and vector memory stores when running from the workbench controller.
 - **Communication policy** so low-importance findings are stored silently while high-importance findings become visible messages and chat bubbles.
+- **Memory board events** so the visual office can display the actual request, workspace facts, retrieved project context, and agent findings stored in shared memory.
 
 For the MVP, vector retrieval uses a local hashing embedding provider. It does not require an API key and keeps tests deterministic. The workbench controller persists lexical and vector memory records in workspace storage so future sessions can reuse project context. In a production build, this storage can be replaced by SQLite, a local vector database, OpenAI embeddings, a local embedding model, or an enterprise embedding service without changing the runtime contract.
 
@@ -302,14 +303,14 @@ Implemented in this repository:
 - React workbench shell.
 - Phaser 2D office simulation.
 - Animated office avatars and chat bubbles.
-- Memory board and task status UI.
+- Memory board and task status UI backed by runtime `memory_update` events.
 - Collapsible side/bottom panels and Office Focus mode.
 - CEO Agent planning simulation.
 - Specialist agent runtime flow.
 - Designer Agent role for UX, visual language, office atmosphere, and avatar direction.
 - Office settings for CEO and department-head CLI routing.
 - Department-head sleep mode and employee fire/restore controls.
-- Runtime event stream.
+- Runtime event stream including shared-memory board updates.
 - Workbench bridge controller for `gomi.run`, runtime event forwarding, native patch preview, and approved patch apply messages.
 - Native Code - OSS registration template for the Gomi Office Activity Bar container and webview-backed view pane.
 - Generated webview asset path for mounting the React/Phaser office bundle inside the native pane.
@@ -327,7 +328,7 @@ Implemented in this repository:
 - Safe unified-diff patch application core for approved workspace edits.
 - Code - OSS integration manifest and validation/apply script.
 - GitHub Actions build/release workflow and Windows Code - OSS packaging script.
-- Tests for runtime, CLI routing, planner, message bus, patch approval, patch application, Code - OSS workspace service adaptation, workspace reader, project context indexing, shared memory, and vector memory.
+- Tests for runtime memory updates, CLI routing, planner, message bus, patch approval, patch application, Code - OSS workspace service adaptation, workspace reader, project context indexing, shared memory, and vector memory.
 
 Not yet implemented:
 

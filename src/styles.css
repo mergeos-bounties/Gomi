@@ -635,6 +635,73 @@ button {
   font-size: 11px;
 }
 
+.gomi-memory-board {
+  display: grid;
+  gap: 8px;
+}
+
+.gomi-memory-board.is-compact {
+  max-height: 260px;
+  overflow: auto;
+}
+
+.gomi-memory-card {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #101826;
+  padding: 8px;
+}
+
+.gomi-memory-card[data-source="project"] {
+  border-color: #0f766e;
+  background: rgba(15, 118, 110, 0.12);
+}
+
+.gomi-memory-card__head,
+.gomi-memory-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gomi-memory-card__head span:first-child {
+  overflow: hidden;
+  color: #f9fafb;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gomi-memory-card__head span:last-child,
+.gomi-memory-card__meta span {
+  overflow: hidden;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.gomi-memory-card__body {
+  color: #cbd5e1;
+  font-size: 11px;
+  line-height: 1.42;
+}
+
+.gomi-memory-card__meta {
+  justify-content: flex-start;
+}
+
+.gomi-memory-card__meta span:first-child {
+  max-width: 150px;
+}
+
 .gomi-diff-view {
   display: grid;
   max-height: 150px;

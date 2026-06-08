@@ -164,6 +164,20 @@ export interface GomiMemoryEntry {
   taskId?: string;
 }
 
+export interface GomiMemoryBoardItem {
+  id: string;
+  key: string;
+  title: string;
+  content: string;
+  source: 'session' | 'project';
+  kind: GomiMemoryKind | 'shared_project';
+  createdAt: string;
+  importance?: number;
+  shouldBroadcast?: boolean;
+  agentId?: GomiAgentId;
+  taskId?: string;
+}
+
 export type GomiRuntimeEvent =
   | {
       type: 'session_started';
@@ -188,6 +202,10 @@ export type GomiRuntimeEvent =
   | {
       type: 'agent_result';
       result: GomiAgentResult;
+    }
+  | {
+      type: 'memory_update';
+      item: GomiMemoryBoardItem;
     }
   | {
       type: 'patch';
