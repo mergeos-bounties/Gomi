@@ -2,8 +2,10 @@ import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
 import type {
   GomiAgent,
+  GomiAgentSeat,
   GomiChatMessage,
   GomiMemoryBoardItem,
+  GomiOfficeSettings,
   GomiTask
 } from '../common/gomiTypes';
 import {
@@ -15,6 +17,7 @@ import {
 
 interface PhaserOfficeProps {
   agents: GomiAgent[];
+  officeSettings: GomiOfficeSettings;
   tasks: GomiTask[];
   messages: GomiChatMessage[];
   memoryItems?: GomiMemoryBoardItem[];
@@ -45,6 +48,7 @@ const roleColors: Record<GomiAgent['id'], number> = {
 
 export function PhaserOffice({
   agents,
+  officeSettings,
   tasks,
   messages,
   memoryItems = [],
@@ -54,6 +58,7 @@ export function PhaserOffice({
   const gameRef = useRef<Phaser.Game | null>(null);
   const sceneRef = useRef<GomiOfficeScene | null>(null);
   const agentsRef = useRef(agents);
+  const officeSettingsRef = useRef(officeSettings);
   const tasksRef = useRef(tasks);
   const messagesRef = useRef(messages);
   const memoryItemsRef = useRef(memoryItems);
@@ -61,17 +66,19 @@ export function PhaserOffice({
 
   useEffect(() => {
     agentsRef.current = agents;
+    officeSettingsRef.current = officeSettings;
     tasksRef.current = tasks;
     messagesRef.current = messages;
     memoryItemsRef.current = memoryItems;
-    sceneRef.current?.renderOffice(agents, tasks, messages, memoryItems);
-  }, [agents, tasks, messages, memoryItems]);
+    sceneRef.current?.renderOffice(agents, officeSettings, tasks, messages, memoryItems);
+  }, [agents, officeSettings, tasks, messages, memoryItems]);
 
   useEffect(() => {
     const frame = globalThis.requestAnimationFrame(() => {
       resizeGameToHost(hostRef.current, gameRef.current);
       sceneRef.current?.renderOffice(
         agentsRef.current,
+        officeSettingsRef.current,
         tasksRef.current,
         messagesRef.current,
         memoryItemsRef.current
@@ -97,6 +104,7 @@ export function PhaserOffice({
         sceneRef.current = this;
         this.renderOffice(
           agentsRef.current,
+          officeSettingsRef.current,
           tasksRef.current,
           messagesRef.current,
           memoryItemsRef.current
@@ -105,6 +113,7 @@ export function PhaserOffice({
 
       renderOffice(
         nextAgents: GomiAgent[],
+        nextOfficeSettings: GomiOfficeSettings,
         nextTasks: GomiTask[],
         nextMessages: GomiChatMessage[],
         nextMemoryItems: GomiMemoryBoardItem[]
@@ -120,8 +129,9 @@ export function PhaserOffice({
         const graphics = this.add.graphics();
         this.drawOfficeShell(graphics, width, height, officeLayout.rooms);
         this.drawMemoryBoard(graphics, officeLayout.memoryBoard, nextTasks, nextMessages, nextMemoryItems);
-        this.drawStatusWall(graphics, officeLayout.statusWall, nextAgents, nextTasks);
+        this.drawStatusWall(graphics, officeLayout.statusWall, nextAgents, nextTasks, nextOfficeSettings.seats);
         this.drawGomiRoute(graphics, officeLayout.gomiHub, officeLayout.seats, nextAgents);
+        this.drawDepartmentStaff(graphics, officeLayout.rooms, nextOfficeSettings.seats);
 
         for (const agent of nextAgents) {
           const seat = officeLayout.seats.find((candidate) => candidate.agentId === agent.id);
@@ -143,14 +153,14 @@ export function PhaserOffice({
         height: number,
         rooms: GomiOfficeRoomLayout[]
       ) {
-        graphics.fillStyle(0x0f172a, 1);
+        graphics.fillStyle(0xdbeafe, 1);
         graphics.fillRect(0, 0, width, height);
-        graphics.fillStyle(0x172033, 1);
+        graphics.fillStyle(0xf8fafc, 1);
         graphics.fillRoundedRect(18, 18, width - 36, height - 36, 14);
 
         this.drawFloorGrid(graphics, width, height);
 
-        graphics.lineStyle(2, 0x334155, 1);
+        graphics.lineStyle(2, 0x93c5fd, 1);
         graphics.strokeRoundedRect(18, 18, width - 36, height - 36, 14);
 
         for (const roomLayout of rooms) {
@@ -161,7 +171,9 @@ export function PhaserOffice({
       }
 
       private drawFloorGrid(graphics: Phaser.GameObjects.Graphics, width: number, height: number) {
-        graphics.lineStyle(1, 0x253247, 0.55);
+        graphics.fillStyle(0xf1f5f9, 1);
+        graphics.fillRoundedRect(26, 26, width - 52, height - 52, 12);
+        graphics.lineStyle(1, 0xcbd5e1, 0.42);
 
         for (let x = 32; x < width - 24; x += 34) {
           graphics.lineBetween(x, 24, x, height - 24);
@@ -171,8 +183,10 @@ export function PhaserOffice({
           graphics.lineBetween(24, y, width - 24, y);
         }
 
-        graphics.fillStyle(0x26364e, 0.72);
-        graphics.fillRoundedRect(width * 0.29, height * 0.42, width * 0.43, height * 0.09, 18);
+        graphics.fillStyle(0xbfdbfe, 0.78);
+        graphics.fillRoundedRect(width * 0.27, height * 0.41, width * 0.46, height * 0.1, 20);
+        graphics.fillStyle(0xfef3c7, 0.85);
+        graphics.fillRoundedRect(width * 0.34, height * 0.445, width * 0.32, height * 0.018, 8);
       }
 
       private drawRoom(
@@ -180,13 +194,19 @@ export function PhaserOffice({
         roomLayout: GomiOfficeRoomLayout
       ) {
         const { x, y, width, height, label } = roomLayout;
+        const departmentId = roomDepartmentId(roomLayout.id) ?? 'ceo';
+        const accent = roleColors[departmentId];
 
-        graphics.fillStyle(0x1b2638, 0.96);
+        graphics.fillStyle(0xffffff, 0.98);
         graphics.fillRoundedRect(x, y, width, height, 10);
-        graphics.lineStyle(1, 0x475569, 1);
+        graphics.fillStyle(accent, 0.13);
+        graphics.fillRoundedRect(x + 5, y + 5, width - 10, 25, 7);
+        graphics.lineStyle(2, accent, 0.75);
         graphics.strokeRoundedRect(x, y, width, height, 10);
+        graphics.lineStyle(3, 0xf1f5f9, 1);
+        graphics.lineBetween(x + width * 0.45, y + height, x + width * 0.62, y + height);
         this.add.text(x + 12, y + 10, label, {
-          color: '#cbd5e1',
+          color: '#0f172a',
           fontFamily: 'Inter, Arial',
           fontSize: '13px',
           fontStyle: '700'
@@ -206,17 +226,20 @@ export function PhaserOffice({
           };
           const deskWidth = Math.min(92, Math.max(48, roomLayout.width * 0.58));
 
-          graphics.fillStyle(0x8b5e34, 1);
+          graphics.fillStyle(0xbf7c2a, 1);
           graphics.fillRoundedRect(desk.x, desk.y, deskWidth, 34, 8);
-          graphics.fillStyle(0x334155, 1);
+          graphics.fillStyle(0x0f172a, 1);
           graphics.fillRoundedRect(desk.x + 10, desk.y + 7, 32, 18, 4);
-          graphics.fillStyle(0xe2e8f0, 1);
+          graphics.fillStyle(0xdbeafe, 1);
           graphics.fillRoundedRect(desk.x + deskWidth - 32, desk.y + 8, 20, 14, 3);
-          graphics.fillStyle(0x475569, 1);
+          graphics.fillStyle(0x64748b, 1);
           graphics.fillRoundedRect(desk.x + deskWidth * 0.35, desk.y + 40, 34, 14, 6);
+          graphics.fillStyle(0x93c5fd, 0.55);
+          graphics.fillRoundedRect(desk.x - 3, desk.y + 22, 14, 20, 6);
+          graphics.fillRoundedRect(desk.x + deskWidth - 11, desk.y + 22, 14, 20, 6);
         }
 
-        graphics.fillStyle(0x0f766e, 1);
+        graphics.fillStyle(0x0f766e, 0.98);
         graphics.fillRoundedRect(width * 0.42, height * 0.43, width * 0.16, height * 0.06, 12);
         graphics.fillStyle(0xf8fafc, 1);
         graphics.fillCircle(width * 0.45, height * 0.46, 6);
@@ -272,27 +295,30 @@ export function PhaserOffice({
         graphics: Phaser.GameObjects.Graphics,
         wallLayout: GomiOfficeBoardLayout,
         agents: GomiAgent[],
-        tasks: GomiTask[]
+        tasks: GomiTask[],
+        seats: GomiAgentSeat[]
       ) {
         const { x, y, width, height } = wallLayout;
         const runningCount = tasks.filter((task) => task.status === 'running').length;
         const doneCount = tasks.filter((task) => task.status === 'done').length;
         const blockedCount = agents.filter((agent) => agent.status === 'blocked').length;
         const sleepingCount = agents.filter((agent) => agent.status === 'sleeping').length;
+        const employees = seats.filter((seat) => seat.seatKind === 'employee');
+        const activeEmployees = employees.filter((seat) => seat.workMode !== 'fired').length;
         const rows = [
           `Active ${runningCount}`,
           `Done ${doneCount}/${Math.max(tasks.length, 1)}`,
           blockedCount > 0 ? `Blocked ${blockedCount}` : `Sleep ${sleepingCount}`,
-          `Memory ${tasks.length > 0 ? 'live' : 'ready'}`
+          `Staff ${activeEmployees}/${Math.max(employees.length, 1)}`
         ];
 
-        graphics.fillStyle(0x0f172a, 0.94);
+        graphics.fillStyle(0xecfeff, 0.97);
         graphics.fillRoundedRect(x, y, width, height, 10);
-        graphics.lineStyle(2, 0x2dd4bf, 0.9);
+        graphics.lineStyle(2, 0x14b8a6, 0.9);
         graphics.strokeRoundedRect(x, y, width, height, 10);
 
         this.add.text(x + 12, y + 10, 'Status Wall', {
-          color: '#ccfbf1',
+          color: '#0f172a',
           fontFamily: 'Inter, Arial',
           fontSize: '13px',
           fontStyle: '700'
@@ -305,10 +331,119 @@ export function PhaserOffice({
           graphics.fillStyle(color, 0.85);
           graphics.fillCircle(x + 14, rowY + 6, 4);
           this.add.text(x + 24, rowY, row, {
-            color: '#e5e7eb',
+            color: '#0f172a',
             fontFamily: 'Inter, Arial',
             fontSize: '11px'
           });
+        });
+      }
+
+      private drawDepartmentStaff(
+        graphics: Phaser.GameObjects.Graphics,
+        rooms: GomiOfficeRoomLayout[],
+        seats: GomiAgentSeat[]
+      ) {
+        const employees = seats.filter((seat) => seat.seatKind === 'employee');
+
+        for (const roomLayout of rooms) {
+          const departmentId = roomDepartmentId(roomLayout.id);
+          const departmentEmployees = employees.filter((seat) => seat.departmentId === departmentId);
+          const activeEmployees = departmentEmployees.filter((seat) => seat.workMode !== 'fired');
+          const firedEmployees = departmentEmployees.filter((seat) => seat.workMode === 'fired');
+
+          activeEmployees.slice(0, 6).forEach((seat, index) => {
+            this.drawEmployeeAvatar(seat, roomLayout, index, activeEmployees.length);
+          });
+
+          if (activeEmployees.length > 6) {
+            this.drawStaffOverflow(roomLayout, activeEmployees.length - 6);
+          }
+
+          if (firedEmployees.length > 0) {
+            this.drawOffboardedStaff(graphics, roomLayout, firedEmployees.length);
+          }
+        }
+      }
+
+      private drawEmployeeAvatar(
+        seat: GomiAgentSeat,
+        roomLayout: GomiOfficeRoomLayout,
+        index: number,
+        total: number
+      ) {
+        const columns = roomLayout.width < 120 ? 2 : 3;
+        const spacingX = Math.min(31, Math.max(22, roomLayout.width / (columns + 1)));
+        const spacingY = 30;
+        const startX = roomLayout.x + roomLayout.width * 0.18;
+        const startY = roomLayout.y + roomLayout.height * 0.35;
+        const horizontalPadding = Math.min(16, Math.max(8, roomLayout.width * 0.15));
+        const topPadding = Math.min(38, Math.max(22, roomLayout.height * 0.36));
+        const bottomPadding = Math.min(34, Math.max(18, roomLayout.height * 0.28));
+        const x = clampWithin(
+          startX + (index % columns) * spacingX,
+          roomLayout.x + horizontalPadding,
+          roomLayout.x + roomLayout.width - horizontalPadding
+        );
+        const y = clampWithin(
+          startY + Math.floor(index / columns) * spacingY,
+          roomLayout.y + topPadding,
+          roomLayout.y + roomLayout.height - bottomPadding
+        );
+        const color = roleColors[seat.agentId];
+        const group = this.add.container(x, y);
+
+        group.add(this.add.ellipse(0, 15, 28, 10, 0x475569, 0.16));
+        group.add(this.add.circle(0, -4, 11, 0xffedd5, 1));
+        group.add(this.add.rectangle(0, 13, 18, 18, color, 0.95).setOrigin(0.5));
+        group.add(this.add.rectangle(0, -13, 17, 7, color, 0.92).setOrigin(0.5));
+        group.add(this.add.circle(-4, -5, 1.4, 0x111827, 1));
+        group.add(this.add.circle(4, -5, 1.4, 0x111827, 1));
+        group.add(this.add.arc(0, -1, 4, 20, 160, false).setStrokeStyle(1, 0x111827));
+        group.add(this.add.circle(10, -14, 3.8, 0x22c55e, 1));
+
+        if (total > 1) {
+          this.tweens.add({
+            targets: group,
+            y: y - 3,
+            duration: 900 + index * 120,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+          });
+        }
+      }
+
+      private drawStaffOverflow(roomLayout: GomiOfficeRoomLayout, count: number) {
+        this.add
+          .text(roomLayout.x + roomLayout.width - 28, roomLayout.y + roomLayout.height - 42, `+${count}`, {
+            color: '#14532d',
+            fontFamily: 'Inter, Arial',
+            fontSize: '12px',
+            fontStyle: '700',
+            backgroundColor: '#dcfce7',
+            padding: { x: 5, y: 3 }
+          })
+          .setOrigin(0.5, 0);
+      }
+
+      private drawOffboardedStaff(
+        graphics: Phaser.GameObjects.Graphics,
+        roomLayout: GomiOfficeRoomLayout,
+        count: number
+      ) {
+        const x = roomLayout.x + roomLayout.width - 22;
+        const y = roomLayout.y + roomLayout.height - 24;
+
+        graphics.fillStyle(0x94a3b8, 0.6);
+        graphics.fillCircle(x, y - 8, 8);
+        graphics.fillRoundedRect(x - 10, y, 20, 14, 4);
+        graphics.fillStyle(0x475569, 0.9);
+        graphics.fillRoundedRect(x - 7, y + 11, 14, 8, 3);
+        this.add.text(x + 13, y - 15, `left ${count}`, {
+          color: '#475569',
+          fontFamily: 'Inter, Arial',
+          fontSize: '10px',
+          fontStyle: '700'
         });
       }
 
@@ -361,9 +496,9 @@ export function PhaserOffice({
         const isActive = agent.status !== 'idle' && agent.status !== 'waiting';
         const group = this.add.container(x, y);
 
-        group.add(this.add.ellipse(0, 28, 54, 18, 0x020617, 0.24));
-        group.add(this.add.rectangle(-11, 34, 10, 13, 0x1e293b, 1).setOrigin(0.5));
-        group.add(this.add.rectangle(11, 34, 10, 13, 0x1e293b, 1).setOrigin(0.5));
+        group.add(this.add.ellipse(0, 28, 54, 18, 0x475569, 0.18));
+        group.add(this.add.rectangle(-11, 34, 10, 13, 0x334155, 1).setOrigin(0.5));
+        group.add(this.add.rectangle(11, 34, 10, 13, 0x334155, 1).setOrigin(0.5));
         group.add(this.add.rectangle(0, 11, 34, 36, color, 1).setOrigin(0.5));
         group.add(this.add.circle(0, -18, 22, 0xffedd5, 1));
         group.add(this.add.rectangle(0, -33, 36, 14, color, 1).setOrigin(0.5));
@@ -378,10 +513,12 @@ export function PhaserOffice({
 
         this.add
           .text(x, y + 43, agent.name.replace(' Agent', ''), {
-            color: '#e5e7eb',
+            color: '#0f172a',
             fontFamily: 'Inter, Arial',
             fontSize: '12px',
-            fontStyle: '700'
+            fontStyle: '700',
+            backgroundColor: '#ffffff',
+            padding: { x: 5, y: 2 }
           })
           .setOrigin(0.5, 0);
 
@@ -423,7 +560,7 @@ export function PhaserOffice({
           return;
         }
 
-        graphics.lineStyle(3, 0x2dd4bf, 0.42);
+        graphics.lineStyle(3, 0x0f766e, 0.42);
 
         for (const agent of activeAgents.slice(0, 3)) {
           const roomId = agentRoomIds[agent.id];
@@ -443,8 +580,8 @@ export function PhaserOffice({
         const group = this.add.container(x, y);
         const color = roleColors[agent.id];
 
-        group.add(this.add.ellipse(0, 30, 70, 18, 0x020617, 0.24));
-        group.add(this.add.rectangle(0, 14, 68, 24, 0x1e293b, 1).setOrigin(0.5));
+        group.add(this.add.ellipse(0, 30, 70, 18, 0x475569, 0.18));
+        group.add(this.add.rectangle(0, 14, 68, 24, 0x475569, 1).setOrigin(0.5));
         group.add(this.add.rectangle(12, 4, 48, 18, color, 1).setOrigin(0.5));
         group.add(this.add.circle(-24, 2, 14, 0xffedd5, 1));
         group.add(this.add.rectangle(7, 12, 58, 18, 0x93c5fd, 0.92).setOrigin(0.5));
@@ -453,10 +590,12 @@ export function PhaserOffice({
 
         this.add
           .text(x, y + 44, agent.name.replace(' Agent', ''), {
-            color: '#e5e7eb',
+            color: '#0f172a',
             fontFamily: 'Inter, Arial',
             fontSize: '12px',
-            fontStyle: '700'
+            fontStyle: '700',
+            backgroundColor: '#ffffff',
+            padding: { x: 5, y: 2 }
           })
           .setOrigin(0.5, 0);
 
@@ -482,7 +621,7 @@ export function PhaserOffice({
       private drawGomiGuide(x: number, y: number, sceneWidth: number, isMoving: boolean, bubbleText?: string) {
         const group = this.add.container(x, y);
 
-        group.add(this.add.ellipse(0, 25, 42, 14, 0x020617, 0.22));
+        group.add(this.add.ellipse(0, 25, 42, 14, 0x475569, 0.18));
         group.add(this.add.circle(0, 0, 20, 0x2dd4bf, 1));
         group.add(this.add.circle(-7, -3, 3, 0x0f172a, 1));
         group.add(this.add.circle(7, -3, 3, 0x0f172a, 1));
@@ -492,10 +631,12 @@ export function PhaserOffice({
 
         this.add
           .text(x, y + 30, 'Gomi', {
-            color: '#ccfbf1',
+            color: '#0f172a',
             fontFamily: 'Inter, Arial',
             fontSize: '12px',
-            fontStyle: '700'
+            fontStyle: '700',
+            backgroundColor: '#ccfbf1',
+            padding: { x: 5, y: 2 }
           })
           .setOrigin(0.5, 0);
 
@@ -546,7 +687,7 @@ export function PhaserOffice({
       }
 
       private drawPlant(graphics: Phaser.GameObjects.Graphics, x: number, y: number) {
-        graphics.fillStyle(0x475569, 1);
+        graphics.fillStyle(0x64748b, 1);
         graphics.fillRoundedRect(x, y + 20, 24, 18, 6);
         graphics.fillStyle(0x22c55e, 1);
         graphics.fillEllipse(x + 8, y + 16, 16, 28);
@@ -641,6 +782,7 @@ export function PhaserOffice({
       resizeGameToHost(host, gameRef.current);
       sceneRef.current?.renderOffice(
         agentsRef.current,
+        officeSettingsRef.current,
         tasksRef.current,
         messagesRef.current,
         memoryItemsRef.current
@@ -674,9 +816,26 @@ function resizeGameToHost(host: HTMLDivElement | null, game: Phaser.Game | null)
   canvas.style.height = '100%';
 }
 
+function roomDepartmentId(roomId: string): GomiAgentSeat['departmentId'] | undefined {
+  const entry = (Object.entries(agentRoomIds) as Array<[GomiAgent['id'], string]>)
+    .find(([, candidateRoomId]) => candidateRoomId === roomId);
+  const agentId = entry?.[0];
+
+  return agentId === 'ceo' ? undefined : agentId;
+}
+
+function clampWithin(value: number, min: number, max: number): number {
+  if (max < min) {
+    return (min + max) / 2;
+  }
+
+  return Phaser.Math.Clamp(value, min, max);
+}
+
 interface GomiOfficeScene extends Phaser.Scene {
   renderOffice(
     agents: GomiAgent[],
+    officeSettings: GomiOfficeSettings,
     tasks: GomiTask[],
     messages: GomiChatMessage[],
     memoryItems: GomiMemoryBoardItem[]

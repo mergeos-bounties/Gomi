@@ -28,6 +28,7 @@ import {
   ShieldCheck,
   Sparkles,
   Terminal,
+  UserPlus,
   UserX,
   Users,
   XCircle
@@ -35,12 +36,14 @@ import {
 import { BASE_GOMI_AGENTS, GOMI_SAMPLE_REQUEST } from '../common/gomiConstants';
 import {
   GOMI_AGENT_CLI_PROVIDERS,
+  GOMI_HIRABLE_DEPARTMENT_IDS,
   GOMI_MEMORY_EMBEDDING_PROVIDERS,
   assignSeatProvider,
   fireEmployee,
   getMemoryEmbeddingProviderLabel,
   getProviderLabel,
   getSeatForAgent,
+  hireEmployee,
   setCliProvidersEnabled,
   setHttpProvidersEnabled,
   setLiveProviderMode,
@@ -55,6 +58,7 @@ import {
   setSeatWorkMode,
   setSecretRedactionEnabled,
   setSharedMemoryEnabled,
+  simulateStaffingScenario,
   setWorkspaceTrustState,
   setWorkspaceContextIndexing
 } from '../common/gomiOfficeSettings';
@@ -118,6 +122,8 @@ const officeViewModes = [
   Icon: typeof Minimize2;
 }>;
 
+const COMPACT_AGENT_PANEL_QUERY = '(max-width: 1180px)';
+
 export function GomiOfficeApp() {
   const workbenchContext = useMemo(() => resolveGomiWebviewBridgeContext(), []);
   const [officeSettings, setOfficeSettings] = useState<GomiOfficeSettings>(() =>
@@ -146,7 +152,7 @@ export function GomiOfficeApp() {
   const [patchReview, setPatchReview] = useState<GomiPatchReviewState | undefined>();
   const [workspace, setWorkspace] = useState<GomiWorkspaceSnapshot | undefined>();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => isCompactAgentPanelViewport());
   const [bottomCollapsed, setBottomCollapsed] = useState(false);
   const [officeViewMode, setOfficeViewMode] = useState<GomiOfficeViewMode>('standard');
   const sidePanelsAutoCollapsed = officeViewMode !== 'standard';
@@ -232,6 +238,25 @@ export function GomiOfficeApp() {
       }
     });
   }, [workbenchBridge]);
+
+  useEffect(() => {
+    const mediaQuery = globalThis.matchMedia?.(COMPACT_AGENT_PANEL_QUERY);
+
+    if (!mediaQuery) {
+      return undefined;
+    }
+
+    const syncPanelState = () => {
+      setRightPanelCollapsed(mediaQuery.matches);
+    };
+
+    syncPanelState();
+    mediaQuery.addEventListener?.('change', syncPanelState);
+
+    return () => {
+      mediaQuery.removeEventListener?.('change', syncPanelState);
+    };
+  }, []);
 
   useEffect(() => {
     persistOfficeSettings(officeSettings, {
@@ -375,6 +400,14 @@ export function GomiOfficeApp() {
     setOfficeSettings((currentSettings) => fireEmployee(currentSettings, seatId));
   }
 
+  function hireOfficeEmployee(departmentId: GomiAgentId) {
+    setOfficeSettings((currentSettings) => hireEmployee(currentSettings, departmentId));
+  }
+
+  function simulateOfficeStaffing() {
+    setOfficeSettings((currentSettings) => simulateStaffingScenario(currentSettings));
+  }
+
   function restoreOfficeEmployee(seatId: string) {
     setOfficeSettings((currentSettings) => setSeatWorkMode(currentSettings, seatId, 'active'));
   }
@@ -499,6 +532,10 @@ export function GomiOfficeApp() {
     setRightPanelCollapsed(true);
   }
 
+  function closeRightPanel() {
+    setRightPanelCollapsed(true);
+  }
+
   function toggleBottomPanel() {
     if (effectiveBottomCollapsed) {
       setOfficeViewMode('standard');
@@ -596,6 +633,7 @@ export function GomiOfficeApp() {
           <section className="gomi-office-stage" aria-label="Gomi Office Simulation">
             <PhaserOffice
               agents={visualAgents}
+              officeSettings={officeSettings}
               tasks={tasks}
               messages={messages}
               memoryItems={memoryItems}
@@ -624,6 +662,9 @@ export function GomiOfficeApp() {
           memoryItems={memoryItems}
           onProviderChange={assignProvider}
           onToggleSeatSleep={toggleSeatSleep}
+          onClosePanel={closeRightPanel}
+          onHireEmployee={hireOfficeEmployee}
+          onSimulateStaffing={simulateOfficeStaffing}
           onFireEmployee={fireOfficeEmployee}
           onRestoreEmployee={restoreOfficeEmployee}
           onBroadcastThresholdChange={updateBroadcastThreshold}
@@ -731,6 +772,9 @@ function RightPanel({
   memoryItems,
   onProviderChange,
   onToggleSeatSleep,
+  onClosePanel,
+  onHireEmployee,
+  onSimulateStaffing,
   onFireEmployee,
   onRestoreEmployee,
   onBroadcastThresholdChange,
@@ -756,6 +800,9 @@ function RightPanel({
   memoryItems: GomiMemoryBoardItem[];
   onProviderChange: (seatId: string, providerId: GomiAgentCliProviderId) => void;
   onToggleSeatSleep: (seat: GomiAgentSeat) => void;
+  onClosePanel: () => void;
+  onHireEmployee: (departmentId: GomiAgentId) => void;
+  onSimulateStaffing: () => void;
   onFireEmployee: (seatId: string) => void;
   onRestoreEmployee: (seatId: string) => void;
   onBroadcastThresholdChange: (broadcastThreshold: number) => void;
@@ -778,7 +825,11 @@ function RightPanel({
     <aside className="gomi-right-panel" aria-label="Agent Status Panel">
       <div className="gomi-panel-header">
         <span>Agents</span>
-        <Users size={16} />
+        <div className="gomi-panel-header__actions">
+          <button className="gomi-icon-button" onClick={onClosePanel} title="Close agent panel" aria-label="Close agent panel">
+            <PanelRightClose size={16} />
+          </button>
+        </div>
       </div>
       <div className="gomi-panel-body">
         {agents.map((agent) => (
@@ -812,6 +863,8 @@ function RightPanel({
           memoryItems={memoryItems}
           onProviderChange={onProviderChange}
           onToggleSeatSleep={onToggleSeatSleep}
+          onHireEmployee={onHireEmployee}
+          onSimulateStaffing={onSimulateStaffing}
           onFireEmployee={onFireEmployee}
           onRestoreEmployee={onRestoreEmployee}
           onBroadcastThresholdChange={onBroadcastThresholdChange}
@@ -874,6 +927,8 @@ function OfficeSettingsPanel({
   memoryItems,
   onProviderChange,
   onToggleSeatSleep,
+  onHireEmployee,
+  onSimulateStaffing,
   onFireEmployee,
   onRestoreEmployee,
   onBroadcastThresholdChange,
@@ -896,6 +951,8 @@ function OfficeSettingsPanel({
   memoryItems: GomiMemoryBoardItem[];
   onProviderChange: (seatId: string, providerId: GomiAgentCliProviderId) => void;
   onToggleSeatSleep: (seat: GomiAgentSeat) => void;
+  onHireEmployee: (departmentId: GomiAgentId) => void;
+  onSimulateStaffing: () => void;
   onFireEmployee: (seatId: string) => void;
   onRestoreEmployee: (seatId: string) => void;
   onBroadcastThresholdChange: (broadcastThreshold: number) => void;
@@ -916,6 +973,11 @@ function OfficeSettingsPanel({
 }) {
   const leaders = officeSettings.seats.filter((seat) => seat.seatKind !== 'employee');
   const employees = officeSettings.seats.filter((seat) => seat.seatKind === 'employee');
+  const employeeDepartments = GOMI_HIRABLE_DEPARTMENT_IDS.map((departmentId) => ({
+    departmentId,
+    label: getSeatForAgent(officeSettings, departmentId)?.name.replace(' Head', '') ?? departmentId,
+    employees: employees.filter((seat) => seat.departmentId === departmentId)
+  }));
   const selectedEmbeddingProvider =
     GOMI_MEMORY_EMBEDDING_PROVIDERS.find(
       (provider) => provider.id === officeSettings.memory.embeddingProvider
@@ -978,26 +1040,55 @@ function OfficeSettingsPanel({
       </div>
 
       <div className="gomi-settings-group">
-        <div className="gomi-settings-title">Employees</div>
-        {employees.map((seat) => (
-          <div className="gomi-employee-row" data-mode={seat.workMode} key={seat.id}>
-            <div>
-              <div className="gomi-agent-name">{seat.name}</div>
-              <div className="gomi-agent-role">
-                {seat.role} - {seat.departmentId}
+        <div className="gomi-settings-title-row">
+          <div className="gomi-settings-title">Employees</div>
+          <button className="gomi-action-button" onClick={onSimulateStaffing}>
+            <Users size={14} />
+            <span>Simulate Staffing</span>
+          </button>
+        </div>
+        {employeeDepartments.map((department) => (
+          <div className="gomi-employee-department" key={department.departmentId}>
+            <div className="gomi-employee-department__head">
+              <div>
+                <div className="gomi-agent-name">{department.label}</div>
+                <div className="gomi-agent-role">
+                  {department.employees.filter((seat) => seat.workMode !== 'fired').length} active / {department.employees.length} total
+                </div>
               </div>
+              <button
+                className="gomi-icon-button"
+                onClick={() => onHireEmployee(department.departmentId)}
+                title={`Hire ${department.label} employee`}
+                aria-label={`Hire ${department.label} employee`}
+              >
+                <UserPlus size={16} />
+              </button>
             </div>
-            <span className="gomi-status" data-status={seat.workMode}>
-              {seat.workMode}
-            </span>
-            {seat.workMode === 'fired' ? (
-              <button className="gomi-icon-button" onClick={() => onRestoreEmployee(seat.id)} title="Restore employee" aria-label="Restore employee">
-                <RotateCcw size={16} />
-              </button>
+
+            {department.employees.length === 0 ? (
+              <div className="gomi-project-detail">No employees hired yet.</div>
             ) : (
-              <button className="gomi-icon-button is-danger" onClick={() => onFireEmployee(seat.id)} title="Fire employee" aria-label="Fire employee">
-                <UserX size={16} />
-              </button>
+              department.employees.map((seat) => (
+                <div className="gomi-employee-row" data-mode={seat.workMode} key={seat.id}>
+                  <div>
+                    <div className="gomi-agent-name">{seat.name}</div>
+                    <div className="gomi-agent-role">{seat.role}</div>
+                  </div>
+                  <span className="gomi-status" data-status={seat.workMode}>
+                    {seat.workMode}
+                  </span>
+                  {seat.workMode === 'fired' ? (
+                    <button className="gomi-icon-button" onClick={() => onRestoreEmployee(seat.id)} title="Restore employee" aria-label="Restore employee">
+                      <RotateCcw size={16} />
+                    </button>
+                  ) : (
+                    <button className="gomi-icon-button is-danger" onClick={() => onFireEmployee(seat.id)} title="Fire employee" aria-label="Fire employee">
+                      <UserX size={16} />
+                    </button>
+                  )}
+                </div>
+              ))
             )}
           </div>
         ))}
@@ -1416,6 +1507,10 @@ function shortenText(value: string, maxLength: number): string {
   }
 
   return `${compactValue.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function isCompactAgentPanelViewport(): boolean {
+  return Boolean(globalThis.matchMedia?.(COMPACT_AGENT_PANEL_QUERY).matches);
 }
 
 function applyOfficeSettingsToAgents(

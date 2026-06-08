@@ -52,15 +52,16 @@ This repository is the current product foundation and technical prototype. It is
 - **Generated Gomi Office webview bundle pipeline** for mounting the React/Phaser office inside the native Code - OSS view pane.
 - **Gomi Office panel UI** built with React.
 - **Standard, Expanded, and Full Office layout modes** so side panels can collapse and the visual office can take over the workspace.
-- **2D office simulation** built with Phaser.
-- **Animated game-style agents** with visible status and chat bubbles.
+- **Responsive agent/settings drawer** so office staffing controls remain reachable on compact workbench widths.
+- **Cute real-office 2D simulation** built with Phaser, including rooms, desks, doors, shared boards, staff avatars, and route lines.
+- **Animated game-style agents and staff** with visible status, sleep state, offboarded markers, and chat bubbles.
 - **Responsive office layout model** with dedicated rooms, a shared memory board, a status wall, and route lines showing Gomi moving between active agents.
 - **Shared memory board** fed by real runtime memory updates for project context.
 - **CEO Agent planning flow** with specialist agent delegation.
 - **Office organization settings** for assigning CLI agent routes to the CEO and department heads.
 - **Persisted Office Settings** through VS Code webview state with local storage fallback for the standalone demo.
 - **Department head sleep mode** to pause a leader without removing the role from the organization.
-- **Employee lifecycle controls** for removing or restoring non-lead staff seats.
+- **Employee lifecycle controls** for hiring additional department staff, offboarding non-lead employees, restoring employees, and running a staffing demo scenario.
 - **Workbench agent provider router** for demo, CLI, OpenAI-compatible HTTP, and Ollama-compatible local model routes.
 - **Live provider execution policy** with workspace trust state, demo-only/trusted-workspace/allow-all modes, CLI/HTTP transport toggles, and patch-approval enforcement.
 - **Configurable agent communication policy** that keeps routine updates in memory and only broadcasts findings above the selected importance threshold.
@@ -357,16 +358,17 @@ Implemented in this repository:
 - Generated Gomi desktop branding assets for Windows, Linux, and macOS Code - OSS packaging resource paths.
 - Workbench-compatible Gomi module skeleton.
 - React workbench shell.
-- Phaser 2D office simulation.
+- Phaser 2D office simulation with a brighter real-office scene, room accents, desks, doors, shared boards, and staff markers.
 - Responsive office layout model with deterministic room, seat, memory-board, status-wall, and Gomi-hub coordinates.
-- Animated office avatars and chat bubbles.
+- Animated office avatars, department staff avatars, offboarded employee markers, and chat bubbles.
 - Memory board and task status UI backed by runtime `memory_update` events.
 - Collapsible side/bottom panels plus Standard, Expanded, and Full Office layout modes.
+- Responsive agent/settings drawer for compact workbench widths.
 - CEO Agent planning simulation.
 - Specialist agent runtime flow.
 - Designer Agent role for UX, visual language, office atmosphere, and avatar direction.
 - Office settings for CEO and department-head CLI routing.
-- Department-head sleep mode and employee fire/restore controls.
+- Department-head sleep mode plus employee hire, offboard, restore, and staffing-demo controls.
 - Runtime event stream including shared-memory board updates.
 - Workbench bridge controller for `gomi.run`, runtime event forwarding, native patch preview, and approved patch apply messages.
 - Native Code - OSS registration template for the Gomi Office Activity Bar container and webview-backed view pane.

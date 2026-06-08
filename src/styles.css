@@ -137,6 +137,10 @@ button {
   cursor: pointer;
 }
 
+.gomi-icon-button svg {
+  pointer-events: none;
+}
+
 .gomi-icon-button:hover,
 .gomi-icon-button.is-active {
   background: #1f2937;
@@ -181,6 +185,17 @@ button {
   color: #f9fafb;
   font-size: 13px;
   font-weight: 700;
+}
+
+.gomi-panel-header__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gomi-panel-header__actions .gomi-icon-button {
+  width: 28px;
+  height: 28px;
 }
 
 .gomi-panel-body {
@@ -595,6 +610,7 @@ button {
 .gomi-settings-panel,
 .gomi-settings-group,
 .gomi-seat-row,
+.gomi-employee-department,
 .gomi-employee-row {
   display: grid;
   gap: 10px;
@@ -618,9 +634,36 @@ button {
   text-transform: uppercase;
 }
 
+.gomi-settings-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.gomi-settings-title-row .gomi-action-button {
+  min-height: 30px;
+  padding: 0 9px;
+  white-space: nowrap;
+}
+
 .gomi-seat-row {
   border-top: 1px solid #253247;
   padding-top: 10px;
+}
+
+.gomi-employee-department {
+  gap: 8px;
+  border-top: 1px solid #253247;
+  padding-top: 10px;
+}
+
+.gomi-employee-department__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
 }
 
 .gomi-seat-row__head,
@@ -874,6 +917,7 @@ button {
     --gomi-sidebar-width: 270px;
     --gomi-right-width: 0px;
     grid-template-columns: 48px var(--gomi-sidebar-width) minmax(0, 1fr);
+    position: relative;
   }
 
   .gomi-workbench.is-view-full-office {
@@ -881,6 +925,18 @@ button {
   }
 
   .gomi-right-panel {
+    display: block;
+    position: fixed;
+    top: 34px;
+    right: 12px;
+    bottom: 24px;
+    z-index: 30;
+    width: min(380px, calc(100vw - 64px));
+    box-shadow: -18px 0 44px rgba(0, 0, 0, 0.34);
+  }
+
+  .gomi-workbench.is-right-collapsed .gomi-right-panel,
+  .gomi-workbench.is-view-full-office .gomi-right-panel {
     display: none;
   }
 }
@@ -914,6 +970,30 @@ button {
 
   .gomi-workbench.is-view-full-office .gomi-main {
     grid-column: 1;
+  }
+
+  .gomi-tab {
+    min-width: 112px;
+    padding: 0 8px;
+  }
+
+  .gomi-view-controls {
+    gap: 2px;
+    padding: 0 4px;
+  }
+
+  .gomi-view-controls > .gomi-icon-button {
+    width: 30px;
+    height: 30px;
+  }
+
+  .gomi-view-mode-controls {
+    margin-left: 2px;
+  }
+
+  .gomi-view-mode-controls .gomi-icon-button {
+    width: 28px;
+    height: 30px;
   }
 
   .gomi-sidebar {

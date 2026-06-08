@@ -15,6 +15,50 @@ export const GOMI_DEFAULT_MEMORY_BROADCAST_THRESHOLD = 0.74;
 export const GOMI_DEFAULT_MEMORY_RETENTION_DAYS = 30;
 export const GOMI_DEFAULT_MAX_PROJECT_MEMORY_ITEMS = 420;
 
+export const GOMI_HIRABLE_DEPARTMENT_IDS: GomiAgentId[] = [
+  'system-analyst',
+  'backend',
+  'frontend',
+  'designer',
+  'database',
+  'qa',
+  'devops'
+];
+
+const GOMI_EMPLOYEE_PROFILES: Record<Exclude<GomiAgentId, 'ceo'>, {
+  baseName: string;
+  role: string;
+}> = {
+  'system-analyst': {
+    baseName: 'System Analyst',
+    role: 'Requirement and module analysis'
+  },
+  backend: {
+    baseName: 'Backend Developer',
+    role: 'Implementation support'
+  },
+  frontend: {
+    baseName: 'UI Developer',
+    role: 'Interface implementation'
+  },
+  designer: {
+    baseName: 'Product Designer',
+    role: 'Visual and interaction support'
+  },
+  database: {
+    baseName: 'Database Engineer',
+    role: 'Schema and data support'
+  },
+  qa: {
+    baseName: 'QA Engineer',
+    role: 'Test execution support'
+  },
+  devops: {
+    baseName: 'DevOps Engineer',
+    role: 'Build and deployment support'
+  }
+};
+
 export const GOMI_MEMORY_EMBEDDING_PROVIDERS: Array<{
   id: GomiMemoryEmbeddingProviderId;
   label: string;
@@ -204,6 +248,41 @@ export function setSeatWorkMode(
 
 export function fireEmployee(settings: GomiOfficeSettings, seatId: string): GomiOfficeSettings {
   return setSeatWorkMode(settings, seatId, 'fired');
+}
+
+export function hireEmployee(settings: GomiOfficeSettings, departmentId: GomiAgentId): GomiOfficeSettings {
+  if (!isHirableDepartmentId(departmentId)) {
+    return settings;
+  }
+
+  const nextIndex = nextEmployeeIndex(settings, departmentId);
+  const profile = GOMI_EMPLOYEE_PROFILES[departmentId];
+
+  return {
+    ...settings,
+    seats: [
+      ...settings.seats,
+      createEmployeeSeat(
+        `employee-${departmentId}-${String(nextIndex).padStart(2, '0')}`,
+        departmentId,
+        `${profile.baseName} ${nextIndex}`,
+        profile.role
+      )
+    ]
+  };
+}
+
+export function simulateStaffingScenario(settings: GomiOfficeSettings): GomiOfficeSettings {
+  const offboardingCandidate = settings.seats.find(
+    (seat) =>
+      seat.seatKind === 'employee' &&
+      seat.workMode !== 'fired' &&
+      ['qa', 'frontend', 'backend', 'designer'].includes(seat.departmentId ?? '')
+  );
+  let nextSettings = hireEmployee(settings, 'backend');
+  nextSettings = hireEmployee(nextSettings, 'designer');
+
+  return offboardingCandidate ? fireEmployee(nextSettings, offboardingCandidate.id) : nextSettings;
 }
 
 export function setMemoryBroadcastThreshold(
@@ -563,7 +642,8 @@ function normalizeSeatSettings(value: unknown): GomiAgentSeat[] {
       .map((seat) => [String(seat.id), seat])
   );
 
-  return DEFAULT_GOMI_OFFICE_SETTINGS.seats.map((defaultSeat) => {
+  const defaultSeatIds = new Set(DEFAULT_GOMI_OFFICE_SETTINGS.seats.map((seat) => seat.id));
+  const normalizedDefaultSeats = DEFAULT_GOMI_OFFICE_SETTINGS.seats.map((defaultSeat) => {
     const rawSeat = rawSeatsById.get(defaultSeat.id);
     const providerId = agentProviderSetting(rawSeat?.providerId, defaultSeat.providerId);
     const requestedWorkMode = agentWorkModeSetting(rawSeat?.workMode, defaultSeat.workMode);
@@ -579,6 +659,58 @@ function normalizeSeatSettings(value: unknown): GomiAgentSeat[] {
       workMode
     };
   });
+
+  return [
+    ...normalizedDefaultSeats,
+    ...normalizeAdditionalEmployeeSeats(value, defaultSeatIds)
+  ];
+}
+
+function normalizeAdditionalEmployeeSeats(
+  seats: unknown[],
+  reservedSeatIds: Set<string>
+): GomiAgentSeat[] {
+  const seenSeatIds = new Set(reservedSeatIds);
+  const normalizedSeats: GomiAgentSeat[] = [];
+
+  for (const rawSeat of seats.filter(isRecord)) {
+    const seatId = typeof rawSeat.id === 'string' ? rawSeat.id : '';
+
+    if (!/^employee-[a-z0-9-]+-\d+$/i.test(seatId) || seenSeatIds.has(seatId)) {
+      continue;
+    }
+
+    const idInfo = parseEmployeeSeatId(seatId);
+    const explicitDepartmentId = departmentIdSetting(rawSeat.departmentId ?? rawSeat.agentId);
+
+    if (!idInfo || (explicitDepartmentId && explicitDepartmentId !== idInfo.departmentId)) {
+      continue;
+    }
+
+    const departmentId = idInfo.departmentId;
+    const profile = GOMI_EMPLOYEE_PROFILES[departmentId];
+    const workMode = rawSeat.workMode === 'fired' ? 'fired' : 'active';
+
+    normalizedSeats.push({
+      id: seatId,
+      agentId: departmentId,
+      name: typeof rawSeat.name === 'string' && rawSeat.name.trim()
+        ? rawSeat.name.trim()
+        : `${profile.baseName} ${idInfo.index}`,
+      role: typeof rawSeat.role === 'string' && rawSeat.role.trim()
+        ? rawSeat.role.trim()
+        : profile.role,
+      seatKind: 'employee',
+      providerId: agentProviderSetting(rawSeat.providerId, 'demo-runtime'),
+      workMode,
+      canSleep: false,
+      canFire: true,
+      departmentId
+    });
+    seenSeatIds.add(seatId);
+  }
+
+  return normalizedSeats;
 }
 
 function agentProviderSetting(value: unknown, fallback: GomiAgentCliProviderId): GomiAgentCliProviderId {
@@ -613,6 +745,49 @@ function liveProviderModeSetting(value: unknown): GomiLiveProviderMode {
 
 function agentWorkModeSetting(value: unknown, fallback: GomiAgentWorkMode): GomiAgentWorkMode {
   return value === 'active' || value === 'sleeping' || value === 'fired' ? value : fallback;
+}
+
+function departmentIdSetting(value: unknown): Exclude<GomiAgentId, 'ceo'> | undefined {
+  return isHirableDepartmentId(value) ? value : undefined;
+}
+
+function isHirableDepartmentId(value: unknown): value is Exclude<GomiAgentId, 'ceo'> {
+  return GOMI_HIRABLE_DEPARTMENT_IDS.includes(value as GomiAgentId);
+}
+
+function parseEmployeeSeatId(seatId: string): {
+  departmentId: Exclude<GomiAgentId, 'ceo'>;
+  index: number;
+} | undefined {
+  const match = seatId.match(/^employee-(.+)-(\d+)$/i);
+
+  if (!match) {
+    return undefined;
+  }
+
+  const departmentId = departmentIdSetting(match[1]);
+  const index = Number(match[2]);
+
+  if (!departmentId || !Number.isFinite(index) || index < 1) {
+    return undefined;
+  }
+
+  return {
+    departmentId,
+    index
+  };
+}
+
+function nextEmployeeIndex(settings: GomiOfficeSettings, departmentId: GomiAgentId): number {
+  const indexes = settings.seats
+    .filter((seat) => seat.seatKind === 'employee' && seat.departmentId === departmentId)
+    .map((seat) => {
+      const match = seat.id.match(/-(\d+)$/);
+      return match ? Number(match[1]) : 0;
+    })
+    .filter((value) => Number.isFinite(value));
+
+  return Math.max(0, ...indexes) + 1;
 }
 
 function booleanSetting(value: unknown, fallback: boolean): boolean {

@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GOMI_OFFICE_SETTINGS,
   GOMI_AGENT_CLI_PROVIDERS,
+  GOMI_HIRABLE_DEPARTMENT_IDS,
   GOMI_MEMORY_EMBEDDING_PROVIDERS,
   assignSeatProvider,
   fireEmployee,
   getMemoryEmbeddingProviderLabel,
   getSeatForAgent,
+  hireEmployee,
   isAgentAvailableForTask,
   normalizeGomiOfficeSettings,
   setMaxProjectMemoryItems,
@@ -22,6 +24,7 @@ import {
   setMemoryEmbeddingExecutionEnabled,
   setMemoryEmbeddingProvider,
   setSeatWorkMode,
+  simulateStaffingScenario,
   setWorkspaceTrustState,
   setSharedMemoryEnabled,
   setWorkspaceContextIndexing
@@ -71,6 +74,53 @@ describe('Gomi office settings', () => {
       'fired'
     );
     expect(protectedCeo.seats.find((seat) => seat.id === 'seat-ceo')?.workMode).toBe('active');
+  });
+
+  it('hires additional employees into departments and keeps offboarded staff visible', () => {
+    const withNewBackend = hireEmployee(DEFAULT_GOMI_OFFICE_SETTINGS, 'backend');
+    const withNewDatabase = hireEmployee(withNewBackend, 'database');
+    const offboardedBackend = fireEmployee(withNewDatabase, 'employee-backend-02');
+
+    expect(GOMI_HIRABLE_DEPARTMENT_IDS).toContain('designer');
+    expect(withNewBackend.seats.find((seat) => seat.id === 'employee-backend-02')).toMatchObject({
+      agentId: 'backend',
+      departmentId: 'backend',
+      seatKind: 'employee',
+      workMode: 'active',
+      canFire: true
+    });
+    expect(withNewDatabase.seats.find((seat) => seat.id === 'employee-database-01')).toMatchObject({
+      agentId: 'database',
+      name: 'Database Engineer 1'
+    });
+    expect(offboardedBackend.seats.find((seat) => seat.id === 'employee-backend-02')?.workMode).toBe('fired');
+  });
+
+  it('simulates staffing by hiring employees and offboarding an existing staff member', () => {
+    const staffed = simulateStaffingScenario(DEFAULT_GOMI_OFFICE_SETTINGS);
+
+    expect(staffed.seats.find((seat) => seat.id === 'employee-backend-02')).toMatchObject({
+      departmentId: 'backend',
+      workMode: 'active'
+    });
+    expect(staffed.seats.find((seat) => seat.id === 'employee-designer-02')).toMatchObject({
+      departmentId: 'designer',
+      workMode: 'active'
+    });
+    expect(staffed.seats.some((seat) => seat.seatKind === 'employee' && seat.workMode === 'fired')).toBe(true);
+  });
+
+  it('does not immediately offboard newly hired staff when no active employee exists', () => {
+    const allExistingEmployeesFired = DEFAULT_GOMI_OFFICE_SETTINGS.seats
+      .filter((seat) => seat.seatKind === 'employee')
+      .reduce(
+        (settings, seat) => fireEmployee(settings, seat.id),
+        DEFAULT_GOMI_OFFICE_SETTINGS
+      );
+    const staffed = simulateStaffingScenario(allExistingEmployeesFired);
+
+    expect(staffed.seats.find((seat) => seat.id === 'employee-backend-02')?.workMode).toBe('active');
+    expect(staffed.seats.find((seat) => seat.id === 'employee-designer-02')?.workMode).toBe('active');
   });
 
   it('updates and clamps the shared-memory broadcast threshold', () => {
@@ -133,6 +183,36 @@ describe('Gomi office settings', () => {
           id: 'employee-qa-01',
           providerId: 'demo-runtime',
           workMode: 'fired'
+        },
+        {
+          id: 'employee-backend-02',
+          agentId: 'backend',
+          departmentId: 'backend',
+          seatKind: 'employee',
+          providerId: 'claude-code',
+          workMode: 'active',
+          name: 'Backend Developer 2',
+          role: 'Implementation support'
+        },
+        {
+          id: 'employee-backend-03',
+          agentId: 'backend',
+          departmentId: 'qa',
+          seatKind: 'employee',
+          providerId: 'demo-runtime',
+          workMode: 'active',
+          name: 'Wrong Department',
+          role: 'Should be rejected'
+        },
+        {
+          id: 'employee-designer-07',
+          agentId: 'designer',
+          departmentId: 'designer',
+          seatKind: 'employee',
+          providerId: 'demo-runtime',
+          workMode: 'sleeping',
+          name: ' ',
+          role: ' '
         }
       ],
       memory: {
@@ -155,6 +235,18 @@ describe('Gomi office settings', () => {
     expect(settings.seats.find((seat) => seat.id === 'seat-ceo')?.workMode).toBe('active');
     expect(settings.seats.find((seat) => seat.id === 'head-backend')?.workMode).toBe('sleeping');
     expect(settings.seats.find((seat) => seat.id === 'employee-qa-01')?.workMode).toBe('fired');
+    expect(settings.seats.find((seat) => seat.id === 'employee-backend-02')).toMatchObject({
+      agentId: 'backend',
+      providerId: 'claude-code',
+      workMode: 'active'
+    });
+    expect(settings.seats.find((seat) => seat.id === 'employee-backend-03')).toBeUndefined();
+    expect(settings.seats.find((seat) => seat.id === 'employee-designer-07')).toMatchObject({
+      agentId: 'designer',
+      name: 'Product Designer 7',
+      role: 'Visual and interaction support',
+      workMode: 'active'
+    });
     expect(settings.memory.embeddingProvider).toBe('ollama-embed');
     expect(settings.memory.embeddingExecutionEnabled).toBe(true);
     expect(settings.memory.privacyMode).toBe('strict');
