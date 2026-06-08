@@ -16,6 +16,8 @@ Gomi repository
 
 The repository includes `.github/workflows/build-release.yml`.
 
+Pushes to `master` run the verification job and upload the prototype artifact. Tagged releases and manual runs can also publish GitHub Release assets.
+
 It has three jobs:
 
 - `verify-prototype`: installs dependencies, runs typecheck/tests, builds the current Gomi Office webview prototype, and uploads `gomi-office-webview-prototype.zip`.

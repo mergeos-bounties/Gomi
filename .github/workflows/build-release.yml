@@ -2,6 +2,8 @@ name: Build and Release Gomi IDE
 
 on:
   push:
+    branches:
+      - master
     tags:
       - 'v*'
   workflow_dispatch:
