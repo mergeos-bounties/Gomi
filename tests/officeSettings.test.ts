@@ -8,6 +8,7 @@ import {
   getMemoryEmbeddingProviderLabel,
   getSeatForAgent,
   isAgentAvailableForTask,
+  normalizeGomiOfficeSettings,
   setMaxProjectMemoryItems,
   setMemoryBroadcastThreshold,
   setMemoryPrivacyMode,
@@ -113,6 +114,57 @@ describe('Gomi office settings', () => {
     expect(httpEmbeddings.memory.embeddingExecutionEnabled).toBe(true);
     expect(localHashing.memory.embeddingProvider).toBe('local-hashing');
     expect(localHashing.memory.embeddingExecutionEnabled).toBe(false);
+  });
+
+  it('normalizes persisted settings across versions and rejects unsafe seat state', () => {
+    const settings = normalizeGomiOfficeSettings({
+      seats: [
+        {
+          id: 'seat-ceo',
+          providerId: 'not-a-provider',
+          workMode: 'fired'
+        },
+        {
+          id: 'head-backend',
+          providerId: 'claude-code',
+          workMode: 'sleeping'
+        },
+        {
+          id: 'employee-qa-01',
+          providerId: 'demo-runtime',
+          workMode: 'fired'
+        }
+      ],
+      memory: {
+        embeddingProvider: 'ollama-embed',
+        embeddingExecutionEnabled: true,
+        retentionDays: 9999,
+        maxProjectMemoryItems: 1,
+        broadcastThreshold: 0.1,
+        privacyMode: 'strict',
+        redactSecrets: false
+      },
+      execution: {
+        workspaceTrust: 'trusted',
+        liveProviderMode: 'allow-all',
+        allowHttpProviders: true
+      }
+    });
+
+    expect(settings.seats.find((seat) => seat.id === 'seat-ceo')?.providerId).toBe('codex-cli');
+    expect(settings.seats.find((seat) => seat.id === 'seat-ceo')?.workMode).toBe('active');
+    expect(settings.seats.find((seat) => seat.id === 'head-backend')?.workMode).toBe('sleeping');
+    expect(settings.seats.find((seat) => seat.id === 'employee-qa-01')?.workMode).toBe('fired');
+    expect(settings.memory.embeddingProvider).toBe('ollama-embed');
+    expect(settings.memory.embeddingExecutionEnabled).toBe(true);
+    expect(settings.memory.privacyMode).toBe('strict');
+    expect(settings.memory.redactSecrets).toBe(true);
+    expect(settings.memory.retentionDays).toBe(365);
+    expect(settings.memory.maxProjectMemoryItems).toBe(40);
+    expect(settings.memory.broadcastThreshold).toBe(0.45);
+    expect(settings.execution.workspaceTrust).toBe('trusted');
+    expect(settings.execution.liveProviderMode).toBe('allow-all');
+    expect(settings.execution.allowHttpProviders).toBe(true);
   });
 
   it('updates live provider execution policy controls', () => {

@@ -1,3 +1,4 @@
+import { normalizeGomiOfficeSettings } from '../common/gomiOfficeSettings';
 import type { GomiOfficeSettings, GomiPatchPreviewResult, GomiRuntimeEvent } from '../common/gomiTypes';
 import type { GomiBridgeMessage, GomiWorkbenchBridge } from '../electron-sandbox/gomiBridge';
 import { GomiAgentRuntime, type GomiRuntimeOptions } from '../node/agentRuntime';
@@ -146,7 +147,9 @@ export class GomiWebviewHostController {
     return new GomiAgentRuntime({
       delayMs: 120,
       ...this.options.runtimeOptions,
-      officeSettings: officeSettings ?? this.options.runtimeOptions?.officeSettings
+      officeSettings: officeSettings
+        ? normalizeGomiOfficeSettings(officeSettings)
+        : this.options.runtimeOptions?.officeSettings
     });
   }
 }

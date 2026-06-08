@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { GomiBridgeMessage } from '../src/vs/workbench/contrib/gomi/electron-sandbox/gomiBridge';
 import {
   createGomiWebviewBridge,
+  createGomiWebviewStateStore,
   isGomiBridgeMessage,
   resolveGomiWebviewBridge,
+  resolveGomiWebviewBridgeContext,
   type GomiMessageEventTarget,
   type GomiVsCodeWebviewApi,
   type GomiWebviewBridgeGlobal
@@ -71,6 +73,44 @@ describe('Gomi webview bridge', () => {
     });
   });
 
+  it('resolves bridge and webview state store from one VS Code API handle', () => {
+    const api = new MemoryVsCodeApi();
+    const target = new MemoryMessageTarget();
+    const context = resolveGomiWebviewBridgeContext(
+      {
+        acquireVsCodeApi: () => api,
+        __GOMI_ENABLE_WORKBENCH_BRIDGE__: true
+      },
+      target
+    );
+
+    context?.stateStore.setState({ persisted: true });
+    context?.bridge.postMessage({
+      type: 'gomi.run',
+      request: 'Persisted bridge'
+    });
+
+    expect(api.state).toEqual({ persisted: true });
+    expect(context?.stateStore.getState()).toEqual({ persisted: true });
+    expect(api.outbox[0]).toMatchObject({
+      type: 'gomi.run',
+      request: 'Persisted bridge'
+    });
+  });
+
+  it('keeps an in-memory state fallback when the VS Code API omits state methods', () => {
+    const api = {
+      postMessage(message: GomiBridgeMessage) {
+        void message;
+      }
+    };
+    const stateStore = createGomiWebviewStateStore(api);
+
+    stateStore.setState({ office: 'Gomi' });
+
+    expect(stateStore.getState()).toEqual({ office: 'Gomi' });
+  });
+
   it('filters bridge messages by Gomi namespace', () => {
     expect(isGomiBridgeMessage({ type: 'gomi.event' })).toBe(true);
     expect(isGomiBridgeMessage({ type: 'workspace.event' })).toBe(false);
@@ -96,9 +136,18 @@ describe('Gomi webview bridge', () => {
 
 class MemoryVsCodeApi implements GomiVsCodeWebviewApi {
   readonly outbox: GomiBridgeMessage[] = [];
+  state: unknown;
 
   postMessage(message: GomiBridgeMessage): void {
     this.outbox.push(message);
+  }
+
+  getState(): unknown {
+    return this.state;
+  }
+
+  setState(state: unknown): void {
+    this.state = state;
   }
 }
 

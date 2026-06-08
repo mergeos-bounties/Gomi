@@ -377,6 +377,89 @@ export function isAgentAvailableForTask(settings: GomiOfficeSettings, agentId: G
   return !seat || seat.workMode === 'active';
 }
 
+export function normalizeGomiOfficeSettings(value: unknown): GomiOfficeSettings {
+  if (!isRecord(value)) {
+    return DEFAULT_GOMI_OFFICE_SETTINGS;
+  }
+
+  const rawSettings = value as Partial<GomiOfficeSettings>;
+  let normalizedSettings: GomiOfficeSettings = {
+    ...DEFAULT_GOMI_OFFICE_SETTINGS,
+    seats: normalizeSeatSettings(rawSettings.seats)
+  };
+  const rawMemory: Record<string, unknown> = isRecord(rawSettings.memory) ? rawSettings.memory : {};
+  const rawExecution: Record<string, unknown> = isRecord(rawSettings.execution) ? rawSettings.execution : {};
+
+  normalizedSettings = setSharedMemoryEnabled(
+    normalizedSettings,
+    booleanSetting(rawMemory.sharedMemoryEnabled, DEFAULT_GOMI_OFFICE_SETTINGS.memory.sharedMemoryEnabled)
+  );
+  normalizedSettings = setWorkspaceContextIndexing(
+    normalizedSettings,
+    booleanSetting(rawMemory.indexWorkspaceContext, DEFAULT_GOMI_OFFICE_SETTINGS.memory.indexWorkspaceContext)
+  );
+  normalizedSettings = setMemoryEmbeddingProvider(
+    normalizedSettings,
+    memoryEmbeddingProviderSetting(rawMemory.embeddingProvider)
+  );
+  normalizedSettings = setMemoryEmbeddingExecutionEnabled(
+    normalizedSettings,
+    booleanSetting(
+      rawMemory.embeddingExecutionEnabled,
+      DEFAULT_GOMI_OFFICE_SETTINGS.memory.embeddingExecutionEnabled
+    )
+  );
+  normalizedSettings = setMemoryPrivacyMode(
+    normalizedSettings,
+    memoryPrivacyModeSetting(rawMemory.privacyMode)
+  );
+  normalizedSettings = setSecretRedactionEnabled(
+    normalizedSettings,
+    booleanSetting(rawMemory.redactSecrets, normalizedSettings.memory.redactSecrets)
+  );
+  normalizedSettings = setMemoryRetentionDays(
+    normalizedSettings,
+    numberSetting(rawMemory.retentionDays, DEFAULT_GOMI_OFFICE_SETTINGS.memory.retentionDays)
+  );
+  normalizedSettings = setMaxProjectMemoryItems(
+    normalizedSettings,
+    numberSetting(rawMemory.maxProjectMemoryItems, DEFAULT_GOMI_OFFICE_SETTINGS.memory.maxProjectMemoryItems)
+  );
+  normalizedSettings = setMemoryBroadcastThreshold(
+    normalizedSettings,
+    numberSetting(rawMemory.broadcastThreshold, DEFAULT_GOMI_OFFICE_SETTINGS.memory.broadcastThreshold)
+  );
+  normalizedSettings = setPatchApprovalRequired(
+    normalizedSettings,
+    booleanSetting(rawMemory.requirePatchApproval, DEFAULT_GOMI_OFFICE_SETTINGS.memory.requirePatchApproval)
+  );
+  normalizedSettings = setWorkspaceTrustState(
+    normalizedSettings,
+    workspaceTrustSetting(rawExecution.workspaceTrust)
+  );
+  normalizedSettings = setLiveProviderMode(
+    normalizedSettings,
+    liveProviderModeSetting(rawExecution.liveProviderMode)
+  );
+  normalizedSettings = setCliProvidersEnabled(
+    normalizedSettings,
+    booleanSetting(rawExecution.allowCliProviders, DEFAULT_GOMI_OFFICE_SETTINGS.execution.allowCliProviders)
+  );
+  normalizedSettings = setHttpProvidersEnabled(
+    normalizedSettings,
+    booleanSetting(rawExecution.allowHttpProviders, DEFAULT_GOMI_OFFICE_SETTINGS.execution.allowHttpProviders)
+  );
+  normalizedSettings = setLiveProviderPatchApprovalRequired(
+    normalizedSettings,
+    booleanSetting(
+      rawExecution.requirePatchApprovalForLiveProviders,
+      DEFAULT_GOMI_OFFICE_SETTINGS.execution.requirePatchApprovalForLiveProviders
+    )
+  );
+
+  return normalizedSettings;
+}
+
 function updateSeat(
   settings: GomiOfficeSettings,
   seatId: string,
@@ -467,4 +550,79 @@ function createEmployeeSeat(
     canFire: true,
     departmentId
   };
+}
+
+function normalizeSeatSettings(value: unknown): GomiAgentSeat[] {
+  if (!Array.isArray(value)) {
+    return DEFAULT_GOMI_OFFICE_SETTINGS.seats;
+  }
+
+  const rawSeatsById = new Map(
+    value
+      .filter(isRecord)
+      .map((seat) => [String(seat.id), seat])
+  );
+
+  return DEFAULT_GOMI_OFFICE_SETTINGS.seats.map((defaultSeat) => {
+    const rawSeat = rawSeatsById.get(defaultSeat.id);
+    const providerId = agentProviderSetting(rawSeat?.providerId, defaultSeat.providerId);
+    const requestedWorkMode = agentWorkModeSetting(rawSeat?.workMode, defaultSeat.workMode);
+    const workMode =
+      (requestedWorkMode === 'sleeping' && !defaultSeat.canSleep) ||
+      (requestedWorkMode === 'fired' && !defaultSeat.canFire)
+        ? defaultSeat.workMode
+        : requestedWorkMode;
+
+    return {
+      ...defaultSeat,
+      providerId,
+      workMode
+    };
+  });
+}
+
+function agentProviderSetting(value: unknown, fallback: GomiAgentCliProviderId): GomiAgentCliProviderId {
+  return GOMI_AGENT_CLI_PROVIDERS.some((provider) => provider.id === value)
+    ? value as GomiAgentCliProviderId
+    : fallback;
+}
+
+function memoryEmbeddingProviderSetting(value: unknown): GomiMemoryEmbeddingProviderId {
+  return GOMI_MEMORY_EMBEDDING_PROVIDERS.some((provider) => provider.id === value)
+    ? value as GomiMemoryEmbeddingProviderId
+    : DEFAULT_GOMI_OFFICE_SETTINGS.memory.embeddingProvider;
+}
+
+function memoryPrivacyModeSetting(value: unknown): GomiMemoryPrivacyMode {
+  return value === 'strict' || value === 'standard'
+    ? value
+    : DEFAULT_GOMI_OFFICE_SETTINGS.memory.privacyMode;
+}
+
+function workspaceTrustSetting(value: unknown): GomiWorkspaceTrustState {
+  return value === 'trusted' || value === 'untrusted'
+    ? value
+    : DEFAULT_GOMI_OFFICE_SETTINGS.execution.workspaceTrust;
+}
+
+function liveProviderModeSetting(value: unknown): GomiLiveProviderMode {
+  return value === 'demo-only' || value === 'trusted-workspaces' || value === 'allow-all'
+    ? value
+    : DEFAULT_GOMI_OFFICE_SETTINGS.execution.liveProviderMode;
+}
+
+function agentWorkModeSetting(value: unknown, fallback: GomiAgentWorkMode): GomiAgentWorkMode {
+  return value === 'active' || value === 'sleeping' || value === 'fired' ? value : fallback;
+}
+
+function booleanSetting(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function numberSetting(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }

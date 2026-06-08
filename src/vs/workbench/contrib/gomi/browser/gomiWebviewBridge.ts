@@ -6,6 +6,16 @@ export interface GomiVsCodeWebviewApi {
   setState?(state: unknown): void;
 }
 
+export interface GomiWebviewStateStore {
+  getState(): unknown;
+  setState(state: unknown): void;
+}
+
+export interface GomiWebviewBridgeContext {
+  bridge: GomiWorkbenchBridge;
+  stateStore: GomiWebviewStateStore;
+}
+
 export interface GomiWebviewBridgeGlobal {
   acquireVsCodeApi?: () => GomiVsCodeWebviewApi;
   __GOMI_ENABLE_WORKBENCH_BRIDGE__?: boolean;
@@ -21,11 +31,24 @@ export function resolveGomiWebviewBridge(
   eventTarget: GomiMessageEventTarget | undefined =
     typeof window !== 'undefined' ? window : undefined
 ): GomiWorkbenchBridge | undefined {
+  return resolveGomiWebviewBridgeContext(globalObject, eventTarget)?.bridge;
+}
+
+export function resolveGomiWebviewBridgeContext(
+  globalObject: GomiWebviewBridgeGlobal = globalThis as GomiWebviewBridgeGlobal,
+  eventTarget: GomiMessageEventTarget | undefined =
+    typeof window !== 'undefined' ? window : undefined
+): GomiWebviewBridgeContext | undefined {
   if (!globalObject.__GOMI_ENABLE_WORKBENCH_BRIDGE__ || !globalObject.acquireVsCodeApi || !eventTarget) {
     return undefined;
   }
 
-  return createGomiWebviewBridge(globalObject.acquireVsCodeApi(), eventTarget);
+  const api = globalObject.acquireVsCodeApi();
+
+  return {
+    bridge: createGomiWebviewBridge(api, eventTarget),
+    stateStore: createGomiWebviewStateStore(api)
+  };
 }
 
 export function createGomiWebviewBridge(
@@ -49,6 +72,21 @@ export function createGomiWebviewBridge(
       return () => {
         eventTarget.removeEventListener('message', messageListener);
       };
+    }
+  };
+}
+
+export function createGomiWebviewStateStore(api: GomiVsCodeWebviewApi): GomiWebviewStateStore {
+  let fallbackState: unknown = {};
+
+  return {
+    getState() {
+      return api.getState?.() ?? fallbackState;
+    },
+
+    setState(state) {
+      fallbackState = state;
+      api.setState?.(state);
     }
   };
 }

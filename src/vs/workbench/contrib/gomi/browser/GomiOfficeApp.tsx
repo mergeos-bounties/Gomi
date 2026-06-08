@@ -34,7 +34,6 @@ import {
 } from 'lucide-react';
 import { BASE_GOMI_AGENTS, GOMI_SAMPLE_REQUEST } from '../common/gomiConstants';
 import {
-  DEFAULT_GOMI_OFFICE_SETTINGS,
   GOMI_AGENT_CLI_PROVIDERS,
   GOMI_MEMORY_EMBEDDING_PROVIDERS,
   assignSeatProvider,
@@ -91,7 +90,11 @@ import {
   rejectPatchReview,
   type GomiPatchReviewState
 } from './gomiPatchApproval';
-import { resolveGomiWebviewBridge } from './gomiWebviewBridge';
+import {
+  loadPersistedOfficeSettings,
+  persistOfficeSettings
+} from './gomiOfficeSettingsPersistence';
+import { resolveGomiWebviewBridgeContext } from './gomiWebviewBridge';
 import { PhaserOffice } from './PhaserOffice';
 
 const activityItems = [
@@ -116,8 +119,11 @@ const officeViewModes = [
 }>;
 
 export function GomiOfficeApp() {
-  const [officeSettings, setOfficeSettings] = useState<GomiOfficeSettings>(
-    DEFAULT_GOMI_OFFICE_SETTINGS
+  const workbenchContext = useMemo(() => resolveGomiWebviewBridgeContext(), []);
+  const [officeSettings, setOfficeSettings] = useState<GomiOfficeSettings>(() =>
+    loadPersistedOfficeSettings({
+      stateStore: workbenchContext?.stateStore
+    })
   );
   const runtime = useMemo(
     () =>
@@ -127,7 +133,7 @@ export function GomiOfficeApp() {
       }),
     [officeSettings]
   );
-  const workbenchBridge = useMemo(() => resolveGomiWebviewBridge(), []);
+  const workbenchBridge = workbenchContext?.bridge;
   const [request, setRequest] = useState(GOMI_SAMPLE_REQUEST);
   const [isRunning, setIsRunning] = useState(false);
   const [agents, setAgents] = useState<GomiAgent[]>(() =>
@@ -226,6 +232,12 @@ export function GomiOfficeApp() {
       }
     });
   }, [workbenchBridge]);
+
+  useEffect(() => {
+    persistOfficeSettings(officeSettings, {
+      stateStore: workbenchContext?.stateStore
+    });
+  }, [officeSettings, workbenchContext]);
 
   async function runOfficeSession() {
     const trimmedRequest = request.trim();

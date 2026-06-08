@@ -58,6 +58,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Shared memory board** fed by real runtime memory updates for project context.
 - **CEO Agent planning flow** with specialist agent delegation.
 - **Office organization settings** for assigning CLI agent routes to the CEO and department heads.
+- **Persisted Office Settings** through VS Code webview state with local storage fallback for the standalone demo.
 - **Department head sleep mode** to pause a leader without removing the role from the organization.
 - **Employee lifecycle controls** for removing or restoring non-lead staff seats.
 - **Workbench agent provider router** for demo, CLI, OpenAI-compatible HTTP, and Ollama-compatible local model routes.
@@ -381,6 +382,7 @@ Implemented in this repository:
 - Hybrid project memory with lexical and vector-style retrieval.
 - HTTP embedding provider adapter for OpenAI-compatible and Ollama local embedding routes, with deterministic hashing fallback.
 - Office Settings vector embedding provider selection and HTTP embedding execution toggle.
+- Persisted Office Settings for agent provider assignments, sleep/fire state, execution policy, and memory controls.
 - File-backed persistent project memory for workbench sessions.
 - Memory privacy guard with secret redaction, strict mode, shared-memory toggles, retention days, and max project memory controls.
 - Project context chunking and indexing.

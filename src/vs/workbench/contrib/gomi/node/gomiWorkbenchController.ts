@@ -1,5 +1,6 @@
 import path from 'node:path';
 import type { GomiWorkbenchBridge, GomiBridgeMessage } from '../electron-sandbox/gomiBridge';
+import { normalizeGomiOfficeSettings } from '../common/gomiOfficeSettings';
 import type {
   GomiMemoryEmbeddingProviderId,
   GomiOfficeSettings,
@@ -75,13 +76,17 @@ export class GomiWorkbenchController {
     this.bridge = options.bridge;
     this.workspaceRoot = options.workspaceRoot;
     this.runtime = options.runtime;
-    this.runtimeFactory = (officeSettings) =>
-      createWorkbenchRuntime(
+    this.runtimeFactory = (officeSettings) => {
+      const normalizedOfficeSettings = officeSettings
+        ? normalizeGomiOfficeSettings(officeSettings)
+        : options.runtimeOptions?.officeSettings;
+
+      return createWorkbenchRuntime(
         options.workspaceRoot,
         options.memoryDirectory,
         {
           ...options.runtimeOptions,
-          officeSettings: officeSettings ?? options.runtimeOptions?.officeSettings
+          officeSettings: normalizedOfficeSettings
         },
         {
           enableCliAgentExecution: options.enableCliAgentExecution,
@@ -97,6 +102,7 @@ export class GomiWorkbenchController {
           cliAgentTimeoutMs: options.cliAgentTimeoutMs
         }
       );
+    };
     this.patchApplyOptions = options.patchApplyOptions;
     this.applyPatch =
       options.applyPatch ??
