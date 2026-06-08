@@ -831,7 +831,7 @@ function OfficeSettingsPanel({
             </div>
 
             <label className="gomi-field">
-              <span>CLI</span>
+              <span>Provider</span>
               <select
                 value={seat.providerId}
                 onChange={(event) =>
@@ -853,7 +853,7 @@ function OfficeSettingsPanel({
               </button>
             ) : (
               <div className="gomi-seat-note">
-                CEO is always retained. CLI route: {getProviderLabel(seat.providerId)}.
+                CEO is always retained. Provider route: {getProviderLabel(seat.providerId)}.
               </div>
             )}
           </div>

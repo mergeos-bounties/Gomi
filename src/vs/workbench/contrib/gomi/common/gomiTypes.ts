@@ -35,16 +35,27 @@ export type GomiAgentCliProviderId =
   | 'gemini-cli'
   | 'aider-cli'
   | 'cursor-style-agent'
+  | 'openai-compatible-api'
+  | 'ollama-local-model'
   | 'local-llm'
   | 'demo-runtime';
 export type GomiAgentSeatKind = 'executive' | 'department-head' | 'employee';
 export type GomiAgentWorkMode = 'active' | 'sleeping' | 'fired';
+export type GomiAgentProviderTransport =
+  | 'cli'
+  | 'openai-compatible'
+  | 'ollama-chat'
+  | 'demo';
 
 export interface GomiAgentCliProvider {
   id: GomiAgentCliProviderId;
   label: string;
   command: string;
   description: string;
+  transport?: GomiAgentProviderTransport;
+  endpointEnv?: string;
+  apiKeyEnv?: string;
+  modelEnv?: string;
 }
 
 export interface GomiAgentSeat {

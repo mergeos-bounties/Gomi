@@ -17,42 +17,68 @@ export const GOMI_AGENT_CLI_PROVIDERS: GomiAgentCliProvider[] = [
     id: 'codex-cli',
     label: 'Codex CLI',
     command: 'codex',
+    transport: 'cli',
     description: 'Terminal-first coding agent for planning, edits, tests, and patch review.'
   },
   {
     id: 'claude-code',
     label: 'Claude Code',
     command: 'claude',
+    transport: 'cli',
     description: 'CLI coding agent option for long-form implementation and codebase reasoning.'
   },
   {
     id: 'gemini-cli',
     label: 'Gemini CLI',
     command: 'gemini',
+    transport: 'cli',
     description: 'CLI model runner option for project analysis and implementation tasks.'
   },
   {
     id: 'aider-cli',
     label: 'Aider',
     command: 'aider',
+    transport: 'cli',
     description: 'Git-aware pair programming CLI focused on file edits and diffs.'
   },
   {
     id: 'cursor-style-agent',
     label: 'Cursor-style Agent',
     command: 'cursor-agent',
+    transport: 'cli',
     description: 'Placeholder adapter for editor-native agent routing with vector project memory.'
+  },
+  {
+    id: 'openai-compatible-api',
+    label: 'OpenAI-Compatible API',
+    command: 'GOMI_CLOUD_LLM_ENDPOINT',
+    transport: 'openai-compatible',
+    endpointEnv: 'GOMI_CLOUD_LLM_ENDPOINT',
+    apiKeyEnv: 'GOMI_CLOUD_LLM_API_KEY',
+    modelEnv: 'GOMI_CLOUD_LLM_MODEL',
+    description: 'Cloud LLM route for OpenAI-compatible chat completion APIs.'
+  },
+  {
+    id: 'ollama-local-model',
+    label: 'Ollama Local Model',
+    command: 'GOMI_LOCAL_LLM_ENDPOINT',
+    transport: 'ollama-chat',
+    endpointEnv: 'GOMI_LOCAL_LLM_ENDPOINT',
+    modelEnv: 'GOMI_LOCAL_LLM_MODEL',
+    description: 'Local model route for private workspaces through an Ollama-compatible chat API.'
   },
   {
     id: 'local-llm',
     label: 'Local LLM',
     command: 'ollama run',
+    transport: 'cli',
     description: 'Private local model route for sensitive workspaces.'
   },
   {
     id: 'demo-runtime',
     label: 'Demo Runtime',
     command: 'gomi-demo',
+    transport: 'demo',
     description: 'Deterministic built-in provider used by the prototype and tests.'
   }
 ];

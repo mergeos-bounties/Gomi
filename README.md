@@ -58,6 +58,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Office organization settings** for assigning CLI agent routes to the CEO and department heads.
 - **Department head sleep mode** to pause a leader without removing the role from the organization.
 - **Employee lifecycle controls** for removing or restoring non-lead staff seats.
+- **Workbench agent provider router** for demo, CLI, OpenAI-compatible HTTP, and Ollama-compatible local model routes.
 - **Configurable agent communication policy** that keeps routine updates in memory and only broadcasts findings above the selected importance threshold.
 - **Novelty-aware agent communication** that checks recalled shared memory before showing another chat bubble for repeated routine findings.
 - **Hybrid project memory** using lexical search plus vector-style retrieval.
@@ -156,13 +157,20 @@ The current implementation uses hybrid retrieval:
 
 For the MVP, vector retrieval uses a local hashing embedding provider. It does not require an API key and keeps tests deterministic. The workbench controller persists lexical and vector memory records in workspace storage so future sessions can reuse project context. In a production build, this storage can be replaced by SQLite, a local vector database, OpenAI embeddings, a local embedding model, or an enterprise embedding service without changing the runtime contract.
 
-## Agent CLI Routing
+## Agent Provider Routing
 
 Gomi separates office organization from agent execution.
 
-The Office Settings view lets the user assign CLI providers to the CEO and each department head. The node-side workbench runtime includes a CLI agent router that can execute the selected command, pass a structured prompt through stdin, and map JSON or plain-text output back into `GomiAgentResult`.
+The Office Settings view lets the user assign providers to the CEO and each department head. The node-side workbench runtime includes a provider router that can dispatch work to deterministic demo mode, CLI agents, OpenAI-compatible HTTP chat APIs, or Ollama-compatible local chat APIs.
 
-CLI execution is disabled by default in the prototype for safety and deterministic tests. A real Code - OSS workbench integration can enable it through `GomiWorkbenchController` once provider commands, workspace trust, approval policy, and enterprise controls are configured. When disabled, the same route metadata still flows through the runtime and the demo provider remains the fallback.
+CLI and HTTP execution are disabled by default in the prototype for safety and deterministic tests. A real Code - OSS workbench integration can enable them through `GomiWorkbenchController` once provider commands, endpoint/model/API-key environment variables, workspace trust, approval policy, and enterprise controls are configured. When disabled, the same route metadata still flows through the runtime and the demo provider remains the fallback.
+
+Supported provider routes:
+
+- `codex-cli`, `claude-code`, `gemini-cli`, `aider-cli`, `cursor-style-agent`, and `local-llm` through the CLI router.
+- `openai-compatible-api` through `GOMI_CLOUD_LLM_ENDPOINT`, `GOMI_CLOUD_LLM_MODEL`, and optional `GOMI_CLOUD_LLM_API_KEY`.
+- `ollama-local-model` through `GOMI_LOCAL_LLM_ENDPOINT` and `GOMI_LOCAL_LLM_MODEL`.
+- `demo-runtime` for offline, deterministic product previews and tests.
 
 ## Patch Review And Safety
 
@@ -325,6 +333,8 @@ Implemented in this repository:
 - Code - OSS workspace services adapter for native workspace folders, open editors, selected code, diagnostics, terminal output, SCM/git diff previews, optional error logs, text snippets, native diff preview, and approved patch application.
 - Agent provider contract with a demo provider.
 - Node-side CLI provider router with command execution, JSON/plain-text output mapping, and demo fallback.
+- Workbench provider router for CLI, OpenAI-compatible HTTP, Ollama-compatible local HTTP, and demo routes.
+- HTTP agent provider adapter with endpoint/model/API-key environment routing and JSON/plain-text result mapping.
 - Hybrid project memory with lexical and vector-style retrieval.
 - File-backed persistent project memory for workbench sessions.
 - Memory privacy guard with secret redaction, strict mode, shared-memory toggles, retention days, and max project memory controls.
@@ -343,8 +353,7 @@ Not yet implemented:
 - Validating the React/Phaser webview mount and native diff preview inside a real Code - OSS checkout.
 - Durable terminal scrollback capture beyond the selected/current exposed terminal text.
 - Native output-channel/log-service integration beyond the current optional error-log provider hook.
-- Production LLM API provider.
-- Production local model provider.
+- Production provider secrets UI and enterprise model governance.
 - Workspace trust and enterprise policy UI for enabling live CLI execution.
 - Persistent database-backed memory.
 - Signed desktop packaging assets and production release signing.
@@ -426,7 +435,7 @@ Recommended next milestones:
 
 1. Import the module into a real Code - OSS fork.
 2. Complete Gomi branding assets across Windows, macOS, and Linux.
-3. Add provider adapters for OpenAI-compatible APIs and local model runtimes.
+3. Harden provider secrets UI, model governance, and workspace-trust gates for OpenAI-compatible APIs and local model runtimes.
 4. Add persistent memory using SQLite and optional vector database support.
 5. Deepen native workspace context with durable terminal scrollback and workbench log/output-channel readers.
 6. Validate and polish the native diff preview inside a real Code - OSS fork.

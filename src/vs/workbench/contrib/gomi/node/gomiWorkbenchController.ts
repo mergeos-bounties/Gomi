@@ -2,10 +2,8 @@ import path from 'node:path';
 import type { GomiWorkbenchBridge, GomiBridgeMessage } from '../electron-sandbox/gomiBridge';
 import type { GomiOfficeSettings, GomiPatchPreviewResult, GomiRuntimeEvent } from '../common/gomiTypes';
 import { GomiAgentRuntime, type GomiRuntimeOptions } from './agentRuntime';
-import {
-  createNodeCliGomiAgentProvider,
-  type GomiCliCommandRunner
-} from './cliAgentProvider';
+import type { GomiCliCommandRunner } from './cliAgentProvider';
+import type { GomiHttpFetch, GomiHttpProviderRoute } from './httpAgentProvider';
 import {
   createFileBackedGomiMemoryStore,
   createFileBackedVectorMemoryStore
@@ -16,6 +14,7 @@ import {
   type GomiPatchApplyOptions,
   type GomiPatchApplyResult
 } from './workspacePatchApplier';
+import { createWorkbenchGomiAgentProvider } from './workbenchAgentProvider';
 
 export interface GomiRuntimeRunner {
   run(request: string): AsyncGenerator<GomiRuntimeEvent>;
@@ -28,7 +27,11 @@ export interface GomiWorkbenchControllerOptions {
   memoryDirectory?: string;
   runtimeOptions?: GomiRuntimeOptions;
   enableCliAgentExecution?: boolean;
+  enableHttpAgentExecution?: boolean;
   cliAgentCommandRunner?: GomiCliCommandRunner;
+  httpFetch?: GomiHttpFetch;
+  httpRoutes?: Partial<Record<string, GomiHttpProviderRoute>>;
+  providerEnv?: Record<string, string | undefined>;
   cliAgentTimeoutMs?: number;
   patchApplyOptions?: GomiPatchApplyOptions;
   applyPatch?: (
@@ -68,7 +71,11 @@ export class GomiWorkbenchController {
         },
         {
           enableCliAgentExecution: options.enableCliAgentExecution,
+          enableHttpAgentExecution: options.enableHttpAgentExecution,
           cliAgentCommandRunner: options.cliAgentCommandRunner,
+          httpFetch: options.httpFetch,
+          httpRoutes: options.httpRoutes,
+          providerEnv: options.providerEnv,
           cliAgentTimeoutMs: options.cliAgentTimeoutMs
         }
       );
@@ -201,7 +208,13 @@ function createWorkbenchRuntime(
   runtimeOptions: GomiRuntimeOptions = {},
   cliOptions: Pick<
     GomiWorkbenchControllerOptions,
-    'enableCliAgentExecution' | 'cliAgentCommandRunner' | 'cliAgentTimeoutMs'
+    | 'enableCliAgentExecution'
+    | 'enableHttpAgentExecution'
+    | 'cliAgentCommandRunner'
+    | 'httpFetch'
+    | 'httpRoutes'
+    | 'providerEnv'
+    | 'cliAgentTimeoutMs'
   > = {}
 ): GomiRuntimeRunner {
   const projectMemoryDirectory = memoryDirectory ?? path.join(workspaceRoot, '.gomi-ide', 'memory');
@@ -217,9 +230,13 @@ function createWorkbenchRuntime(
       createFileBackedVectorMemoryStore(path.join(projectMemoryDirectory, 'vector-memory.json')),
     agentProvider:
       runtimeOptions.agentProvider ??
-      createNodeCliGomiAgentProvider({
-        enabled: cliOptions.enableCliAgentExecution ?? false,
-        commandRunner: cliOptions.cliAgentCommandRunner,
+      createWorkbenchGomiAgentProvider({
+        enableCliAgentExecution: cliOptions.enableCliAgentExecution ?? false,
+        enableHttpAgentExecution: cliOptions.enableHttpAgentExecution ?? false,
+        cliAgentCommandRunner: cliOptions.cliAgentCommandRunner,
+        httpFetch: cliOptions.httpFetch,
+        httpRoutes: cliOptions.httpRoutes,
+        env: cliOptions.providerEnv,
         timeoutMs: cliOptions.cliAgentTimeoutMs,
         cwd: workspaceRoot
       })

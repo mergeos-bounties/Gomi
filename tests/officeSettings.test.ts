@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GOMI_OFFICE_SETTINGS,
+  GOMI_AGENT_CLI_PROVIDERS,
   assignSeatProvider,
   fireEmployee,
   getSeatForAgent,
@@ -17,6 +18,15 @@ import {
 } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
 
 describe('Gomi office settings', () => {
+  it('registers CLI, cloud API, local model, and demo provider transports', () => {
+    const transports = new Map(GOMI_AGENT_CLI_PROVIDERS.map((provider) => [provider.id, provider.transport]));
+
+    expect(transports.get('codex-cli')).toBe('cli');
+    expect(transports.get('openai-compatible-api')).toBe('openai-compatible');
+    expect(transports.get('ollama-local-model')).toBe('ollama-chat');
+    expect(transports.get('demo-runtime')).toBe('demo');
+  });
+
   it('assigns CLI providers to CEO and department head seats', () => {
     const settings = assignSeatProvider(
       DEFAULT_GOMI_OFFICE_SETTINGS,
