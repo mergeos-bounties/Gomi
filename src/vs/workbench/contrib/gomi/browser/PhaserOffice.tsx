@@ -13,7 +13,6 @@ import {
   createGomiConversationRoute,
   createGomiOfficeLayout,
   isGomiAgentId,
-  resolveGomiConversationRecipient,
   type GomiOfficeBoardLayout,
   type GomiOfficeConversationRoute,
   type GomiOfficeRoomLayout
@@ -31,6 +30,7 @@ interface PhaserOfficeProps {
 interface ActiveOfficeConversation extends GomiOfficeConversationRoute {
   content: string;
   senderName: string;
+  recipientName: string;
 }
 
 const statusColors: Record<GomiAgent['status'], number> = {
@@ -154,6 +154,7 @@ export function PhaserOffice({
           const seat = officeLayout.seats.find((candidate) => candidate.agentId === agent.id);
           const isConversationAgent =
             activeConversation?.speakerId === agent.id || activeConversation?.recipientId === agent.id;
+          const agentBubbleText = activeConversation ? undefined : latestSpeech.get(agent.id);
           const visitTarget =
             activeConversation?.speakerId === agent.id ? activeConversation.speakerVisitPoint : undefined;
 
@@ -161,7 +162,7 @@ export function PhaserOffice({
             agent,
             width,
             height,
-            isConversationAgent ? undefined : latestSpeech.get(agent.id),
+            isConversationAgent ? undefined : agentBubbleText,
             seat,
             visitTarget
           );
@@ -179,7 +180,10 @@ export function PhaserOffice({
           this.drawSpeechBubble(
             activeConversation.bubbleAnchor.x,
             activeConversation.bubbleAnchor.y,
-            this.shorten(`${activeConversation.senderName}: ${activeConversation.content}`, 68),
+            this.shorten(
+              `${activeConversation.senderName} -> ${activeConversation.recipientName}: ${activeConversation.content}`,
+              76
+            ),
             width
           );
         }
@@ -670,6 +674,8 @@ export function PhaserOffice({
 
           graphics.fillStyle(speakerColor, 0.85 - index * 0.08);
           graphics.fillCircle(x, y, 4);
+          graphics.fillStyle(0x0f172a, 0.42);
+          graphics.fillEllipse(x + (index % 2 === 0 ? 7 : -7), y + 8, 11, 5);
         }
 
         graphics.fillStyle(0xffffff, 0.95);
@@ -678,6 +684,55 @@ export function PhaserOffice({
         graphics.strokeCircle(conversation.speakerVisitPoint.x, conversation.speakerVisitPoint.y, 13);
         graphics.fillStyle(recipientColor, 0.9);
         graphics.fillCircle(conversation.recipientSeat.x, conversation.recipientSeat.y - 42, 5);
+
+        this.drawConversationArrow(graphics, conversation.speakerSeat, conversation.speakerVisitPoint, speakerColor);
+        this.drawConversationBadge(conversation);
+      }
+
+      private drawConversationArrow(
+        graphics: Phaser.GameObjects.Graphics,
+        from: { x: number; y: number },
+        to: { x: number; y: number },
+        color: number
+      ) {
+        const angle = Math.atan2(to.y - from.y, to.x - from.x);
+        const arrowLength = 13;
+        const left = {
+          x: to.x - Math.cos(angle - Math.PI / 6) * arrowLength,
+          y: to.y - Math.sin(angle - Math.PI / 6) * arrowLength
+        };
+        const right = {
+          x: to.x - Math.cos(angle + Math.PI / 6) * arrowLength,
+          y: to.y - Math.sin(angle + Math.PI / 6) * arrowLength
+        };
+
+        graphics.lineStyle(3, color, 0.82);
+        graphics.lineBetween(to.x, to.y, left.x, left.y);
+        graphics.lineBetween(to.x, to.y, right.x, right.y);
+      }
+
+      private drawConversationBadge(conversation: ActiveOfficeConversation) {
+        const speaker = conversation.senderName.replace(' Agent', '');
+        const recipient = conversation.recipientName.replace(' Agent', '');
+        const label = this.shorten(`${speaker} -> ${recipient}`, 28);
+        const x = (conversation.speakerVisitPoint.x + conversation.recipientSeat.x) / 2;
+        const y = Math.min(conversation.speakerVisitPoint.y, conversation.recipientSeat.y) - 56;
+        const width = Math.min(176, Math.max(92, label.length * 7));
+        const labelX = Phaser.Math.Clamp(x - width / 2, 18, this.game.canvas.width - width - 18);
+        const labelY = Math.max(18, y);
+        const graphics = this.add.graphics();
+
+        graphics.fillStyle(0x0f172a, 0.88);
+        graphics.fillRoundedRect(labelX, labelY, width, 22, 7);
+        graphics.lineStyle(1, 0x2dd4bf, 0.95);
+        graphics.strokeRoundedRect(labelX, labelY, width, 22, 7);
+
+        this.add.text(labelX + 8, labelY + 5, label, {
+          color: '#ccfbf1',
+          fontFamily: 'Inter, Arial',
+          fontSize: '10px',
+          fontStyle: '700'
+        });
       }
 
       private drawSleepingAgent(agent: GomiAgent, x: number, y: number, sceneWidth: number) {
@@ -763,7 +818,9 @@ export function PhaserOffice({
 
       private drawSpeechBubble(x: number, y: number, text: string, sceneWidth: number) {
         const bubbleWidth = Math.min(190, Math.max(126, text.length * 5.2));
-        const bubbleHeight = text.length > 34 ? 48 : 34;
+        const estimatedLineLength = Math.max(18, Math.floor((bubbleWidth - 20) / 5.8));
+        const estimatedLineCount = Math.max(1, Math.ceil(text.length / estimatedLineLength));
+        const bubbleHeight = Math.min(78, 22 + estimatedLineCount * 14);
         const bubbleX = Phaser.Math.Clamp(x - bubbleWidth / 2, 18, sceneWidth - bubbleWidth - 18);
         const bubbleY = Math.max(18, y);
         const graphics = this.add.graphics();
@@ -843,16 +900,16 @@ export function PhaserOffice({
             continue;
           }
 
-          const recipientId = resolveGomiConversationRecipient(
-            message.senderId,
-            message.recipientId,
-            availableAgentIds
-          );
-
-          if (!recipientId) {
+          if (
+            !message.recipientId ||
+            !isGomiAgentId(message.recipientId) ||
+            message.recipientId === message.senderId ||
+            !availableAgentIds.includes(message.recipientId)
+          ) {
             continue;
           }
 
+          const recipientId = message.recipientId;
           const route = createGomiConversationRoute(width, height, seats, message.senderId, recipientId);
 
           if (!route) {
@@ -862,7 +919,11 @@ export function PhaserOffice({
           return {
             ...route,
             content: message.content,
-            senderName: message.senderName
+            senderName: message.senderName,
+            recipientName:
+              message.recipientName ??
+              agents.find((agent) => agent.id === recipientId)?.name ??
+              recipientId
           };
         }
 

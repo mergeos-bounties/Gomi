@@ -162,7 +162,7 @@ export class GomiAgentRuntime {
     yield* this.say(
       'ceo',
       'CEO Agent',
-      `I am reading the workspace through ${getProviderLabel(this.getAgentProviderId('ceo'))} and splitting this request into agent tasks.`,
+      `I am walking this context over to System Analyst. I read the workspace through ${getProviderLabel(this.getAgentProviderId('ceo'))} and need the plan split into concrete tasks.`,
       'system-analyst',
       this.agentName('system-analyst')
     );
@@ -240,7 +240,7 @@ export class GomiAgentRuntime {
         yield* this.say(
           task.agentId,
           this.agentName(task.agentId),
-          this.agentMessage(task, agentResult, communicationDecision.broadcastSummary),
+          this.agentQuestion(task, agentResult, communicationDecision.broadcastSummary, recipientId),
           recipientId,
           this.agentName(recipientId)
         );
@@ -403,7 +403,11 @@ export class GomiAgentRuntime {
   }
 
   private communicationRecipientFor(senderId: GomiAgentId, tasks: GomiTask[]): GomiAgentId {
-    const plannedAgentIds = new Set(tasks.map((task) => task.agentId));
+    const plannedAgentIds = new Set(
+      tasks
+        .filter((task) => isAgentAvailableForTask(this.officeSettings, task.agentId))
+        .map((task) => task.agentId)
+    );
     const preferredRecipients: Record<GomiAgentId, GomiAgentId[]> = {
       ceo: ['system-analyst', 'qa'],
       'system-analyst': ['backend', 'database', 'designer', 'qa'],
@@ -449,8 +453,25 @@ export class GomiAgentRuntime {
     };
   }
 
-  private agentMessage(task: GomiTask, result: GomiAgentResult, broadcastSummary: string): string {
-    return `${task.title}: ${broadcastSummary || result.findings[0] || task.detail}`;
+  private agentQuestion(
+    task: GomiTask,
+    result: GomiAgentResult,
+    broadcastSummary: string,
+    recipientId: GomiAgentId
+  ): string {
+    const topic = broadcastSummary || result.findings[0] || task.detail;
+
+    return `Can you verify this for ${task.title.toLowerCase()} before I continue? ${this.shortenForChat(topic)} (${this.agentName(recipientId)})`;
+  }
+
+  private shortenForChat(value: string): string {
+    const normalizedValue = value.replace(/\s+/g, ' ').trim();
+
+    if (normalizedValue.length <= 180) {
+      return normalizedValue;
+    }
+
+    return `${normalizedValue.slice(0, 177)}...`;
   }
 
   private wait(): Promise<void> {
