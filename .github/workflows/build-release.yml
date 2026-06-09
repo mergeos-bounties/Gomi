@@ -175,51 +175,21 @@ jobs:
       - name: Collect Windows artifacts
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path release | Out-Null
-          $files = Get-ChildItem -Path code-oss\.build -Recurse -File -Include *.exe,*.msi,*.zip -ErrorAction SilentlyContinue
-
-          if (-not $files) {
-            $archiveRoot = Join-Path 'code-oss' ".build\${{ env.GOMI_WINDOWS_PLATFORM }}"
-            if (Test-Path $archiveRoot) {
-              Compress-Archive -Path "$archiveRoot\*" -DestinationPath "release\gomi-ide-${{ env.GOMI_WINDOWS_PLATFORM }}.zip" -Force
-            } else {
-              throw 'No Code - OSS Windows artifacts were found.'
-            }
-          } else {
-            foreach ($file in $files) {
-              Copy-Item -LiteralPath $file.FullName -Destination (Join-Path 'release' $file.Name) -Force
-            }
-          }
-
-          $releaseFiles = Get-ChildItem -Path release -File -ErrorAction SilentlyContinue
-          if (-not $releaseFiles) {
-            throw 'The Windows packaging job completed without producing release files.'
-          }
-
-          $manifest = @(
-            '# Gomi IDE Windows Artifacts',
-            '',
-            "Commit: $env:GITHUB_SHA",
-            "Ref: $env:GITHUB_REF_NAME",
-            "Code - OSS source: $env:GOMI_CODE_OSS_REPOSITORY@$env:GOMI_CODE_OSS_REF",
-            "Platform: $env:GOMI_WINDOWS_PLATFORM",
-            "Setup installer requested: $env:GOMI_BUILD_SETUP_EXE",
-            '',
-            'Files:'
+          $args = @(
+            '-CodeOssRoot', (Resolve-Path 'code-oss').Path,
+            '-ReleaseDir', 'release',
+            '-Platform', '${{ env.GOMI_WINDOWS_PLATFORM }}',
+            '-CodeOssRepository', '${{ env.GOMI_CODE_OSS_REPOSITORY }}',
+            '-CodeOssRef', '${{ env.GOMI_CODE_OSS_REF }}',
+            '-CommitSha', $env:GITHUB_SHA,
+            '-RefName', $env:GITHUB_REF_NAME
           )
 
-          foreach ($file in $releaseFiles | Sort-Object Name) {
-            $manifest += "- $($file.Name) ($([Math]::Round($file.Length / 1MB, 2)) MB)"
+          if ('${{ env.GOMI_BUILD_SETUP_EXE }}' -eq 'true') {
+            $args += '-SetupRequested'
           }
 
-          $manifest | Set-Content -Path release\ARTIFACTS.md -Encoding UTF8
-
-          $checksumLines = foreach ($file in (Get-ChildItem -Path release -File | Where-Object { $_.Name -ne 'ARTIFACTS.md' } | Sort-Object Name)) {
-            $hash = Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256
-            "$($hash.Hash.ToLowerInvariant())  $($file.Name)"
-          }
-
-          $checksumLines | Set-Content -Path release\WINDOWS-SHA256SUMS.txt -Encoding UTF8
+          & .\gomi\scripts\collect-gomi-windows-artifacts.ps1 @args
 
       - name: Upload Windows desktop artifacts
         uses: actions/upload-artifact@v4

@@ -23,7 +23,7 @@ Pushes to `master` run the verification job and upload a prototype artifact. Rel
 It has three jobs:
 
 - `verify-prototype`: installs dependencies, generates branded desktop assets, runs typecheck/tests/release-readiness checks, builds the standalone preview and Code - OSS webview bundle, then uploads a versioned `gomi-office-webview-prototype-<commit>.zip` with a SHA-256 checksum.
-- `code-oss-windows`: checks out a Code - OSS fork, applies the Gomi integration manifest, packages Gomi for Windows, collects `.exe`, `.msi`, and `.zip` outputs when present, and writes an `ARTIFACTS.md` manifest. It runs automatically for `v*` tags and can be enabled manually with `build_code_oss_windows`.
+- `code-oss-windows`: checks out a Code - OSS fork, applies the Gomi integration manifest, packages Gomi for Windows, validates the patched `product.json` still identifies the build as Gomi IDE, collects `.exe`, `.msi`, and `.zip` outputs when present, and writes an `ARTIFACTS.md` manifest. It runs automatically for `v*` tags and can be enabled manually with `build_code_oss_windows`.
 - `release`: downloads all artifacts, generates release notes, and publishes artifacts to a GitHub Release only after the Windows desktop packaging job succeeds.
 
 For tagged releases, the Code - OSS source defaults to `microsoft/vscode` at `main`. In production, configure repository variables before tagging:
@@ -62,6 +62,8 @@ To run the full Windows desktop packaging workflow:
 7. Enable `build_setup_exe` when the fork has a compatible Windows setup gulp task.
 
 The Windows packaging job runs `scripts/build-gomi-code-oss-windows.ps1`. That script validates the Code - OSS checkout, generates Gomi desktop branding assets, builds the Gomi Office React/Phaser webview bundle, applies `build/gomi-code-oss.integration.json`, merges Gomi product metadata over the fork's existing `product.json`, copies Gomi branding/module files into the fork, overlays the native Gomi workbench registration template, copies the generated webview assets into the workbench module, appends the Gomi workbench import when needed, and then runs the Code - OSS gulp package task.
+
+After packaging, `scripts/collect-gomi-windows-artifacts.ps1` validates the final Code - OSS `product.json` before any artifact is uploaded. It refuses to collect release files unless the product identity is `Gomi IDE`, the app id is `gomi-ide`, the data folder is `.gomi-ide`, and the extension gallery points to Open VSX. This prevents a release run from accidentally publishing upstream Code - OSS artifacts under the Gomi release.
 
 The workflow intentionally keeps the heavy Code - OSS packaging job separate from the normal `master` verification path. Normal pushes verify the Gomi module quickly. Tags or manual release runs produce desktop artifacts.
 

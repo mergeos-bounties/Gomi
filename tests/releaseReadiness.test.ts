@@ -207,6 +207,7 @@ describe('release readiness', () => {
 
   it('keeps GitHub Actions wired for verification, optional Windows packaging, and release publishing', async () => {
     const workflow = await readFile(path.join(root, '.github/workflows/build-release.yml'), 'utf8');
+    const collectorScript = await readFile(path.join(root, 'scripts/collect-gomi-windows-artifacts.ps1'), 'utf8');
 
     expect(workflow).toContain('name: Build and Release Gomi IDE');
     expect(workflow).toContain("tags:");
@@ -225,22 +226,25 @@ describe('release readiness', () => {
     expect(workflow).toContain('npm run verify:release');
     expect(workflow).toContain('Build Code - OSS Windows package');
     expect(workflow).toContain('scripts\\build-gomi-code-oss-windows.ps1');
-    expect(workflow).toContain('-Include *.exe,*.msi,*.zip');
-    expect(workflow).toContain('gomi-ide-${{ env.GOMI_WINDOWS_PLATFORM }}.zip');
-    expect(workflow).toContain('ARTIFACTS.md');
+    expect(workflow).toContain('scripts\\collect-gomi-windows-artifacts.ps1');
     expect(workflow).toContain('PROTOTYPE-SHA256SUMS.txt');
-    expect(workflow).toContain('WINDOWS-SHA256SUMS.txt');
     expect(workflow).toContain("needs.code-oss-windows.result == 'success'");
     expect(workflow).toContain('inputs.build_code_oss_windows == true');
     expect(workflow).toContain('softprops/action-gh-release@v2');
     expect(workflow).not.toContain("needs.code-oss-windows.result == 'skipped'");
     expect(workflow).not.toMatch(/marketplace\.visualstudio\.com/i);
+    expect(collectorScript).toContain('-Include *.exe, *.msi, *.zip');
+    expect(collectorScript).toContain('"gomi-ide-$Platform.zip"');
+    expect(collectorScript).toContain('ARTIFACTS.md');
+    expect(collectorScript).toContain('WINDOWS-SHA256SUMS.txt');
+    expect(collectorScript).toContain('Product identity verified from Code - OSS product.json');
   });
 
   it('documents the executable-first release path instead of presenting npm as the product runtime', async () => {
     const readme = await readFile(path.join(root, 'README.md'), 'utf8');
     const windowsRelease = await readFile(path.join(root, 'docs/windows-release.md'), 'utf8');
     const bootstrapScript = await readFile(path.join(root, 'scripts/bootstrap-gomi-code-oss-fork.ps1'), 'utf8');
+    const collectorScript = await readFile(path.join(root, 'scripts/collect-gomi-windows-artifacts.ps1'), 'utf8');
     const packageJson = await readJson<{ scripts?: Record<string, string> }>('package.json');
 
     expect(readme).toContain('Gomi IDE should be released as a desktop artifact from a Code - OSS fork');
@@ -262,6 +266,9 @@ describe('release readiness', () => {
     expect(bootstrapScript).toContain('apply-gomi-code-oss-integration.ps1');
     expect(bootstrapScript).toContain('-ValidateOnly');
     expect(bootstrapScript).toContain('-DryRun');
+    expect(collectorScript).toContain('Assert-GomiProductJson');
+    expect(collectorScript).toContain('Product identity verified from Code - OSS product.json');
+    expect(collectorScript).toContain('WINDOWS-SHA256SUMS.txt');
     expect(packageJson.scripts?.['verify:release']).toBe(
       'vitest run tests/releaseReadiness.test.ts tests/codeOssIntegrationManifest.test.ts'
     );
