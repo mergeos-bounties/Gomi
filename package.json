@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "description": "Gomi Office IDE: Multi-Agent Development Environment",
+  "author": "Gomi",
+  "license": "MIT",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
@@ -12,7 +15,10 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "typecheck": "tsc -b",
-    "verify:release": "vitest run tests/releaseReadiness.test.ts tests/codeOssIntegrationManifest.test.ts"
+    "verify:release": "vitest run tests/releaseReadiness.test.ts tests/codeOssIntegrationManifest.test.ts",
+    "electron:start": "electron .",
+    "desktop:dir": "npm run build && electron-builder --win --dir",
+    "desktop:build": "npm run build && electron-builder --win"
   },
   "dependencies": {
     "lucide-react": "^0.475.0",
@@ -25,9 +31,39 @@
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^5.0.0",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
     "playwright": "^1.60.0",
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
     "vitest": "^3.0.5"
+  },
+  "build": {
+    "appId": "com.gomi.ide",
+    "productName": "Gomi IDE",
+    "copyright": "Copyright (c) Gomi",
+    "directories": {
+      "output": "release/desktop",
+      "buildResources": "resources/gomi-branding"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "resources/gomi-branding/win32/gomi.ico",
+      "artifactName": "Gomi-IDE-Setup-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Gomi IDE",
+      "uninstallDisplayName": "Gomi IDE"
+    }
   }
 }
