@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { BASE_GOMI_AGENTS } from '../src/vs/workbench/contrib/gomi/common/gomiConstants';
-import { createGomiOfficeLayout, workStatusLabels } from '../src/vs/workbench/contrib/gomi/browser/gomiOfficeLayout';
+import {
+  createGomiConversationRoute,
+  createGomiOfficeLayout,
+  resolveGomiConversationRecipient,
+  workStatusLabels
+} from '../src/vs/workbench/contrib/gomi/browser/gomiOfficeLayout';
 
 describe('Gomi office layout', () => {
   it('assigns every base agent to a visible room seat', () => {
@@ -54,5 +59,25 @@ describe('Gomi office layout', () => {
       'waiting',
       'working'
     ]);
+  });
+
+  it('creates bounded direct conversation routes between agents', () => {
+    const layout = createGomiOfficeLayout(1280, 720);
+    const recipientId = resolveGomiConversationRecipient('backend', undefined, ['backend', 'database', 'qa']);
+    const route = createGomiConversationRoute(1280, 720, layout.seats, 'backend', recipientId ?? 'qa');
+
+    expect(recipientId).toBe('database');
+    expect(route).toMatchObject({
+      speakerId: 'backend',
+      recipientId: 'database'
+    });
+    expect(route?.speakerVisitPoint.x).toBeGreaterThanOrEqual(34);
+    expect(route?.speakerVisitPoint.x).toBeLessThanOrEqual(1280 - 34);
+    expect(route?.speakerVisitPoint.y).toBeGreaterThanOrEqual(78);
+    expect(route?.speakerVisitPoint.y).toBeLessThanOrEqual(720 - 40);
+    expect(route?.bubbleAnchor.x).toBeGreaterThanOrEqual(34);
+    expect(route?.bubbleAnchor.x).toBeLessThanOrEqual(1280 - 34);
+    expect(route?.bubbleAnchor.y).toBeGreaterThanOrEqual(18);
+    expect(route?.bubbleAnchor.y).toBeLessThanOrEqual(720 - 72);
   });
 });

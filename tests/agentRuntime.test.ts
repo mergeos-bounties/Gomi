@@ -20,6 +20,7 @@ describe('GomiAgentRuntime', () => {
     let memoryUpdateCount = 0;
     const memoryKeys: string[] = [];
     let messageCount = 0;
+    const directedMessagePairs: string[] = [];
 
     for await (const event of runtime.run('Review API and UI')) {
       eventTypes.push(event.type);
@@ -32,6 +33,9 @@ describe('GomiAgentRuntime', () => {
       }
       if (event.type === 'message') {
         messageCount += 1;
+        if (event.message.recipientId) {
+          directedMessagePairs.push(`${event.message.senderId}->${event.message.recipientId}`);
+        }
       }
     }
 
@@ -44,6 +48,8 @@ describe('GomiAgentRuntime', () => {
     expect(memoryUpdateCount).toBeGreaterThan(agentResultCount);
     expect(memoryKeys).toContain('workspace:files');
     expect(memoryKeys.some((key) => key.startsWith('agent:'))).toBe(true);
+    expect(directedMessagePairs).toContain('ceo->system-analyst');
+    expect(directedMessagePairs.some((pair) => !pair.startsWith('ceo->'))).toBe(true);
     expect(messageCount).toBeLessThan(agentResultCount + 4);
     expect(eventTypes.at(-1)).toBe('session_completed');
   });

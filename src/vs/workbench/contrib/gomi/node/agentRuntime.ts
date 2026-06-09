@@ -162,7 +162,9 @@ export class GomiAgentRuntime {
     yield* this.say(
       'ceo',
       'CEO Agent',
-      `I am reading the workspace through ${getProviderLabel(this.getAgentProviderId('ceo'))} and splitting this request into agent tasks.`
+      `I am reading the workspace through ${getProviderLabel(this.getAgentProviderId('ceo'))} and splitting this request into agent tasks.`,
+      'system-analyst',
+      this.agentName('system-analyst')
     );
     await this.wait();
 
@@ -234,10 +236,13 @@ export class GomiAgentRuntime {
         );
       }
       if (communicationDecision.shouldBroadcast) {
+        const recipientId = this.communicationRecipientFor(task.agentId, tasks);
         yield* this.say(
           task.agentId,
           this.agentName(task.agentId),
-          this.agentMessage(task, agentResult, communicationDecision.broadcastSummary)
+          this.agentMessage(task, agentResult, communicationDecision.broadcastSummary),
+          recipientId,
+          this.agentName(recipientId)
         );
       }
       await this.wait();
@@ -287,7 +292,9 @@ export class GomiAgentRuntime {
   private async *say(
     senderId: GomiChatMessage['senderId'],
     senderName: string,
-    content: string
+    content: string,
+    recipientId?: GomiChatMessage['recipientId'],
+    recipientName?: string
   ): AsyncGenerator<GomiRuntimeEvent> {
     yield* this.emit({
       type: 'message',
@@ -295,6 +302,8 @@ export class GomiAgentRuntime {
         id: `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`,
         senderId,
         senderName,
+        recipientId,
+        recipientName,
         content,
         createdAt: new Date().toLocaleTimeString()
       }
@@ -391,6 +400,25 @@ export class GomiAgentRuntime {
 
   private agentName(agentId: GomiAgentId): string {
     return BASE_GOMI_AGENTS.find((agent) => agent.id === agentId)?.name ?? 'Gomi Agent';
+  }
+
+  private communicationRecipientFor(senderId: GomiAgentId, tasks: GomiTask[]): GomiAgentId {
+    const plannedAgentIds = new Set(tasks.map((task) => task.agentId));
+    const preferredRecipients: Record<GomiAgentId, GomiAgentId[]> = {
+      ceo: ['system-analyst', 'qa'],
+      'system-analyst': ['backend', 'database', 'designer', 'qa'],
+      backend: ['database', 'qa', 'frontend'],
+      frontend: ['designer', 'qa', 'backend'],
+      designer: ['frontend', 'qa'],
+      database: ['backend', 'qa'],
+      qa: ['backend', 'frontend', 'devops'],
+      devops: ['backend', 'qa']
+    };
+
+    return (
+      preferredRecipients[senderId].find((agentId) => plannedAgentIds.has(agentId) && agentId !== senderId) ??
+      'ceo'
+    );
   }
 
   private applyOfficeAvailability(task: GomiTask): GomiTask {

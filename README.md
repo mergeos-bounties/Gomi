@@ -55,6 +55,7 @@ This repository is the current product foundation and technical prototype. It is
 - **Responsive agent/settings drawer** so office staffing controls remain reachable on compact workbench widths.
 - **Cute real-office 2D simulation** built with Phaser, including rooms, desks, doors, shared boards, staff avatars, and route lines.
 - **Animated game-style agents and staff** with visible status, sleep state, offboarded markers, and chat bubbles.
+- **Directed agent conversations** where important broadcasts include a recipient, the speaking avatar runs toward that agent, and the shared bubble appears at the meeting point.
 - **Responsive office layout model** with dedicated rooms, a shared memory board, a status wall, and route lines showing Gomi moving between active agents.
 - **Shared memory board** fed by real runtime memory updates for project context.
 - **CEO Agent planning flow** with specialist agent delegation.

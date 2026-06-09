@@ -1320,7 +1320,10 @@ function ChatLog({ messages }: { messages: GomiChatMessage[] }) {
           messages.map((message) => (
             <div className="gomi-message" key={message.id}>
               <div className="gomi-message__head">
-                <span>{message.senderName}</span>
+                <span>
+                  {message.senderName}
+                  {message.recipientName ? ` -> ${message.recipientName}` : ''}
+                </span>
                 <time>{message.createdAt}</time>
               </div>
               <div className="gomi-message__body">{message.content}</div>

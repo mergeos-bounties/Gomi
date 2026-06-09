@@ -131,6 +131,8 @@ export interface GomiChatMessage {
   id: string;
   senderId: GomiAgentId | 'user' | 'system' | 'pet-gomi';
   senderName: string;
+  recipientId?: GomiAgentId | 'user' | 'system' | 'pet-gomi';
+  recipientName?: string;
   content: string;
   createdAt: string;
 }

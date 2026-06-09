@@ -23,6 +23,15 @@ export interface GomiOfficeAgentSeat {
   y: number;
 }
 
+export interface GomiOfficeConversationRoute {
+  speakerId: GomiAgentId;
+  recipientId: GomiAgentId;
+  speakerSeat: { x: number; y: number };
+  recipientSeat: { x: number; y: number };
+  speakerVisitPoint: { x: number; y: number };
+  bubbleAnchor: { x: number; y: number };
+}
+
 export interface GomiOfficeLayout {
   rooms: GomiOfficeRoomLayout[];
   memoryBoard: GomiOfficeBoardLayout;
@@ -51,6 +60,17 @@ export const workStatusLabels: Record<GomiAgentStatus, string> = {
   sleeping: 'Sleeping',
   done: 'Done',
   blocked: 'Blocked'
+};
+
+const fallbackConversationRecipients: Record<GomiAgentId, GomiAgentId[]> = {
+  ceo: ['system-analyst', 'qa'],
+  'system-analyst': ['backend', 'database', 'designer', 'qa'],
+  backend: ['database', 'qa', 'frontend'],
+  frontend: ['designer', 'qa', 'backend'],
+  designer: ['frontend', 'qa'],
+  database: ['backend', 'qa'],
+  qa: ['backend', 'frontend', 'devops'],
+  devops: ['backend', 'qa']
 };
 
 export function createGomiOfficeLayout(width: number, height: number): GomiOfficeLayout {
@@ -90,6 +110,75 @@ export function createGomiOfficeLayout(width: number, height: number): GomiOffic
       y: clamp(safeHeight * 0.52, topY + roomHeight + 22, bottomY - 20)
     },
     seats: createSeats(rooms)
+  };
+}
+
+export function isGomiAgentId(value: string): value is GomiAgentId {
+  return Object.prototype.hasOwnProperty.call(agentRoomIds, value);
+}
+
+export function resolveGomiConversationRecipient(
+  senderId: GomiAgentId,
+  explicitRecipientId?: string,
+  availableAgentIds: GomiAgentId[] = Object.keys(agentRoomIds) as GomiAgentId[]
+): GomiAgentId | undefined {
+  const available = new Set(availableAgentIds);
+
+  if (
+    explicitRecipientId &&
+    isGomiAgentId(explicitRecipientId) &&
+    explicitRecipientId !== senderId &&
+    available.has(explicitRecipientId)
+  ) {
+    return explicitRecipientId;
+  }
+
+  return (
+    fallbackConversationRecipients[senderId].find((agentId) => agentId !== senderId && available.has(agentId)) ??
+    availableAgentIds.find((agentId) => agentId !== senderId)
+  );
+}
+
+export function createGomiConversationRoute(
+  width: number,
+  height: number,
+  seats: GomiOfficeAgentSeat[],
+  speakerId: GomiAgentId,
+  recipientId: GomiAgentId
+): GomiOfficeConversationRoute | undefined {
+  if (speakerId === recipientId) {
+    return undefined;
+  }
+
+  const speakerSeat = seats.find((seat) => seat.agentId === speakerId);
+  const recipientSeat = seats.find((seat) => seat.agentId === recipientId);
+
+  if (!speakerSeat || !recipientSeat) {
+    return undefined;
+  }
+
+  const dx = recipientSeat.x - speakerSeat.x;
+  const dy = recipientSeat.y - speakerSeat.y;
+  const distance = Math.max(1, Math.hypot(dx, dy));
+  const unitX = dx / distance;
+  const unitY = dy / distance;
+  const approachDistance = clamp(distance * 0.22, 38, 62);
+  const speakerVisitPoint = {
+    x: clamp(recipientSeat.x - unitX * approachDistance, 34, width - 34),
+    y: clamp(recipientSeat.y - unitY * approachDistance, 78, height - 40)
+  };
+  const bubbleAnchor = {
+    x: clamp((speakerVisitPoint.x + recipientSeat.x) / 2, 34, width - 34),
+    y: clamp(Math.min(speakerVisitPoint.y, recipientSeat.y) - 96, 18, height - 72)
+  };
+
+  return {
+    speakerId,
+    recipientId,
+    speakerSeat,
+    recipientSeat,
+    speakerVisitPoint,
+    bubbleAnchor
   };
 }
 

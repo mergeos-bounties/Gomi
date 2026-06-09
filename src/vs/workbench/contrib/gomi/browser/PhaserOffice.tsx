@@ -10,8 +10,12 @@ import type {
 } from '../common/gomiTypes';
 import {
   agentRoomIds,
+  createGomiConversationRoute,
   createGomiOfficeLayout,
+  isGomiAgentId,
+  resolveGomiConversationRecipient,
   type GomiOfficeBoardLayout,
+  type GomiOfficeConversationRoute,
   type GomiOfficeRoomLayout
 } from './gomiOfficeLayout';
 
@@ -22,6 +26,11 @@ interface PhaserOfficeProps {
   messages: GomiChatMessage[];
   memoryItems?: GomiMemoryBoardItem[];
   layoutToken?: string;
+}
+
+interface ActiveOfficeConversation extends GomiOfficeConversationRoute {
+  content: string;
+  senderName: string;
 }
 
 const statusColors: Record<GomiAgent['status'], number> = {
@@ -122,6 +131,13 @@ export function PhaserOffice({
         const height = this.game.canvas.height || this.scale.height || 360;
         const officeLayout = createGomiOfficeLayout(width, height);
         const latestSpeech = this.getLatestSpeechBySender(nextMessages);
+        const activeConversation = this.getActiveConversation(
+          nextMessages,
+          officeLayout.seats,
+          nextAgents,
+          width,
+          height
+        );
 
         this.children.removeAll(true);
         this.tweens.killAll();
@@ -131,11 +147,24 @@ export function PhaserOffice({
         this.drawMemoryBoard(graphics, officeLayout.memoryBoard, nextTasks, nextMessages, nextMemoryItems);
         this.drawStatusWall(graphics, officeLayout.statusWall, nextAgents, nextTasks, nextOfficeSettings.seats);
         this.drawGomiRoute(graphics, officeLayout.gomiHub, officeLayout.seats, nextAgents);
+        this.drawConversationRoute(graphics, activeConversation);
         this.drawDepartmentStaff(graphics, officeLayout.rooms, nextOfficeSettings.seats);
 
         for (const agent of nextAgents) {
           const seat = officeLayout.seats.find((candidate) => candidate.agentId === agent.id);
-          this.drawAgent(agent, width, height, latestSpeech.get(agent.id), seat);
+          const isConversationAgent =
+            activeConversation?.speakerId === agent.id || activeConversation?.recipientId === agent.id;
+          const visitTarget =
+            activeConversation?.speakerId === agent.id ? activeConversation.speakerVisitPoint : undefined;
+
+          this.drawAgent(
+            agent,
+            width,
+            height,
+            isConversationAgent ? undefined : latestSpeech.get(agent.id),
+            seat,
+            visitTarget
+          );
         }
 
         this.drawGomiGuide(
@@ -145,6 +174,15 @@ export function PhaserOffice({
           nextTasks.some((task) => task.status === 'running'),
           latestSpeech.get('pet-gomi')
         );
+
+        if (activeConversation) {
+          this.drawSpeechBubble(
+            activeConversation.bubbleAnchor.x,
+            activeConversation.bubbleAnchor.y,
+            this.shorten(`${activeConversation.senderName}: ${activeConversation.content}`, 68),
+            width
+          );
+        }
       }
 
       private drawOfficeShell(
@@ -481,7 +519,8 @@ export function PhaserOffice({
         width: number,
         height: number,
         bubbleText?: string,
-        seat?: { x: number; y: number }
+        seat?: { x: number; y: number },
+        visitTarget?: { x: number; y: number }
       ) {
         const x = seat?.x ?? (agent.position.x / 100) * width;
         const y = seat?.y ?? (agent.position.y / 100) * height;
@@ -495,10 +534,12 @@ export function PhaserOffice({
         const statusColor = statusColors[agent.status];
         const isActive = agent.status !== 'idle' && agent.status !== 'waiting';
         const group = this.add.container(x, y);
+        const leftLeg = this.add.rectangle(-11, 34, 10, 13, 0x334155, 1).setOrigin(0.5);
+        const rightLeg = this.add.rectangle(11, 34, 10, 13, 0x334155, 1).setOrigin(0.5);
 
         group.add(this.add.ellipse(0, 28, 54, 18, 0x475569, 0.18));
-        group.add(this.add.rectangle(-11, 34, 10, 13, 0x334155, 1).setOrigin(0.5));
-        group.add(this.add.rectangle(11, 34, 10, 13, 0x334155, 1).setOrigin(0.5));
+        group.add(leftLeg);
+        group.add(rightLeg);
         group.add(this.add.rectangle(0, 11, 34, 36, color, 1).setOrigin(0.5));
         group.add(this.add.circle(0, -18, 22, 0xffedd5, 1));
         group.add(this.add.rectangle(0, -33, 36, 14, color, 1).setOrigin(0.5));
@@ -511,18 +552,38 @@ export function PhaserOffice({
         const badge = this.add.circle(24, -34, 7, statusColor, 1);
         group.add(badge);
 
-        this.add
-          .text(x, y + 43, agent.name.replace(' Agent', ''), {
-            color: '#0f172a',
-            fontFamily: 'Inter, Arial',
-            fontSize: '12px',
-            fontStyle: '700',
-            backgroundColor: '#ffffff',
-            padding: { x: 5, y: 2 }
-          })
-          .setOrigin(0.5, 0);
+        group.add(
+          this.add
+            .text(0, 43, agent.name.replace(' Agent', ''), {
+              color: '#0f172a',
+              fontFamily: 'Inter, Arial',
+              fontSize: '12px',
+              fontStyle: '700',
+              backgroundColor: '#ffffff',
+              padding: { x: 5, y: 2 }
+            })
+            .setOrigin(0.5, 0)
+        );
 
-        if (isActive) {
+        if (visitTarget) {
+          this.tweens.add({
+            targets: group,
+            x: visitTarget.x,
+            y: visitTarget.y,
+            duration: 1050,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+          });
+          this.tweens.add({
+            targets: [leftLeg, rightLeg],
+            y: 38,
+            duration: 190,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+          });
+        } else if (isActive) {
           this.tweens.add({
             targets: group,
             y: y - 8,
@@ -574,6 +635,49 @@ export function PhaserOffice({
           graphics.fillStyle(statusColors[agent.status], 0.85);
           graphics.fillCircle((hub.x + target.x) / 2, (hub.y + target.y) / 2, 5);
         }
+      }
+
+      private drawConversationRoute(
+        graphics: Phaser.GameObjects.Graphics,
+        conversation: ActiveOfficeConversation | undefined
+      ) {
+        if (!conversation) {
+          return;
+        }
+
+        const speakerColor = roleColors[conversation.speakerId];
+        const recipientColor = roleColors[conversation.recipientId];
+
+        graphics.lineStyle(4, speakerColor, 0.38);
+        graphics.lineBetween(
+          conversation.speakerSeat.x,
+          conversation.speakerSeat.y,
+          conversation.speakerVisitPoint.x,
+          conversation.speakerVisitPoint.y
+        );
+        graphics.lineStyle(3, recipientColor, 0.28);
+        graphics.lineBetween(
+          conversation.speakerVisitPoint.x,
+          conversation.speakerVisitPoint.y,
+          conversation.recipientSeat.x,
+          conversation.recipientSeat.y
+        );
+
+        for (let index = 1; index <= 4; index += 1) {
+          const progress = index / 5;
+          const x = Phaser.Math.Linear(conversation.speakerSeat.x, conversation.speakerVisitPoint.x, progress);
+          const y = Phaser.Math.Linear(conversation.speakerSeat.y, conversation.speakerVisitPoint.y, progress);
+
+          graphics.fillStyle(speakerColor, 0.85 - index * 0.08);
+          graphics.fillCircle(x, y, 4);
+        }
+
+        graphics.fillStyle(0xffffff, 0.95);
+        graphics.fillCircle(conversation.speakerVisitPoint.x, conversation.speakerVisitPoint.y, 13);
+        graphics.lineStyle(2, speakerColor, 0.9);
+        graphics.strokeCircle(conversation.speakerVisitPoint.x, conversation.speakerVisitPoint.y, 13);
+        graphics.fillStyle(recipientColor, 0.9);
+        graphics.fillCircle(conversation.recipientSeat.x, conversation.recipientSeat.y - 42, 5);
       }
 
       private drawSleepingAgent(agent: GomiAgent, x: number, y: number, sceneWidth: number) {
@@ -723,6 +827,46 @@ export function PhaserOffice({
         }
 
         return latest;
+      }
+
+      private getActiveConversation(
+        messages: GomiChatMessage[],
+        seats: Array<{ agentId: GomiAgent['id']; roomId: string; x: number; y: number }>,
+        agents: GomiAgent[],
+        width: number,
+        height: number
+      ): ActiveOfficeConversation | undefined {
+        const availableAgentIds = agents.map((agent) => agent.id);
+
+        for (const message of [...messages].reverse()) {
+          if (!isGomiAgentId(message.senderId)) {
+            continue;
+          }
+
+          const recipientId = resolveGomiConversationRecipient(
+            message.senderId,
+            message.recipientId,
+            availableAgentIds
+          );
+
+          if (!recipientId) {
+            continue;
+          }
+
+          const route = createGomiConversationRoute(width, height, seats, message.senderId, recipientId);
+
+          if (!route) {
+            continue;
+          }
+
+          return {
+            ...route,
+            content: message.content,
+            senderName: message.senderName
+          };
+        }
+
+        return undefined;
       }
 
       private shorten(value: string, maxLength: number): string {
