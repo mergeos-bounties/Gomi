@@ -66,6 +66,7 @@ const gomiOfficeIcon = registerIcon(
 );
 
 class GomiOfficeViewPane extends ViewPane {
+  private static activeController?: GomiWebviewHostController;
   private readonly webview = this._register(new MutableDisposable<IOverlayWebview>());
   private readonly webviewDisposables = this._register(new DisposableStore());
   private container?: HTMLElement;
@@ -106,6 +107,10 @@ class GomiOfficeViewPane extends ViewPane {
     );
 
     this._register(this.onDidChangeBodyVisibility(() => this.updateWebviewVisibility()));
+  }
+
+  static stopActiveSession(reason = 'Gomi Office session stopped from the command palette.'): void {
+    this.activeController?.stopOfficeSession(reason);
   }
 
   focus(): void {
@@ -182,8 +187,14 @@ class GomiOfficeViewPane extends ViewPane {
       patchApplier: (message) => applyCodeOssPatchMessage(message, codeOssWorkspaceServices)
     });
     controller.start();
+    GomiOfficeViewPane.activeController = controller;
     this.webviewDisposables.add(bridge);
     this.webviewDisposables.add(controller);
+    this.webviewDisposables.add(toDisposable(() => {
+      if (GomiOfficeViewPane.activeController === controller) {
+        GomiOfficeViewPane.activeController = undefined;
+      }
+    }));
     this.webviewDisposables.add(toDisposable(() => this.webview.value?.release(this)));
   }
 
@@ -279,6 +290,7 @@ registerAction2(class GomiStopAgentTaskAction extends Action2 {
 
   async run(accessor: ServicesAccessor): Promise<void> {
     await openGomiOfficeView(accessor);
+    GomiOfficeViewPane.stopActiveSession();
   }
 });
 

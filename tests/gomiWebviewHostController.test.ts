@@ -14,6 +14,7 @@ import {
   GomiWebviewHostController,
   type GomiWebviewRuntimeRunner
 } from '../src/vs/workbench/contrib/gomi/browser/gomiWebviewHostController';
+import type { GomiRuntimeRunOptions } from '../src/vs/workbench/contrib/gomi/node/agentRuntime';
 
 describe('Gomi webview host controller', () => {
   it('streams runtime events back to the webview bridge', async () => {
@@ -61,6 +62,62 @@ describe('Gomi webview host controller', () => {
     expect(seenSettings[0].seats.find((seat) => seat.id === 'head-backend')?.workMode).toBe('sleeping');
     expect(seenSettings[0].memory.broadcastThreshold).toBe(0.88);
     expect(bridge.outbox.map((message) => message.type)).toEqual(['gomi.event', 'gomi.event']);
+  });
+
+  it('stops a running host session through a bridge stop message', async () => {
+    const bridge = new MemoryBridge();
+    let seenSignal: AbortSignal | undefined;
+    const controller = new GomiWebviewHostController({
+      bridge,
+      runtime: {
+        async *run(_request: string, options?: GomiRuntimeRunOptions) {
+          seenSignal = options?.signal;
+          yield {
+            type: 'session_started',
+            sessionId: 'session-stop',
+            request: 'Stop this',
+            workspace: {
+              rootName: 'StopWorkspace',
+              files: ['README.md'],
+              openEditors: [],
+              gitSummary: 'Git clean.',
+              terminalSummary: 'Idle.'
+            }
+          } satisfies GomiRuntimeEvent;
+
+          await waitForAbort(options?.signal);
+
+          yield {
+            type: 'session_stopped',
+            sessionId: 'session-stop',
+            reason: 'Stopped by test.'
+          } satisfies GomiRuntimeEvent;
+          yield {
+            type: 'session_completed',
+            sessionId: 'session-stop'
+          } satisfies GomiRuntimeEvent;
+        }
+      }
+    });
+
+    const runPromise = controller.handleMessage({
+      type: 'gomi.run',
+      request: 'Stop this'
+    });
+    await Promise.resolve();
+    await controller.handleMessage({
+      type: 'gomi.stop',
+      reason: 'Stopped by test.'
+    });
+    await runPromise;
+
+    const eventTypes = bridge.outbox
+      .filter((message): message is Extract<GomiBridgeMessage, { type: 'gomi.event' }> => message.type === 'gomi.event')
+      .map((message) => message.event.type);
+
+    expect(seenSignal?.aborted).toBe(true);
+    expect(eventTypes).toContain('session_stopped');
+    expect(eventTypes.at(-1)).toBe('session_completed');
   });
 
   it('returns patch apply errors when no host patch applier is configured', async () => {
@@ -251,6 +308,16 @@ function createRuntime(events: GomiRuntimeEvent[]): GomiWebviewRuntimeRunner {
       }
     }
   };
+}
+
+function waitForAbort(signal?: AbortSignal): Promise<void> {
+  if (!signal || signal.aborted) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    signal.addEventListener('abort', () => resolve(), { once: true });
+  });
 }
 
 function createPatch(id: string): GomiPatchProposal {

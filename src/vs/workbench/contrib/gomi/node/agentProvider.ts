@@ -59,6 +59,7 @@ export interface GomiAgentRunContext {
   executionPolicy?: GomiOfficeExecutionSettings & {
     patchApprovalRequired: boolean;
   };
+  signal?: AbortSignal;
 }
 
 export interface GomiAgentProvider {
@@ -118,21 +119,24 @@ export class DemoGomiAgentProvider implements GomiAgentProvider {
   async runAgentTask(context: GomiAgentRunContext): Promise<GomiAgentResult> {
     const role = roleFocus[context.task.agentId];
     const proposedFiles = this.pickProposedFiles(context);
-    const response = await this.complete({
-      system: `You are ${context.task.agentId} in the Gomi Multi-Agent Office.`,
-      messages: [
-        {
-          role: 'user',
-          content: context.request
+    const response = await this.complete(
+      {
+        system: `You are ${context.task.agentId} in the Gomi Multi-Agent Office.`,
+        messages: [
+          {
+            role: 'user',
+            content: context.request
+          }
+        ],
+        workspaceContext: context.workspace.files,
+        memory: context.memory,
+        metadata: {
+          taskId: context.task.id,
+          agentId: context.task.agentId
         }
-      ],
-      workspaceContext: context.workspace.files,
-      memory: context.memory,
-      metadata: {
-        taskId: context.task.id,
-        agentId: context.task.agentId
-      }
-    });
+      },
+      context.signal
+    );
 
     return {
       agentId: context.task.agentId,

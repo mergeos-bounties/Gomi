@@ -1,11 +1,11 @@
 import { normalizeGomiOfficeSettings } from '../common/gomiOfficeSettings';
 import type { GomiOfficeSettings, GomiPatchPreviewResult, GomiRuntimeEvent } from '../common/gomiTypes';
 import type { GomiBridgeMessage, GomiWorkbenchBridge } from '../electron-sandbox/gomiBridge';
-import { GomiAgentRuntime, type GomiRuntimeOptions } from '../node/agentRuntime';
+import { GomiAgentRuntime, type GomiRuntimeOptions, type GomiRuntimeRunOptions } from '../node/agentRuntime';
 import type { GomiPatchApplyResult } from '../node/workspacePatchApplier';
 
 export interface GomiWebviewRuntimeRunner {
-  run(request: string): AsyncGenerator<GomiRuntimeEvent>;
+  run(request: string, options?: GomiRuntimeRunOptions): AsyncGenerator<GomiRuntimeEvent>;
 }
 
 export interface GomiWebviewHostControllerOptions {
@@ -24,6 +24,7 @@ export interface GomiWebviewHostControllerOptions {
 export class GomiWebviewHostController {
   private unsubscribe?: () => void;
   private running = false;
+  private abortController?: AbortController;
   private readonly previewedPatches = new Map<string, string>();
 
   constructor(private readonly options: GomiWebviewHostControllerOptions) {}
@@ -39,6 +40,10 @@ export class GomiWebviewHostController {
   }
 
   dispose(): void {
+    if (this.running && this.abortController) {
+      this.abortController.abort('Gomi Office host view was disposed.');
+    }
+
     this.unsubscribe?.();
     this.unsubscribe = undefined;
   }
@@ -46,6 +51,11 @@ export class GomiWebviewHostController {
   async handleMessage(message: GomiBridgeMessage): Promise<void> {
     if (message.type === 'gomi.run') {
       await this.runOfficeSession(message);
+      return;
+    }
+
+    if (message.type === 'gomi.stop') {
+      this.stopOfficeSession(message.reason);
       return;
     }
 
@@ -78,19 +88,38 @@ export class GomiWebviewHostController {
     }
 
     this.running = true;
+    const abortController = new AbortController();
+    this.abortController = abortController;
 
     try {
       const runtime = this.options.runtime ?? this.createRuntime(message.officeSettings);
 
-      for await (const event of runtime.run(message.request)) {
+      for await (const event of runtime.run(message.request, {
+        signal: abortController.signal,
+        stopReason: 'Gomi Office session stopped by user.'
+      })) {
         this.options.bridge.postMessage({
           type: 'gomi.event',
           event
         });
       }
     } finally {
+      if (this.abortController === abortController) {
+        this.abortController = undefined;
+      }
+
       this.running = false;
     }
+  }
+
+  stopOfficeSession(reason = 'Gomi Office session stopped by user.'): void {
+    if (!this.running || !this.abortController) {
+      this.postSystemMessage('No Gomi Office session is running.');
+      return;
+    }
+
+    this.postSystemMessage('Stopping the current Gomi Office session...');
+    this.abortController.abort(reason);
   }
 
   private async applyPatch(message: Extract<GomiBridgeMessage, { type: 'gomi.applyPatch' }>): Promise<void> {
@@ -150,6 +179,22 @@ export class GomiWebviewHostController {
       officeSettings: officeSettings
         ? normalizeGomiOfficeSettings(officeSettings)
         : this.options.runtimeOptions?.officeSettings
+    });
+  }
+
+  private postSystemMessage(content: string): void {
+    this.options.bridge.postMessage({
+      type: 'gomi.event',
+      event: {
+        type: 'message',
+        message: {
+          id: `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          senderId: 'system',
+          senderName: 'Gomi System',
+          content,
+          createdAt: new Date().toLocaleTimeString()
+        }
+      }
     });
   }
 }

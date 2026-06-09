@@ -59,6 +59,11 @@ export interface GomiRuntimeOptions {
   officeSettings?: GomiOfficeSettings;
 }
 
+export interface GomiRuntimeRunOptions {
+  signal?: AbortSignal;
+  stopReason?: string;
+}
+
 export class GomiAgentRuntime {
   private readonly planner = new GomiTaskPlanner();
   private readonly bus = new GomiMessageBus<GomiRuntimeEvent>();
@@ -86,9 +91,21 @@ export class GomiAgentRuntime {
     return this.bus.subscribe(type, listener);
   }
 
-  async *run(request: string): AsyncGenerator<GomiRuntimeEvent> {
+  async *run(request: string, options: GomiRuntimeRunOptions = {}): AsyncGenerator<GomiRuntimeEvent> {
     const sessionId = `gomi-${Date.now()}`;
+    const signal = options.signal;
+    const stopReason = options.stopReason ?? 'Gomi Office session stopped by user.';
+
+    if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
+      return;
+    }
+
     const rawWorkspace = await this.workspaceReader();
+
+    if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
+      return;
+    }
+
     const memoryScope = {
       workspaceId: rawWorkspace.rootName
     };
@@ -118,6 +135,10 @@ export class GomiAgentRuntime {
           chunkCount: 0,
           indexedPaths: []
         };
+
+    if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
+      return;
+    }
 
     const requestMemory = this.memoryStore.add({
       sessionId,
@@ -166,13 +187,21 @@ export class GomiAgentRuntime {
       'system-analyst',
       this.agentName('system-analyst')
     );
-    await this.wait();
+    await this.wait(signal);
+
+    if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
+      return;
+    }
 
     for (const task of tasks) {
       yield* this.emit({ type: 'task_update', task });
     }
 
     for (const task of tasks) {
+      if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
+        return;
+      }
+
       if (!isAgentAvailableForTask(this.officeSettings, task.agentId)) {
         yield* this.status(task.agentId, 'sleeping');
         yield* this.say(
@@ -199,8 +228,14 @@ export class GomiAgentRuntime {
         executionPolicy: {
           ...this.officeSettings.execution,
           patchApprovalRequired: this.officeSettings.memory.requirePatchApproval
-        }
+        },
+        signal
       });
+
+      if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
+        return;
+      }
+
       const communicationDecision = evaluateAgentCommunication(agentResult, {
         broadcastThreshold: this.officeSettings.memory.broadcastThreshold,
         recalledMemory: sharedMemory
@@ -245,16 +280,30 @@ export class GomiAgentRuntime {
           this.agentName(recipientId)
         );
       }
-      await this.wait();
+      await this.wait(signal);
+
+      if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
+        return;
+      }
+
       yield* this.updateTask(task, 'running', 78);
-      await this.wait();
+      await this.wait(signal);
+
+      if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
+        return;
+      }
+
       yield* this.updateTask(task, 'done', 100);
       yield* this.status(task.agentId, task.agentId === 'qa' ? 'reviewing' : 'done');
     }
 
     yield* this.status('ceo', 'working');
     yield* this.say('pet-gomi', 'Pet Gomi', 'Patch proposal is ready. Waiting for human approval before applying code changes.');
-    await this.wait();
+    await this.wait(signal);
+
+    if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
+      return;
+    }
 
     const patch = createPatchProposal(request, tasks, agentResults);
     const report = this.resultAggregator.createFinalReport({
@@ -343,6 +392,34 @@ export class GomiAgentRuntime {
       type: 'memory_update',
       item
     });
+  }
+
+  private async *stopIfAborted(
+    sessionId: string,
+    signal: AbortSignal | undefined,
+    reason: string
+  ): AsyncGenerator<GomiRuntimeEvent, boolean> {
+    if (!signal?.aborted) {
+      return false;
+    }
+
+    const stopReason = this.resolveStopReason(signal, reason);
+
+    yield* this.say('system', 'Gomi System', stopReason);
+    yield* this.emit({
+      type: 'session_stopped',
+      sessionId,
+      reason: stopReason
+    });
+    yield* this.emit({ type: 'session_completed', sessionId });
+
+    return true;
+  }
+
+  private resolveStopReason(signal: AbortSignal, fallbackReason: string): string {
+    return typeof signal.reason === 'string' && signal.reason.trim().length > 0
+      ? signal.reason
+      : fallbackReason;
   }
 
   private sessionMemoryToBoardItem(
@@ -474,9 +551,20 @@ export class GomiAgentRuntime {
     return `${normalizedValue.slice(0, 177)}...`;
   }
 
-  private wait(): Promise<void> {
+  private wait(signal?: AbortSignal): Promise<void> {
+    if (this.delayMs <= 0 || signal?.aborted) {
+      return Promise.resolve();
+    }
+
     return new Promise((resolve) => {
-      globalThis.setTimeout(resolve, this.delayMs);
+      const done = () => {
+        globalThis.clearTimeout(timeout);
+        signal?.removeEventListener('abort', done);
+        resolve();
+      };
+      const timeout = globalThis.setTimeout(done, this.delayMs);
+
+      signal?.addEventListener('abort', done, { once: true });
     });
   }
 }

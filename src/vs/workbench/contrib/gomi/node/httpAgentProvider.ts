@@ -106,7 +106,7 @@ export class HttpGomiAgentProvider implements GomiAgentProvider {
     }
 
     try {
-      const response = await this.completeWithRoute(route, createAgentRequest(context));
+      const response = await this.completeWithRoute(route, createAgentRequest(context), context.signal);
 
       return createAgentResultFromHttpResponse(context, response);
     } catch (error) {
@@ -134,6 +134,9 @@ export class HttpGomiAgentProvider implements GomiAgentProvider {
 
     try {
       signal?.addEventListener('abort', linkedAbort, { once: true });
+      if (signal?.aborted) {
+        abortController.abort(signal.reason);
+      }
 
       const response = await this.fetchImpl(endpoint, {
         method: 'POST',

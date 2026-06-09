@@ -14,6 +14,7 @@ import {
   setWorkspaceTrustState
 } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
 import { GomiAgentRuntime } from '../src/vs/workbench/contrib/gomi/node/agentRuntime';
+import type { GomiRuntimeRunOptions } from '../src/vs/workbench/contrib/gomi/node/agentRuntime';
 import type { GomiCliCommandInvocation } from '../src/vs/workbench/contrib/gomi/node/cliAgentProvider';
 import { GomiWorkbenchController } from '../src/vs/workbench/contrib/gomi/node/gomiWorkbenchController';
 
@@ -24,7 +25,12 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await fs.rm(workspaceRoot, { recursive: true, force: true });
+  await fs.rm(workspaceRoot, {
+    recursive: true,
+    force: true,
+    maxRetries: 5,
+    retryDelay: 100
+  });
 });
 
 describe('GomiWorkbenchController', () => {
@@ -57,6 +63,63 @@ describe('GomiWorkbenchController', () => {
     expect(eventTypes).toContain('session_started');
     expect(eventTypes).toContain('patch');
     expect(eventTypes).toContain('report');
+    expect(eventTypes.at(-1)).toBe('session_completed');
+  });
+
+  it('stops a running workbench session through a bridge stop message', async () => {
+    const bridge = new MemoryWorkbenchBridge();
+    let seenSignal: AbortSignal | undefined;
+    const controller = new GomiWorkbenchController({
+      bridge,
+      workspaceRoot,
+      runtime: {
+        async *run(_request: string, options?: GomiRuntimeRunOptions) {
+          seenSignal = options?.signal;
+          yield {
+            type: 'session_started',
+            sessionId: 'session-stop-node',
+            request: 'Stop node controller',
+            workspace: {
+              rootName: 'NodeStopWorkspace',
+              files: ['package.json'],
+              openEditors: [],
+              gitSummary: 'Git clean.',
+              terminalSummary: 'Idle.'
+            }
+          };
+
+          await waitForAbort(options?.signal);
+
+          yield {
+            type: 'session_stopped',
+            sessionId: 'session-stop-node',
+            reason: 'Stopped by node test.'
+          };
+          yield {
+            type: 'session_completed',
+            sessionId: 'session-stop-node'
+          };
+        }
+      }
+    });
+
+    const runPromise = controller.handleMessage({
+      type: 'gomi.run',
+      request: 'Stop node controller'
+    });
+    await Promise.resolve();
+    await controller.handleMessage({
+      type: 'gomi.stop',
+      reason: 'Stopped by node test.'
+    });
+    await runPromise;
+
+    const eventTypes = bridge.outbox
+      .filter((message): message is Extract<GomiBridgeMessage, { type: 'gomi.event' }> => message.type === 'gomi.event')
+      .map((message) => message.event.type);
+
+    expect(seenSignal?.aborted).toBe(true);
+    expect(eventTypes).toContain('session_stopped');
     expect(eventTypes.at(-1)).toBe('session_completed');
   });
 
@@ -448,4 +511,14 @@ function createPatch(overrides: Partial<GomiPatchProposal>): GomiPatchProposal {
     createdByAgentId: 'ceo',
     ...overrides
   };
+}
+
+function waitForAbort(signal?: AbortSignal): Promise<void> {
+  if (!signal || signal.aborted) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    signal.addEventListener('abort', () => resolve(), { once: true });
+  });
 }

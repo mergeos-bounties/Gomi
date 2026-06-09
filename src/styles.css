@@ -343,6 +343,26 @@ button {
   font-weight: 800;
 }
 
+.gomi-request-actions {
+  display: grid;
+  grid-template-rows: minmax(42px, 1fr);
+  gap: 8px;
+}
+
+.gomi-request-actions .gomi-send {
+  min-height: 42px;
+}
+
+.gomi-send.is-stop {
+  border: 1px solid #7f1d1d;
+  background: #1f1317;
+  color: #fecaca;
+}
+
+.gomi-send.is-stop:hover {
+  background: #3f151c;
+}
+
 .gomi-send:disabled {
   cursor: not-allowed;
   opacity: 0.54;

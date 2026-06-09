@@ -7,7 +7,7 @@ import type {
   GomiPatchPreviewResult,
   GomiRuntimeEvent
 } from '../common/gomiTypes';
-import { GomiAgentRuntime, type GomiRuntimeOptions } from './agentRuntime';
+import { GomiAgentRuntime, type GomiRuntimeOptions, type GomiRuntimeRunOptions } from './agentRuntime';
 import type { GomiCliCommandRunner } from './cliAgentProvider';
 import {
   createConfiguredEmbeddingProvider,
@@ -28,7 +28,7 @@ import {
 import { createWorkbenchGomiAgentProvider } from './workbenchAgentProvider';
 
 export interface GomiRuntimeRunner {
-  run(request: string): AsyncGenerator<GomiRuntimeEvent>;
+  run(request: string, options?: GomiRuntimeRunOptions): AsyncGenerator<GomiRuntimeEvent>;
 }
 
 export interface GomiWorkbenchControllerOptions {
@@ -71,6 +71,7 @@ export class GomiWorkbenchController {
   private readonly previewedPatches = new Map<string, string>();
   private unsubscribe?: () => void;
   private isRunning = false;
+  private abortController?: AbortController;
 
   constructor(options: GomiWorkbenchControllerOptions) {
     this.bridge = options.bridge;
@@ -122,6 +123,10 @@ export class GomiWorkbenchController {
   }
 
   dispose(): void {
+    if (this.isRunning && this.abortController) {
+      this.abortController.abort('Gomi workbench controller was disposed.');
+    }
+
     this.unsubscribe?.();
     this.unsubscribe = undefined;
   }
@@ -129,6 +134,11 @@ export class GomiWorkbenchController {
   async handleMessage(message: GomiBridgeMessage): Promise<void> {
     if (message.type === 'gomi.run') {
       await this.runOfficeSession(message);
+      return;
+    }
+
+    if (message.type === 'gomi.stop') {
+      this.stopOfficeSession(message.reason);
       return;
     }
 
@@ -161,19 +171,38 @@ export class GomiWorkbenchController {
     }
 
     this.isRunning = true;
+    const abortController = new AbortController();
+    this.abortController = abortController;
 
     try {
       const runtime = this.runtime ?? this.runtimeFactory(message.officeSettings);
 
-      for await (const event of runtime.run(message.request)) {
+      for await (const event of runtime.run(message.request, {
+        signal: abortController.signal,
+        stopReason: 'Gomi Office session stopped by user.'
+      })) {
         this.bridge.postMessage({
           type: 'gomi.event',
           event
         });
       }
     } finally {
+      if (this.abortController === abortController) {
+        this.abortController = undefined;
+      }
+
       this.isRunning = false;
     }
+  }
+
+  stopOfficeSession(reason = 'Gomi Office session stopped by user.'): void {
+    if (!this.isRunning || !this.abortController) {
+      this.postSystemMessage('No Gomi Office session is running.');
+      return;
+    }
+
+    this.postSystemMessage('Stopping the current Gomi Office session...');
+    this.abortController.abort(reason);
   }
 
   private async applyPatchMessage(
@@ -223,6 +252,22 @@ export class GomiWorkbenchController {
         error: error instanceof Error ? error.message : 'Unknown patch preview error.'
       });
     }
+  }
+
+  private postSystemMessage(content: string): void {
+    this.bridge.postMessage({
+      type: 'gomi.event',
+      event: {
+        type: 'message',
+        message: {
+          id: `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          senderId: 'system',
+          senderName: 'Gomi System',
+          content,
+          createdAt: new Date().toLocaleTimeString()
+        }
+      }
+    });
   }
 }
 

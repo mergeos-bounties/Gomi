@@ -13,6 +13,10 @@ export type GomiBridgeMessage =
       officeSettings?: GomiOfficeSettings;
     }
   | {
+      type: 'gomi.stop';
+      reason?: string;
+    }
+  | {
       type: 'gomi.event';
       event: GomiRuntimeEvent;
     }

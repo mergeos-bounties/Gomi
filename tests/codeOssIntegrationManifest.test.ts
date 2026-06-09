@@ -64,6 +64,8 @@ describe('Code - OSS integration manifest', () => {
     expect(template).toContain('Run Gomi Agent Task');
     expect(template).toContain('Stop Gomi Agent Task');
     expect(template).toContain('openView(GOMI_OFFICE_VIEW_ID, true)');
+    expect(template).toContain('stopActiveSession');
+    expect(template).toContain('Gomi Office session stopped from the command palette');
   });
 
   it.runIf(process.platform === 'win32')('merges Gomi product branding without dropping upstream packaging keys', async () => {

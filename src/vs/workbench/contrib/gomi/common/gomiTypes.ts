@@ -252,6 +252,11 @@ export type GomiRuntimeEvent =
       report: GomiFinalReport;
     }
   | {
+      type: 'session_stopped';
+      sessionId: string;
+      reason: string;
+    }
+  | {
       type: 'session_completed';
       sessionId: string;
     };

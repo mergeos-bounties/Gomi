@@ -118,7 +118,7 @@ export class NodeCliGomiAgentProvider implements GomiAgentProvider {
       taskId: context.task.id,
       cwd: this.cwd,
       timeoutMs: this.timeoutMs
-    });
+    }, context.signal);
 
     if (result.timedOut) {
       return this.createConfigurationErrorResult(
@@ -144,9 +144,12 @@ export class NodeCliGomiAgentProvider implements GomiAgentProvider {
     return createAgentResultFromCliOutput(context, result.stdout, result.stderr);
   }
 
-  private async runCliCommand(invocation: GomiCliCommandInvocation): Promise<GomiCliCommandResult> {
+  private async runCliCommand(
+    invocation: GomiCliCommandInvocation,
+    signal?: AbortSignal
+  ): Promise<GomiCliCommandResult> {
     try {
-      return await this.commandRunner(invocation);
+      return await this.commandRunner(invocation, signal);
     } catch (error) {
       return {
         stdout: '',
@@ -230,6 +233,11 @@ export async function spawnGomiCliCommand(
     };
 
     signal?.addEventListener('abort', abort, { once: true });
+    if (signal?.aborted) {
+      abort();
+      return;
+    }
+
     child.stdout.on('data', (chunk: Buffer) => {
       stdout += chunk.toString('utf8');
     });

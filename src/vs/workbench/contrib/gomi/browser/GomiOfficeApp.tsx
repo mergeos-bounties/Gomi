@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bot,
   Braces,
@@ -140,6 +140,7 @@ export function GomiOfficeApp() {
     [officeSettings]
   );
   const workbenchBridge = workbenchContext?.bridge;
+  const localAbortControllerRef = useRef<AbortController | null>(null);
   const [request, setRequest] = useState(GOMI_SAMPLE_REQUEST);
   const [isRunning, setIsRunning] = useState(false);
   const [agents, setAgents] = useState<GomiAgent[]>(() =>
@@ -204,7 +205,7 @@ export function GomiOfficeApp() {
       if (message.type === 'gomi.event') {
         applyRuntimeEvent(message.event);
 
-        if (message.event.type === 'session_completed') {
+        if (message.event.type === 'session_completed' || message.event.type === 'session_stopped') {
           setIsRunning(false);
         }
       }
@@ -290,12 +291,35 @@ export function GomiOfficeApp() {
     }
 
     try {
-      for await (const event of runtime.run(trimmedRequest)) {
+      const abortController = new AbortController();
+      localAbortControllerRef.current = abortController;
+
+      for await (const event of runtime.run(trimmedRequest, {
+        signal: abortController.signal,
+        stopReason: 'Gomi Office session stopped from the office controls.'
+      })) {
         applyRuntimeEvent(event);
       }
     } finally {
+      localAbortControllerRef.current = null;
       setIsRunning(false);
     }
+  }
+
+  function stopOfficeSession() {
+    if (!isRunning) {
+      return;
+    }
+
+    if (workbenchBridge) {
+      workbenchBridge.postMessage({
+        type: 'gomi.stop',
+        reason: 'Gomi Office session stopped from the office controls.'
+      });
+      return;
+    }
+
+    localAbortControllerRef.current?.abort('Gomi Office session stopped from the office controls.');
   }
 
   function approvePatch() {
@@ -361,6 +385,23 @@ export function GomiOfficeApp() {
           agent.id === event.agentId
             ? { ...agent, status: event.status, currentTaskId: event.currentTaskId }
             : agent
+        )
+      );
+    }
+
+    if (event.type === 'session_stopped') {
+      setAgents((currentAgents) =>
+        currentAgents.map((agent) =>
+          ['planning', 'working', 'waiting', 'reviewing'].includes(agent.status)
+            ? { ...agent, status: 'blocked', currentTaskId: undefined }
+            : agent
+        )
+      );
+      setTasks((currentTasks) =>
+        currentTasks.map((task) =>
+          task.status === 'queued' || task.status === 'running'
+            ? { ...task, status: 'blocked' }
+            : task
         )
       );
     }
@@ -624,10 +665,18 @@ export function GomiOfficeApp() {
               aria-label="Project Request"
               spellCheck={false}
             />
-            <button className="gomi-send" onClick={runOfficeSession} disabled={isRunning}>
-              <Send size={17} />
-              <span>{isRunning ? 'Running' : 'Run CEO'}</span>
-            </button>
+            <div className="gomi-request-actions">
+              <button className="gomi-send" onClick={runOfficeSession} disabled={isRunning}>
+                <Send size={17} />
+                <span>{isRunning ? 'Running' : 'Run CEO'}</span>
+              </button>
+              {isRunning ? (
+                <button className="gomi-send is-stop" onClick={stopOfficeSession}>
+                  <XCircle size={17} />
+                  <span>Stop</span>
+                </button>
+              ) : undefined}
+            </div>
           </section>
 
           <section className="gomi-office-stage" aria-label="Gomi Office Simulation">

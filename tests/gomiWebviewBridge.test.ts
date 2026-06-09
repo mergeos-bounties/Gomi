@@ -43,6 +43,10 @@ describe('Gomi webview bridge', () => {
       type: 'gomi.run',
       request: 'Review workspace'
     });
+    bridge?.postMessage({
+      type: 'gomi.stop',
+      reason: 'Stop bridge test'
+    });
     target.emit({
       type: 'gomi.applyPatchResult',
       patchId: 'patch-1',
@@ -64,6 +68,10 @@ describe('Gomi webview bridge', () => {
       {
         type: 'gomi.run',
         request: 'Review workspace'
+      },
+      {
+        type: 'gomi.stop',
+        reason: 'Stop bridge test'
       }
     ]);
     expect(received).toHaveLength(1);

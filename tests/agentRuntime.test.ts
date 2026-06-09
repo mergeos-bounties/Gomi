@@ -225,6 +225,61 @@ describe('GomiAgentRuntime', () => {
       patchApprovalRequired: true
     });
   });
+
+  it('stops a running session before generating patch and report output', async () => {
+    const abortController = new AbortController();
+    const runtime = new GomiAgentRuntime({ delayMs: 20 });
+    const eventTypes: string[] = [];
+
+    for await (const event of runtime.run('Review stop behavior', {
+      signal: abortController.signal,
+      stopReason: 'Stopped by test.'
+    })) {
+      eventTypes.push(event.type);
+
+      if (event.type === 'message' && event.message.senderId === 'ceo') {
+        abortController.abort('test stop');
+      }
+    }
+
+    expect(eventTypes).toContain('session_started');
+    expect(eventTypes).toContain('session_stopped');
+    expect(eventTypes).not.toContain('patch');
+    expect(eventTypes).not.toContain('report');
+    expect(eventTypes.at(-1)).toBe('session_completed');
+  });
+
+  it('passes the run abort signal into agent providers', async () => {
+    const abortController = new AbortController();
+    const seenSignals: Array<AbortSignal | undefined> = [];
+    const demoProvider = createDemoGomiAgentProvider();
+    const runtime = new GomiAgentRuntime({
+      delayMs: 0,
+      agentProvider: {
+        id: demoProvider.id,
+        label: demoProvider.label,
+        kind: demoProvider.kind,
+        capabilities: demoProvider.capabilities,
+        complete: (request, signal) => demoProvider.complete(request, signal),
+        runAgentTask: async (context) => {
+          seenSignals.push(context.signal);
+          abortController.abort('provider test stop');
+
+          return demoProvider.runAgentTask(context);
+        }
+      }
+    });
+
+    for await (const event of runtime.run('Review provider signal', {
+      signal: abortController.signal
+    })) {
+      if (event.type === 'session_completed') {
+        break;
+      }
+    }
+
+    expect(seenSignals[0]).toBe(abortController.signal);
+  });
 });
 
 async function countSpecialistMessages(runtime: GomiAgentRuntime): Promise<number> {
