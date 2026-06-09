@@ -7,12 +7,12 @@ import { FileAccess } from '../../../../base/common/network.js';
 import { basename, dirname, joinPath, relativePath } from '../../../../base/common/resources.js';
 import { URI } from '../../../../base/common/uri.js';
 import { localize, localize2 } from '../../../../nls.js';
-import { MenuId } from '../../../../platform/actions/common/actions.js';
+import { Action2, MenuId, registerAction2 } from '../../../../platform/actions/common/actions.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
 import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
-import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+import { IInstantiationService, ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
 import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
 import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
 import { IMarkerService } from '../../../../platform/markers/common/markers.js';
@@ -38,6 +38,7 @@ import {
 } from '../../webview/browser/webview.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { ITextFileService } from '../../../services/textfile/common/textfiles.js';
+import { IViewsService } from '../../../services/views/common/viewsService.js';
 import { ITerminalService } from '../../terminal/browser/terminal.js';
 import { ISCMService } from '../../scm/common/scm.js';
 import {
@@ -52,6 +53,8 @@ const GOMI_VIEW_CONTAINER_ID = 'workbench.view.gomiOffice';
 const GOMI_OFFICE_VIEW_ID = 'gomi.office.view';
 const GOMI_COMMAND_OPEN_OFFICE = 'gomi.openOffice';
 const GOMI_COMMAND_RUN_AGENT_TASK = 'gomi.runAgentTask';
+const GOMI_COMMAND_STOP_AGENT_TASK = 'gomi.stopAgentTask';
+const GOMI_COMMAND_CATEGORY = localize2('gomiCategory', 'Gomi');
 const GOMI_OFFICE_WEBVIEW_ROOT = FileAccess.asBrowserUri('vs/workbench/contrib/gomi/browser/media/office');
 const GOMI_OFFICE_WEBVIEW_SCRIPT = FileAccess.asBrowserUri('vs/workbench/contrib/gomi/browser/media/office/assets/index.js');
 const GOMI_OFFICE_WEBVIEW_STYLE = FileAccess.asBrowserUri('vs/workbench/contrib/gomi/browser/media/office/assets/index.css');
@@ -249,10 +252,45 @@ const gomiOfficeViewDescriptor: IViewDescriptor = {
 
 Registry.as(ViewExtensions.ViewsRegistry).registerViews([gomiOfficeViewDescriptor], GOMI_VIEW_CONTAINER);
 
+registerAction2(class GomiRunAgentTaskAction extends Action2 {
+  constructor() {
+    super({
+      id: GOMI_COMMAND_RUN_AGENT_TASK,
+      title: localize2('gomiRunAgentTask', 'Run Gomi Agent Task'),
+      category: GOMI_COMMAND_CATEGORY,
+      f1: true
+    });
+  }
+
+  async run(accessor: ServicesAccessor): Promise<void> {
+    await openGomiOfficeView(accessor);
+  }
+});
+
+registerAction2(class GomiStopAgentTaskAction extends Action2 {
+  constructor() {
+    super({
+      id: GOMI_COMMAND_STOP_AGENT_TASK,
+      title: localize2('gomiStopAgentTask', 'Stop Gomi Agent Task'),
+      category: GOMI_COMMAND_CATEGORY,
+      f1: true
+    });
+  }
+
+  async run(accessor: ServicesAccessor): Promise<void> {
+    await openGomiOfficeView(accessor);
+  }
+});
+
 export const GOMI_NATIVE_WORKBENCH_COMMANDS = {
   openOffice: GOMI_COMMAND_OPEN_OFFICE,
-  runAgentTask: GOMI_COMMAND_RUN_AGENT_TASK
+  runAgentTask: GOMI_COMMAND_RUN_AGENT_TASK,
+  stopAgentTask: GOMI_COMMAND_STOP_AGENT_TASK
 } as const;
+
+async function openGomiOfficeView(accessor: ServicesAccessor): Promise<void> {
+  await accessor.get(IViewsService).openView(GOMI_OFFICE_VIEW_ID, true);
+}
 
 function createGomiOfficeWebviewHtml(): string {
   const nonce = createNonce();

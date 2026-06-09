@@ -34,6 +34,8 @@ describe('Code - OSS integration manifest', () => {
 
     expect(template).toContain('registerViewContainer');
     expect(template).toContain('registerViews');
+    expect(template).toContain('registerAction2');
+    expect(template).toContain('IViewsService');
     expect(template).toContain('createWebviewOverlay');
     expect(template).toContain('createGomiWebviewHostBridge');
     expect(template).toContain('GomiWebviewHostController');
@@ -56,6 +58,12 @@ describe('Code - OSS integration manifest', () => {
     expect(template).toContain('assets/index.css');
     expect(template).toContain('workbench.view.gomiOffice');
     expect(template).toContain('gomi.office.view');
+    expect(template).toContain('gomi.openOffice');
+    expect(template).toContain('gomi.runAgentTask');
+    expect(template).toContain('gomi.stopAgentTask');
+    expect(template).toContain('Run Gomi Agent Task');
+    expect(template).toContain('Stop Gomi Agent Task');
+    expect(template).toContain('openView(GOMI_OFFICE_VIEW_ID, true)');
   });
 
   it.runIf(process.platform === 'win32')('merges Gomi product branding without dropping upstream packaging keys', async () => {
