@@ -1,4 +1,8 @@
 import { spawn } from 'node:child_process';
+import {
+  matchWorkspaceFilesInOutput,
+  parseAgentResultJson
+} from './agentOutputParsing';
 import { BASE_GOMI_AGENTS } from '../common/gomiConstants';
 import {
   GOMI_AGENT_CLI_PROVIDERS,
@@ -107,6 +111,13 @@ export class NodeCliGomiAgentProvider implements GomiAgentProvider {
       );
     }
 
+    if (!this.isAllowedExecutable(executable)) {
+      return this.createConfigurationErrorResult(
+        context,
+        `Executable "${executable}" is not in the allowed CLI agent list for ${getProviderLabel(providerId)}.`
+      );
+    }
+
     const providerLabel = context.agentCli?.label ?? provider?.label ?? providerId;
     const result = await this.runCliCommand({
       executable,
@@ -159,6 +170,16 @@ export class NodeCliGomiAgentProvider implements GomiAgentProvider {
     }
   }
 
+  private isAllowedExecutable(executable: string): boolean {
+    const allowed = new Set(
+      this.providerCatalog
+        .map((provider) => splitCommandLine(provider.command)[0])
+        .filter((token): token is string => typeof token === 'string' && token.length > 0)
+    );
+
+    return allowed.has(executable);
+  }
+
   private createConfigurationErrorResult(
     context: GomiAgentRunContext,
     message: string
@@ -188,6 +209,8 @@ export function createNodeCliGomiAgentProvider(
 ): GomiAgentProvider {
   return new NodeCliGomiAgentProvider(options);
 }
+
+const MAX_CLI_OUTPUT_BYTES = 10_000_000;
 
 export async function spawnGomiCliCommand(
   invocation: GomiCliCommandInvocation,
@@ -239,9 +262,17 @@ export async function spawnGomiCliCommand(
     }
 
     child.stdout.on('data', (chunk: Buffer) => {
+      if (stdout.length >= MAX_CLI_OUTPUT_BYTES) {
+        return;
+      }
+
       stdout += chunk.toString('utf8');
     });
     child.stderr.on('data', (chunk: Buffer) => {
+      if (stderr.length >= MAX_CLI_OUTPUT_BYTES) {
+        return;
+      }
+
       stderr += chunk.toString('utf8');
     });
     child.on('error', (error) => {
@@ -273,8 +304,15 @@ export async function spawnGomiCliCommand(
       });
     });
 
-    child.stdin.write(invocation.input);
-    child.stdin.end();
+    child.stdin.on('error', () => {
+      // Ignore stdin errors (e.g. EPIPE if the process exits before reading input).
+    });
+    try {
+      child.stdin.write(invocation.input);
+      child.stdin.end();
+    } catch {
+      // Ignore write/end failures on a process that already closed stdin.
+    }
   });
 }
 
@@ -354,23 +392,7 @@ function createAgentResultFromCliOutput(
 }
 
 function parseCliJson(stdout: string): Partial<GomiAgentResult> | undefined {
-  const trimmed = stdout.trim();
-
-  if (!trimmed) {
-    return undefined;
-  }
-
-  try {
-    const value = JSON.parse(trimmed) as unknown;
-
-    if (value && typeof value === 'object') {
-      return value as Partial<GomiAgentResult>;
-    }
-  } catch {
-    return undefined;
-  }
-
-  return undefined;
+  return parseAgentResultJson(stdout);
 }
 
 function normalizeStringArray(value: unknown, fallback: string[]): string[] {
@@ -399,11 +421,7 @@ function normalizeProposedFiles(
     return fromExplicit;
   }
 
-  const outputLower = output.toLowerCase();
-
-  return workspaceFiles
-    .filter((file) => outputLower.includes(file.toLowerCase()))
-    .slice(0, 8);
+  return matchWorkspaceFilesInOutput(output, workspaceFiles).slice(0, 8);
 }
 
 function normalizeConfidence(value: unknown): number {

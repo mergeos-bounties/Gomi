@@ -209,11 +209,16 @@ export class GomiWorkbenchController {
     message: Extract<GomiBridgeMessage, { type: 'gomi.applyPatch' }>
   ): Promise<void> {
     try {
-      if (this.previewPatch && this.previewedPatches.get(message.patch.id) !== message.patch.diff) {
+      const previewMatched = this.previewedPatches.get(message.patch.id) === message.patch.diff;
+
+      if (this.previewPatch && !previewMatched) {
         throw new Error('Preview the Gomi patch before applying it.');
       }
 
-      const result = await this.applyPatch(message, this.workspaceRoot, this.patchApplyOptions);
+      const applyOptions = previewMatched
+        ? { ...this.patchApplyOptions, authorize: true }
+        : this.patchApplyOptions;
+      const result = await this.applyPatch(message, this.workspaceRoot, applyOptions);
 
       this.bridge.postMessage({
         type: 'gomi.applyPatchResult',

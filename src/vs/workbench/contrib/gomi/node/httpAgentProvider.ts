@@ -1,3 +1,7 @@
+import {
+  matchWorkspaceFilesInOutput,
+  parseAgentResultJson
+} from './agentOutputParsing';
 import { BASE_GOMI_AGENTS } from '../common/gomiConstants';
 import { GOMI_AGENT_CLI_PROVIDERS, getProviderLabel } from '../common/gomiOfficeSettings';
 import type {
@@ -414,23 +418,7 @@ function createConfigurationErrorResult(
 }
 
 function parseProviderJson(text: string): Partial<GomiAgentResult> | undefined {
-  const trimmed = text.trim();
-
-  if (!trimmed) {
-    return undefined;
-  }
-
-  try {
-    const value = JSON.parse(trimmed) as unknown;
-
-    if (value && typeof value === 'object') {
-      return value as Partial<GomiAgentResult>;
-    }
-  } catch {
-    return undefined;
-  }
-
-  return undefined;
+  return parseAgentResultJson(text);
 }
 
 function normalizeStringArray(value: unknown, fallback: string[]): string[] {
@@ -458,11 +446,7 @@ function normalizeProposedFiles(
     return fromExplicit;
   }
 
-  const outputLower = output.toLowerCase();
-
-  return workspaceFiles
-    .filter((file) => outputLower.includes(file.toLowerCase()))
-    .slice(0, 8);
+  return matchWorkspaceFilesInOutput(output, workspaceFiles).slice(0, 8);
 }
 
 function normalizeConfidence(value: unknown): number {

@@ -6,6 +6,7 @@ import { applyParsedPatchFile, parseUnifiedDiff } from './patchApplier';
 export interface GomiPatchApplyOptions {
   dryRun?: boolean;
   requireApproval?: boolean;
+  authorize?: boolean;
 }
 
 export interface GomiPatchApplyResult {
@@ -22,7 +23,7 @@ export async function applyPatchProposalToWorkspace(
 ): Promise<GomiPatchApplyResult> {
   const requireApproval = options.requireApproval ?? true;
 
-  if (requireApproval && patch.approvalStatus !== 'approved') {
+  if (requireApproval && options.authorize !== true && patch.approvalStatus !== 'approved') {
     throw new Error(`Patch ${patch.id} must be approved before it can be applied.`);
   }
 
@@ -37,7 +38,7 @@ export async function applyPatchProposalToWorkspace(
       throw new Error('Patch file is missing both old and new paths.');
     }
 
-    const absolutePath = resolveWorkspacePatchPath(workspaceRoot, targetPath);
+    const absolutePath = await resolveWorkspacePatchPathSafe(workspaceRoot, targetPath);
     const existingContent = await readTextFileIfExists(absolutePath);
     const nextContent = applyParsedPatchFile(existingContent, parsedFile);
 
@@ -57,6 +58,20 @@ export async function applyPatchProposalToWorkspace(
       await fs.mkdir(path.dirname(absolutePath), { recursive: true });
       await fs.writeFile(absolutePath, nextContent, 'utf8');
     }
+
+    const isRename =
+      parsedFile.oldPath !== undefined &&
+      parsedFile.newPath !== undefined &&
+      parsedFile.oldPath !== parsedFile.newPath;
+
+    if (isRename && parsedFile.oldPath) {
+      const oldAbsolutePath = await resolveWorkspacePatchPathSafe(workspaceRoot, parsedFile.oldPath);
+      deletedFiles.push(toPortableRelativePath(workspaceRoot, oldAbsolutePath));
+
+      if (!options.dryRun) {
+        await fs.rm(oldAbsolutePath, { force: true });
+      }
+    }
   }
 
   return {
@@ -67,7 +82,7 @@ export async function applyPatchProposalToWorkspace(
   };
 }
 
-function resolveWorkspacePatchPath(workspaceRoot: string, patchPath: string): string {
+async function resolveWorkspacePatchPathSafe(workspaceRoot: string, patchPath: string): Promise<string> {
   if (path.isAbsolute(patchPath)) {
     throw new Error(`Patch path must be relative to the workspace: ${patchPath}`);
   }
@@ -81,7 +96,40 @@ function resolveWorkspacePatchPath(workspaceRoot: string, patchPath: string): st
     throw new Error(`Patch path escapes the workspace root: ${patchPath}`);
   }
 
+  const realAncestor = await realPathOfNearestAncestor(absolutePath);
+
+  if (realAncestor !== undefined) {
+    const realRoot = await fs.realpath(root).catch(() => root);
+    const realRelative = path.relative(realRoot, realAncestor);
+
+    if (realRelative.startsWith('..') || path.isAbsolute(realRelative)) {
+      throw new Error(`Patch path resolves outside the workspace root through a symlink: ${patchPath}`);
+    }
+  }
+
   return absolutePath;
+}
+
+async function realPathOfNearestAncestor(absolutePath: string): Promise<string | undefined> {
+  let current = path.dirname(absolutePath);
+
+  while (true) {
+    try {
+      return await fs.realpath(current);
+    } catch (error) {
+      if (!isNodeError(error) || error.code !== 'ENOENT') {
+        throw error;
+      }
+    }
+
+    const parent = path.dirname(current);
+
+    if (parent === current) {
+      return undefined;
+    }
+
+    current = parent;
+  }
 }
 
 async function readTextFileIfExists(filePath: string): Promise<string> {

@@ -62,7 +62,7 @@ export function createGomiWebviewBridge(
 
     onMessage(listener) {
       const messageListener = (event: MessageEvent) => {
-        if (isGomiBridgeMessage(event.data)) {
+        if (isTrustedGomiMessageEvent(event) && isGomiBridgeMessage(event.data)) {
           listener(event.data);
         }
       };
@@ -89,6 +89,25 @@ export function createGomiWebviewStateStore(api: GomiVsCodeWebviewApi): GomiWebv
       api.setState?.(state);
     }
   };
+}
+
+const trustedGomiOriginPrefixes = ['vscode-webview://', 'vscode-file://'];
+
+export function isTrustedGomiMessageEvent(event: Pick<MessageEvent, 'origin' | 'source'>): boolean {
+  const origin = event.origin;
+
+  if (typeof origin === 'string' && origin.length > 0) {
+    const localOrigin = globalThis.location?.origin;
+    const matchesOrigin =
+      trustedGomiOriginPrefixes.some((prefix) => origin.startsWith(prefix)) ||
+      (typeof localOrigin === 'string' && localOrigin.length > 0 && origin === localOrigin);
+
+    if (!matchesOrigin) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function isGomiBridgeMessage(value: unknown): value is GomiBridgeMessage {
