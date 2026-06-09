@@ -4,6 +4,8 @@ run-name: Gomi Desktop EXE ${{ github.ref_name }}
 
 on:
   push:
+    branches:
+      - master
     tags:
       - 'v*'
   workflow_dispatch:
@@ -58,6 +60,7 @@ jobs:
         run: npx electron-builder --win --publish never
 
       - name: Checksum installer
+        id: checksum
         shell: pwsh
         run: |
           $installer = Get-ChildItem -Path release\desktop -Filter 'Gomi-IDE-Setup-*.exe' -File |
@@ -81,14 +84,38 @@ jobs:
             release/desktop/Gomi-IDE-Setup-*.exe
             release/desktop/GOMI-IDE-SHA256SUMS.txt
 
+      - name: Resolve release identity
+        id: release_meta
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "name=Gomi IDE ${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "latest=true" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${{ inputs.create_release }}" == "true" ]]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "tag=desktop-latest" >> "$GITHUB_OUTPUT"
+            echo "name=Gomi IDE (latest desktop build)" >> "$GITHUB_OUTPUT"
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_REF}" == "refs/heads/master" ]]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "tag=desktop-latest" >> "$GITHUB_OUTPUT"
+            echo "name=Gomi IDE (latest desktop build)" >> "$GITHUB_OUTPUT"
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
+        if: steps.release_meta.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('desktop-{0}', github.run_number) }}
-          name: Gomi IDE ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('desktop-{0}', github.run_number) }}
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          name: ${{ steps.release_meta.outputs.name }}
           draft: false
           prerelease: true
+          make_latest: ${{ steps.release_meta.outputs.latest }}
           files: |
             release/desktop/Gomi-IDE-Setup-*.exe
             release/desktop/GOMI-IDE-SHA256SUMS.txt
