@@ -267,6 +267,7 @@ describe('release readiness', () => {
     expect(bootstrapScript).toContain('-ValidateOnly');
     expect(bootstrapScript).toContain('-DryRun');
     expect(collectorScript).toContain('Assert-GomiProductJson');
+    expect(collectorScript).toContain('Get-GomiSha256');
     expect(collectorScript).toContain('Product identity verified from Code - OSS product.json');
     expect(collectorScript).toContain('WINDOWS-SHA256SUMS.txt');
     expect(packageJson.scripts?.['verify:release']).toBe(

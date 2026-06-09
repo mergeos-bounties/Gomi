@@ -92,6 +92,34 @@ function Get-ReleaseRoot {
   return (Resolve-Path -LiteralPath $resolved).Path
 }
 
+function Get-GomiSha256 {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$PathValue
+  )
+
+  $getFileHashCommand = Get-Command Get-FileHash -ErrorAction SilentlyContinue
+
+  if ($getFileHashCommand) {
+    return (Get-FileHash -LiteralPath $PathValue -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
+
+  $stream = [System.IO.File]::OpenRead($PathValue)
+
+  try {
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+
+    try {
+      $hashBytes = $sha256.ComputeHash($stream)
+      return (($hashBytes | ForEach-Object { $_.ToString('x2') }) -join '')
+    } finally {
+      $sha256.Dispose()
+    }
+  } finally {
+    $stream.Dispose()
+  }
+}
+
 $codeRoot = Resolve-RequiredPath -PathValue $CodeOssRoot -Description 'Code - OSS root'
 $productJsonPath = Resolve-RequiredPath -PathValue (Join-Path $codeRoot 'product.json') -Description 'Code - OSS product.json'
 $buildRoot = Resolve-RequiredPath -PathValue (Join-Path $codeRoot '.build') -Description 'Code - OSS .build output'
@@ -150,8 +178,8 @@ foreach ($file in $releaseFiles | Sort-Object Name) {
 $manifest | Set-Content -Path (Join-Path $releaseRoot 'ARTIFACTS.md') -Encoding UTF8
 
 $checksumLines = foreach ($file in ($releaseFiles | Sort-Object Name)) {
-  $hash = Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256
-  "$($hash.Hash.ToLowerInvariant())  $($file.Name)"
+  $hash = Get-GomiSha256 -PathValue $file.FullName
+  "$hash  $($file.Name)"
 }
 
 $checksumLines | Set-Content -Path (Join-Path $releaseRoot 'WINDOWS-SHA256SUMS.txt') -Encoding UTF8
