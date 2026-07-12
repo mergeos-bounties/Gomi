@@ -53,6 +53,7 @@ export type GomiMemoryEmbeddingProviderId =
   | 'openai-compatible'
   | 'ollama-embeddings'
   | 'ollama-embed';
+export type GomiAgentResultSchemaVersion = 1;
 
 export interface GomiAgentCliProvider {
   id: GomiAgentCliProviderId;
@@ -181,6 +182,7 @@ export interface GomiWorkspaceContentSnippet {
 }
 
 export interface GomiAgentResult {
+  schemaVersion?: GomiAgentResultSchemaVersion;
   agentId: GomiAgentId;
   taskId: string;
   summary: string;

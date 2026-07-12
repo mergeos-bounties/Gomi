@@ -1,56 +1,127 @@
-import type { GomiAgentResult } from '../common/gomiTypes';
+import type {
+  GomiAgentResult,
+  GomiAgentResultSchemaVersion
+} from '../common/gomiTypes';
 
-export function parseAgentResultJson(text: string): Partial<GomiAgentResult> | undefined {
-  const trimmed = text.trim();
+export const GOMI_AGENT_RESULT_SCHEMA_VERSION = 1 satisfies GomiAgentResultSchemaVersion;
 
-  if (!trimmed) {
-    return undefined;
-  }
-
-  const direct = tryParseObject(trimmed);
-
-  if (direct) {
-    return direct;
-  }
-
-  const candidate = extractLastJsonObject(trimmed);
-
-  return candidate ? tryParseObject(candidate) : undefined;
+interface AgentResultRecord {
+  [key: string]: unknown;
 }
 
-function tryParseObject(text: string): Partial<GomiAgentResult> | undefined {
+export interface GomiAgentResultParseResult {
+  value?: Partial<GomiAgentResult>;
+  diagnostics: string[];
+}
+
+export function parseAgentResultJson(text: string): Partial<GomiAgentResult> | undefined {
+  return parseAgentResultJsonWithDiagnostics(text).value;
+}
+
+export function parseAgentResultJsonWithDiagnostics(text: string): GomiAgentResultParseResult {
+  const trimmed = text.trim();
+  const diagnostics: string[] = [];
+
+  if (!trimmed) {
+    return {
+      diagnostics: ['Agent result output was empty.']
+    };
+  }
+
+  for (const candidate of extractJsonObjectCandidates(trimmed).reverse()) {
+    const parsed = tryParseObject(candidate);
+
+    if (parsed.value) {
+      return normalizeAgentResultObject(parsed.value);
+    }
+
+    diagnostics.push(parsed.error ?? 'Agent result JSON candidate could not be parsed.');
+  }
+
+  const trailingCandidate = extractTrailingJsonObjectCandidate(trimmed);
+  const completedCandidate = trailingCandidate ? completeTruncatedJsonObject(trailingCandidate) : undefined;
+
+  if (completedCandidate && completedCandidate !== trailingCandidate) {
+    const parsed = tryParseObject(completedCandidate);
+
+    if (parsed.value) {
+      const normalized = normalizeAgentResultObject(parsed.value);
+      return {
+        value: normalized.value,
+        diagnostics: [
+          'Recovered truncated agent result JSON by closing incomplete objects and arrays.',
+          ...normalized.diagnostics
+        ]
+      };
+    }
+
+    diagnostics.push(parsed.error ?? 'Recovered agent result JSON candidate could not be parsed.');
+  }
+
+  return {
+    diagnostics: diagnostics.length > 0
+      ? diagnostics
+      : ['No agent result JSON object was found.']
+  };
+}
+
+function tryParseObject(text: string): { value?: AgentResultRecord; error?: string } {
   try {
     const value = JSON.parse(text) as unknown;
 
-    if (value && typeof value === 'object') {
-      return value as Partial<GomiAgentResult>;
+    if (isAgentResultRecord(value)) {
+      return {
+        value
+      };
     }
-  } catch {
-    return undefined;
-  }
 
-  return undefined;
+    return {
+      error: 'Agent result JSON must be an object.'
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Agent result JSON could not be parsed.'
+    };
+  }
 }
 
-function extractLastJsonObject(text: string): string | undefined {
-  let end = -1;
+function normalizeAgentResultObject(value: AgentResultRecord): GomiAgentResultParseResult {
+  const rawSchemaVersion = value.schemaVersion ?? value.schema_version;
 
-  for (let index = text.length - 1; index >= 0; index--) {
-    if (text[index] === '}') {
-      end = index;
-      break;
-    }
+  if (rawSchemaVersion === undefined) {
+    return {
+      value: value as Partial<GomiAgentResult>,
+      diagnostics: []
+    };
   }
 
-  if (end === -1) {
-    return undefined;
+  if (rawSchemaVersion === GOMI_AGENT_RESULT_SCHEMA_VERSION) {
+    return {
+      value: {
+        ...value,
+        schemaVersion: GOMI_AGENT_RESULT_SCHEMA_VERSION
+      } as Partial<GomiAgentResult>,
+      diagnostics: []
+    };
   }
 
+  return {
+    diagnostics: [`Unsupported agent result schemaVersion ${String(rawSchemaVersion)}.`]
+  };
+}
+
+function isAgentResultRecord(value: unknown): value is AgentResultRecord {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function extractJsonObjectCandidates(text: string): string[] {
+  const candidates: string[] = [];
+  let start = -1;
   let depth = 0;
   let inString = false;
   let escaped = false;
 
-  for (let index = end; index >= 0; index--) {
+  for (let index = 0; index < text.length; index++) {
     const char = text[index];
 
     if (escaped) {
@@ -58,7 +129,7 @@ function extractLastJsonObject(text: string): string | undefined {
       continue;
     }
 
-    if (char === '\\') {
+    if (inString && char === '\\') {
       escaped = true;
       continue;
     }
@@ -72,18 +143,128 @@ function extractLastJsonObject(text: string): string | undefined {
       continue;
     }
 
-    if (char === '}') {
+    if (char === '{') {
+      if (depth === 0) {
+        start = index;
+      }
+
       depth++;
-    } else if (char === '{') {
+    } else if (char === '}' && depth > 0) {
       depth--;
 
-      if (depth === 0) {
-        return text.slice(index, end + 1);
+      if (depth === 0 && start !== -1) {
+        candidates.push(text.slice(start, index + 1));
+        start = -1;
       }
     }
   }
 
-  return undefined;
+  return candidates;
+}
+
+function extractTrailingJsonObjectCandidate(text: string): string | undefined {
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (inString && char === '\\') {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) {
+      continue;
+    }
+
+    if (char === '{') {
+      if (depth === 0) {
+        start = index;
+      }
+
+      depth++;
+    } else if (char === '}' && depth > 0) {
+      depth--;
+
+      if (depth === 0) {
+        start = -1;
+      }
+    }
+  }
+
+  return start === -1 ? undefined : text.slice(start).trimEnd();
+}
+
+function completeTruncatedJsonObject(candidate: string): string | undefined {
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < candidate.length; index++) {
+    const char = candidate[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (inString && char === '\\') {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) {
+      continue;
+    }
+
+    if (char === '{') {
+      stack.push('}');
+    } else if (char === '[') {
+      stack.push(']');
+    } else if (char === '}' || char === ']') {
+      if (stack.pop() !== char) {
+        return undefined;
+      }
+    }
+  }
+
+  if (escaped) {
+    return undefined;
+  }
+
+  let completed = candidate.trimEnd();
+
+  if (/[:,]\s*$/.test(completed)) {
+    return undefined;
+  }
+
+  if (inString) {
+    completed += '"';
+  }
+
+  while (stack.length > 0) {
+    completed += stack.pop();
+  }
+
+  return completed.replace(/,\s*([}\]])/g, '$1');
 }
 
 export function matchWorkspaceFilesInOutput(

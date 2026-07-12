@@ -201,6 +201,23 @@ Supported provider routes:
 - `ollama-local-model` through `GOMI_LOCAL_LLM_ENDPOINT` and `GOMI_LOCAL_LLM_MODEL`.
 - `demo-runtime` for offline, deterministic product previews and tests.
 
+### Agent Result JSON Schema
+
+CLI and HTTP providers may return plain English, but structured responses should use schema version `1`:
+
+```json
+{
+  "schemaVersion": 1,
+  "summary": "Short result summary.",
+  "findings": ["Concrete observation."],
+  "recommendations": ["Actionable next step."],
+  "proposedFiles": ["src/example.ts"],
+  "confidence": 0.82
+}
+```
+
+`schemaVersion` is optional for older providers. When present, version `1` is the supported contract. The parser ignores unsupported future versions so provider callers can continue using the existing plain-text fallback path. If a provider response is interrupted after a mostly complete JSON object, the parser attempts to close missing arrays and objects before falling back to the original text.
+
 ## Patch Review And Safety
 
 Gomi is designed around review-first code modification.
@@ -568,4 +585,3 @@ npm run electron:dev
 ```
 
 `GOMI_ELECTRON_DEV=1` makes Electron load the Vite server (default `http://127.0.0.1:5173`). Optional overrides: `GOMI_VITE_DEV_URL`, `GOMI_VITE_PORT`. Packaged builds ignore these flags and always load the built index.
-
