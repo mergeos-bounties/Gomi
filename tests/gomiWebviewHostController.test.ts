@@ -120,6 +120,54 @@ describe('Gomi webview host controller', () => {
     expect(eventTypes.at(-1)).toBe('session_completed');
   });
 
+  it('returns manual memory prune reports through the bridge', async () => {
+    const bridge = new MemoryBridge();
+    const controller = new GomiWebviewHostController({
+      bridge,
+      runtime: {
+        async *run() {
+          yield {
+            type: 'session_completed',
+            sessionId: 'unused'
+          } satisfies GomiRuntimeEvent;
+        },
+        pruneMemory: async () => ({
+          removed: 3,
+          remaining: 2,
+          lexical: {
+            removed: 2,
+            remaining: 1
+          },
+          vector: {
+            removed: 1,
+            remaining: 1
+          }
+        })
+      }
+    });
+
+    await controller.handleMessage({
+      type: 'gomi.pruneMemory',
+      officeSettings: DEFAULT_GOMI_OFFICE_SETTINGS
+    });
+
+    expect(bridge.outbox[0]).toEqual({
+      type: 'gomi.pruneMemoryResult',
+      report: {
+        removed: 3,
+        remaining: 2,
+        lexical: {
+          removed: 2,
+          remaining: 1
+        },
+        vector: {
+          removed: 1,
+          remaining: 1
+        }
+      }
+    });
+  });
+
   it('returns patch apply errors when no host patch applier is configured', async () => {
     const bridge = new MemoryBridge();
     const controller = new GomiWebviewHostController({ bridge });

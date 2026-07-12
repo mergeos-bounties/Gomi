@@ -4,6 +4,7 @@ import type {
   GomiPatchProposal,
   GomiRuntimeEvent
 } from '../common/gomiTypes';
+import type { GomiRuntimeMemoryPruneReport } from '../node/agentRuntime';
 import type { GomiPatchApplyResult } from '../node/workspacePatchApplier';
 
 export type GomiBridgeMessage =
@@ -15,6 +16,15 @@ export type GomiBridgeMessage =
   | {
       type: 'gomi.stop';
       reason?: string;
+    }
+  | {
+      type: 'gomi.pruneMemory';
+      officeSettings?: GomiOfficeSettings;
+    }
+  | {
+      type: 'gomi.pruneMemoryResult';
+      report?: GomiRuntimeMemoryPruneReport;
+      error?: string;
     }
   | {
       type: 'gomi.event';

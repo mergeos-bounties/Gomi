@@ -4,6 +4,7 @@ import type { GomiMemoryEntry } from '../common/gomiTypes';
 import type {
   GomiMemoryHit,
   GomiMemoryItem,
+  GomiMemoryPruneReport,
   GomiMemoryRetentionPolicy,
   GomiMemoryScope,
   GomiMemoryStore
@@ -69,12 +70,14 @@ export class FileBackedGomiMemoryStore implements GomiMemoryStore {
       .slice(0, limit);
   }
 
-  prune(scope: GomiMemoryScope, policy: GomiMemoryRetentionPolicy): void {
+  prune(scope: GomiMemoryScope, policy: GomiMemoryRetentionPolicy): GomiMemoryPruneReport {
     const scopePrefix = this.scopePrefix(scope);
     const cutoffTime = Date.now() - policy.retentionDays * 24 * 60 * 60 * 1000;
     const scopedItems = Array.from(this.scopedItems.entries())
       .filter(([key]) => key.startsWith(scopePrefix))
       .sort((left, right) => memoryTimestamp(right[1]) - memoryTimestamp(left[1]));
+    const entryCountBefore = this.entries.length;
+    const scopedCountBefore = scopedItems.length;
 
     for (const [key, item] of scopedItems) {
       if (memoryTimestamp(item) < cutoffTime) {
@@ -92,6 +95,16 @@ export class FileBackedGomiMemoryStore implements GomiMemoryStore {
 
     this.entries = this.entries.filter((entry) => Date.parse(entry.createdAt) >= cutoffTime);
     this.persist();
+
+    const remainingScopedItems = Array.from(this.scopedItems.keys()).filter((key) =>
+      key.startsWith(scopePrefix)
+    ).length;
+    const remaining = remainingScopedItems + this.entries.length;
+
+    return {
+      removed: entryCountBefore + scopedCountBefore - remaining,
+      remaining
+    };
   }
 
   add(entry: Omit<GomiMemoryEntry, 'id' | 'createdAt'>): GomiMemoryEntry {
@@ -214,12 +227,13 @@ export class FileBackedVectorMemoryStore implements GomiVectorMemoryStore {
       .slice(0, limit);
   }
 
-  prune(scope: GomiMemoryScope, policy: GomiMemoryRetentionPolicy): void {
+  prune(scope: GomiMemoryScope, policy: GomiMemoryRetentionPolicy): GomiMemoryPruneReport {
     const scopePrefix = this.scopePrefix(scope);
     const cutoffTime = Date.now() - policy.retentionDays * 24 * 60 * 60 * 1000;
     const scopedRecords = Array.from(this.records.entries())
       .filter(([key]) => key.startsWith(scopePrefix))
       .sort((left, right) => memoryTimestamp(right[1]) - memoryTimestamp(left[1]));
+    const scopedCountBefore = scopedRecords.length;
 
     for (const [key, record] of scopedRecords) {
       if (memoryTimestamp(record) < cutoffTime) {
@@ -236,6 +250,15 @@ export class FileBackedVectorMemoryStore implements GomiVectorMemoryStore {
     }
 
     this.persist();
+
+    const remaining = Array.from(this.records.keys()).filter((key) =>
+      key.startsWith(scopePrefix)
+    ).length;
+
+    return {
+      removed: scopedCountBefore - remaining,
+      remaining
+    };
   }
 
   clear(scope?: GomiMemoryScope): void {

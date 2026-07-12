@@ -163,6 +163,75 @@ describe('persistent project memory', () => {
     expect(store.list('session-1').map((entry) => entry.content)).toEqual(['Fresh request']);
   });
 
+  it('reports lexical prune removal and remaining counts', async () => {
+    const filePath = path.join(tempDirectory, 'lexical-memory.json');
+    const scope: GomiMemoryScope = { workspaceId: 'Gomi' };
+    const scopePrefix = 'Gomi:anonymous:default:';
+    const expiredDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString();
+    const recentDate = new Date().toISOString();
+
+    await fs.writeFile(
+      filePath,
+      JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            id: 'memory-old',
+            sessionId: 'session-1',
+            kind: 'request',
+            content: 'Old request',
+            createdAt: expiredDate
+          },
+          {
+            id: 'memory-new',
+            sessionId: 'session-1',
+            kind: 'request',
+            content: 'Fresh request',
+            createdAt: recentDate
+          }
+        ],
+        scopedItems: [
+          [
+            `${scopePrefix}old`,
+            {
+              key: 'old',
+              value: 'Expired context',
+              createdAt: expiredDate
+            }
+          ],
+          [
+            `${scopePrefix}newer`,
+            {
+              key: 'newer',
+              value: 'Fresh context',
+              createdAt: recentDate
+            }
+          ],
+          [
+            `${scopePrefix}newest`,
+            {
+              key: 'newest',
+              value: 'Freshest context',
+              createdAt: new Date(Date.now() + 1000).toISOString()
+            }
+          ]
+        ]
+      }),
+      'utf8'
+    );
+
+    const store = new FileBackedGomiMemoryStore(filePath);
+    const report = store.prune(scope, {
+      retentionDays: 30,
+      maxProjectMemoryItems: 1
+    });
+
+    expect(report).toEqual({
+      removed: 3,
+      remaining: 2
+    });
+  });
+
   it('prunes vector memory by scope retention and max project items', async () => {
     const filePath = path.join(tempDirectory, 'vector-memory.json');
     const scope: GomiMemoryScope = { workspaceId: 'Gomi' };

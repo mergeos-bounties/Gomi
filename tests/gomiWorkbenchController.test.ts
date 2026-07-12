@@ -123,6 +123,55 @@ describe('GomiWorkbenchController', () => {
     expect(eventTypes.at(-1)).toBe('session_completed');
   });
 
+  it('returns manual memory prune reports through the workbench bridge', async () => {
+    const bridge = new MemoryWorkbenchBridge();
+    const controller = new GomiWorkbenchController({
+      bridge,
+      workspaceRoot,
+      runtime: {
+        async *run() {
+          yield {
+            type: 'session_completed',
+            sessionId: 'unused'
+          };
+        },
+        pruneMemory: async () => ({
+          removed: 4,
+          remaining: 3,
+          lexical: {
+            removed: 3,
+            remaining: 2
+          },
+          vector: {
+            removed: 1,
+            remaining: 1
+          }
+        })
+      }
+    });
+
+    await controller.handleMessage({
+      type: 'gomi.pruneMemory',
+      officeSettings: DEFAULT_GOMI_OFFICE_SETTINGS
+    });
+
+    expect(bridge.outbox[0]).toEqual({
+      type: 'gomi.pruneMemoryResult',
+      report: {
+        removed: 4,
+        remaining: 3,
+        lexical: {
+          removed: 3,
+          remaining: 2
+        },
+        vector: {
+          removed: 1,
+          remaining: 1
+        }
+      }
+    });
+  });
+
   it('applies an approved patch message inside the workspace', async () => {
     const bridge = new MemoryWorkbenchBridge();
     const controller = new GomiWorkbenchController({ bridge, workspaceRoot });
