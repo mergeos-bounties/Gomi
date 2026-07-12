@@ -120,6 +120,17 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-gomi-code-oss-windows.p
   -DryRun
 ```
 
+For the lower-level manifest apply step, write a dry-run report outside the Code - OSS checkout so the target tree remains unchanged:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\apply-gomi-code-oss-integration.ps1 `
+  -CodeOssRoot D:\path\to\code-oss-fork `
+  -DryRun `
+  -ReportPath .\artifacts\gomi-code-oss-dry-run-report.json
+```
+
+The dry-run report lists the planned manifest actions and matching rollback steps, such as restoring `product.json`, removing copied Gomi module paths, or removing the appended workbench import. In dry-run mode the report path is rejected if it is inside the Code - OSS checkout.
+
 ## Why EXE, Not NPM
 
 End users should not run Gomi IDE with `npm run dev`.

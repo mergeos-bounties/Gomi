@@ -258,6 +258,8 @@ describe('release readiness', () => {
     expect(windowsRelease).toContain('Bootstrap or update a Code - OSS checkout');
     expect(windowsRelease).toContain('Generate Gomi desktop branding assets');
     expect(windowsRelease).toContain('GitHub Releases do not present the prototype bundle as the final IDE');
+    expect(windowsRelease).toContain('-ReportPath');
+    expect(windowsRelease).toContain('dry-run report');
     expect(windowsRelease).toContain('End users should not run Gomi IDE with `npm run dev`.');
     expect(windowsRelease).toContain('Inno Setup `.exe` installer');
     expect(bootstrapScript).toContain("'clone', '--filter=blob:none'");
@@ -271,7 +273,7 @@ describe('release readiness', () => {
     expect(collectorScript).toContain('Product identity verified from Code - OSS product.json');
     expect(collectorScript).toContain('WINDOWS-SHA256SUMS.txt');
     expect(packageJson.scripts?.['verify:release']).toBe(
-      'vitest run tests/releaseReadiness.test.ts tests/codeOssIntegrationManifest.test.ts'
+      'vitest run tests/releaseReadiness.test.ts tests/codeOssIntegrationManifest.test.ts tests/codeOssIntegrationDryRun.test.ts'
     );
   });
 });
