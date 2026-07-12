@@ -17,7 +17,11 @@ import type {
   GomiRuntimeEvent,
   GomiTask
 } from '../common/gomiTypes';
-import { createDemoGomiAgentProvider, type GomiAgentProvider } from './agentProvider';
+import {
+  createDemoGomiAgentProvider,
+  type GomiAgentProgressUpdate,
+  type GomiAgentProvider
+} from './agentProvider';
 import { evaluateAgentCommunication } from './communicationPolicy';
 import {
   applyWorkspaceMemoryPolicy,
@@ -72,6 +76,11 @@ interface GomiQueuedAgentRun {
   task: GomiTask;
   sharedMemory: GomiMemoryHit[];
   result: GomiAgentResult;
+}
+
+interface GomiQueuedProgressUpdate {
+  task: GomiTask;
+  update: GomiAgentProgressUpdate;
 }
 
 export interface GomiRuntimeMemoryPruneReport extends GomiMemoryPruneReport {
@@ -324,14 +333,16 @@ export class GomiAgentRuntime {
   private async *updateTask(
     task: GomiTask,
     status: GomiTask['status'],
-    progress: number
+    progress: number,
+    statusDetail?: string
   ): AsyncGenerator<GomiRuntimeEvent> {
     yield* this.emit({
       type: 'task_update',
       task: {
         ...task,
         status,
-        progress
+        progress,
+        statusDetail
       }
     });
   }
@@ -367,8 +378,37 @@ export class GomiAgentRuntime {
       Math.max(1, Math.floor(this.officeSettings.execution.maxConcurrentAgentRuns || 1))
     );
     const runningRuns = new Map<number, Promise<GomiQueuedAgentRun>>();
+    const progressUpdates: GomiQueuedProgressUpdate[] = [];
+    let progressSignal: Promise<void> | undefined;
+    let resolveProgressSignal: (() => void) | undefined;
     let nextTaskIndex = 0;
     let nextRunId = 0;
+    const queueProgressUpdate = (task: GomiTask, update: GomiAgentProgressUpdate) => {
+      progressUpdates.push({ task, update });
+
+      if (resolveProgressSignal) {
+        resolveProgressSignal();
+        resolveProgressSignal = undefined;
+        progressSignal = undefined;
+      }
+    };
+    const waitForProgressUpdate = () => {
+      if (progressUpdates.length > 0) {
+        return Promise.resolve();
+      }
+
+      progressSignal ??= new Promise<void>((resolve) => {
+        resolveProgressSignal = resolve;
+      });
+
+      return progressSignal;
+    };
+    const takeProgressUpdate = () => {
+      progressSignal = undefined;
+      resolveProgressSignal = undefined;
+
+      return progressUpdates.shift();
+    };
 
     while (nextTaskIndex < tasks.length || runningRuns.size > 0) {
       while (runningRuns.size < maxConcurrentRuns && nextTaskIndex < tasks.length) {
@@ -416,7 +456,8 @@ export class GomiAgentRuntime {
               ...this.officeSettings.execution,
               patchApprovalRequired: this.officeSettings.memory.requirePatchApproval
             },
-            signal
+            signal,
+            reportProgress: (update) => queueProgressUpdate(task, update)
           }).then((result) => ({
             id: runId,
             task,
@@ -426,11 +467,66 @@ export class GomiAgentRuntime {
         );
       }
 
+      if (progressUpdates.length > 0) {
+        const progressUpdate = takeProgressUpdate();
+
+        if (progressUpdate) {
+          yield* this.updateTask(
+            progressUpdate.task,
+            'running',
+            progressUpdate.update.progress ?? progressUpdate.task.progress,
+            progressUpdate.update.statusDetail
+          );
+        }
+
+        continue;
+      }
+
       if (runningRuns.size === 0) {
         continue;
       }
 
-      const completedRun = await Promise.race(runningRuns.values());
+      const nextRuntimeUpdate = await Promise.race([
+        Promise.race(runningRuns.values()).then((run) => ({
+          kind: 'run' as const,
+          run
+        })),
+        waitForProgressUpdate().then(() => ({
+          kind: 'progress' as const
+        }))
+      ]);
+
+      if (nextRuntimeUpdate.kind === 'progress') {
+        const progressUpdate = takeProgressUpdate();
+
+        if (progressUpdate) {
+          yield* this.updateTask(
+            progressUpdate.task,
+            'running',
+            progressUpdate.update.progress ?? progressUpdate.task.progress,
+            progressUpdate.update.statusDetail
+          );
+        }
+
+        continue;
+      }
+
+      if (progressUpdates.length > 0) {
+        const progressUpdate = takeProgressUpdate();
+
+        if (progressUpdate) {
+          yield* this.updateTask(
+            progressUpdate.task,
+            'running',
+            progressUpdate.update.progress ?? progressUpdate.task.progress,
+            progressUpdate.update.statusDetail
+          );
+        }
+
+        continue;
+      }
+
+      const completedRun = nextRuntimeUpdate.run;
       runningRuns.delete(completedRun.id);
 
       if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {

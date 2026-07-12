@@ -13,3 +13,7 @@ export function upsertGomiTask(tasks: GomiTask[], nextTask: GomiTask): GomiTask[
 export function countCompletedGomiTasks(tasks: GomiTask[]): number {
   return tasks.filter((task) => task.status === 'done').length;
 }
+
+export function formatGomiTaskStatusLabel(task: GomiTask): string {
+  return task.statusDetail ? `${task.status} · ${task.statusDetail}` : task.status;
+}

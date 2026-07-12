@@ -100,6 +100,7 @@ export interface GomiOfficeExecutionSettings {
   allowHttpProviders: boolean;
   requirePatchApprovalForLiveProviders: boolean;
   maxConcurrentAgentRuns: number;
+  httpMaxRetries: number;
 }
 
 export interface GomiOfficeSettings {
@@ -127,6 +128,7 @@ export interface GomiTask {
   agentId: GomiAgentId;
   status: GomiTaskStatus;
   progress: number;
+  statusDetail?: string;
 }
 
 export interface GomiChatMessage {

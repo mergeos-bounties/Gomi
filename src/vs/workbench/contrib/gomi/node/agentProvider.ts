@@ -44,6 +44,11 @@ export interface GomiAgentResponse {
   raw?: unknown;
 }
 
+export interface GomiAgentProgressUpdate {
+  progress?: number;
+  statusDetail?: string;
+}
+
 export interface GomiAgentRunContext {
   sessionId: string;
   request: string;
@@ -60,6 +65,7 @@ export interface GomiAgentRunContext {
     patchApprovalRequired: boolean;
   };
   signal?: AbortSignal;
+  reportProgress?: (update: GomiAgentProgressUpdate) => void;
 }
 
 export interface GomiAgentProvider {

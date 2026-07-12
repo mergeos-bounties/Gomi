@@ -46,6 +46,7 @@ import {
   hireEmployee,
   setCliProvidersEnabled,
   setHttpProvidersEnabled,
+  setHttpProviderMaxRetries,
   setLiveProviderMode,
   setLiveProviderPatchApprovalRequired,
   setMaxConcurrentAgentRuns,
@@ -101,6 +102,7 @@ import {
 } from './gomiOfficeSettingsPersistence';
 import { resolveGomiWebviewBridgeContext } from './gomiWebviewBridge';
 import { PhaserOffice } from './PhaserOffice';
+import { formatGomiTaskStatusLabel } from './gomiTaskView';
 
 const activityItems = [
   { id: 'explorer', label: 'Explorer', Icon: Files },
@@ -590,6 +592,12 @@ export function GomiOfficeApp() {
     );
   }
 
+  function updateHttpProviderMaxRetries(httpMaxRetries: number) {
+    setOfficeSettings((currentSettings) =>
+      setHttpProviderMaxRetries(currentSettings, httpMaxRetries)
+    );
+  }
+
   function setLayoutMode(mode: GomiOfficeViewMode) {
     setOfficeViewMode(mode);
 
@@ -782,6 +790,7 @@ export function GomiOfficeApp() {
           onHttpProvidersEnabledChange={updateHttpProvidersEnabled}
           onLiveProviderPatchApprovalRequiredChange={updateLiveProviderPatchApprovalRequired}
           onMaxConcurrentAgentRunsChange={updateMaxConcurrentAgentRuns}
+          onHttpProviderMaxRetriesChange={updateHttpProviderMaxRetries}
           onPruneMemory={pruneMemoryNow}
         />
       </div>
@@ -897,6 +906,7 @@ function RightPanel({
   onHttpProvidersEnabledChange,
   onLiveProviderPatchApprovalRequiredChange,
   onMaxConcurrentAgentRunsChange,
+  onHttpProviderMaxRetriesChange,
   onPruneMemory
 }: {
   agents: GomiAgent[];
@@ -930,6 +940,7 @@ function RightPanel({
   onHttpProvidersEnabledChange: (allowHttpProviders: boolean) => void;
   onLiveProviderPatchApprovalRequiredChange: (requirePatchApprovalForLiveProviders: boolean) => void;
   onMaxConcurrentAgentRunsChange: (maxConcurrentAgentRuns: number) => void;
+  onHttpProviderMaxRetriesChange: (httpMaxRetries: number) => void;
   onPruneMemory: () => void;
 }) {
   return (
@@ -997,6 +1008,7 @@ function RightPanel({
           onHttpProvidersEnabledChange={onHttpProvidersEnabledChange}
           onLiveProviderPatchApprovalRequiredChange={onLiveProviderPatchApprovalRequiredChange}
           onMaxConcurrentAgentRunsChange={onMaxConcurrentAgentRunsChange}
+          onHttpProviderMaxRetriesChange={onHttpProviderMaxRetriesChange}
           onPruneMemory={onPruneMemory}
         />
       </div>
@@ -1032,7 +1044,7 @@ function TaskRow({ task }: { task: GomiTask }) {
         <span style={{ width: `${task.progress}%` }} />
       </div>
       <span className="gomi-status" data-status={task.status}>
-        {task.status}
+        {formatGomiTaskStatusLabel(task)}
       </span>
     </div>
   );
@@ -1066,6 +1078,7 @@ function OfficeSettingsPanel({
   onHttpProvidersEnabledChange,
   onLiveProviderPatchApprovalRequiredChange,
   onMaxConcurrentAgentRunsChange,
+  onHttpProviderMaxRetriesChange,
   onPruneMemory
 }: {
   officeSettings: GomiOfficeSettings;
@@ -1095,6 +1108,7 @@ function OfficeSettingsPanel({
   onHttpProvidersEnabledChange: (allowHttpProviders: boolean) => void;
   onLiveProviderPatchApprovalRequiredChange: (requirePatchApprovalForLiveProviders: boolean) => void;
   onMaxConcurrentAgentRunsChange: (maxConcurrentAgentRuns: number) => void;
+  onHttpProviderMaxRetriesChange: (httpMaxRetries: number) => void;
   onPruneMemory: () => void;
 }) {
   const leaders = officeSettings.seats.filter((seat) => seat.seatKind !== 'employee');
@@ -1373,6 +1387,7 @@ function OfficeSettingsPanel({
           <span>{officeSettings.execution.allowCliProviders ? 'CLI on' : 'CLI off'}</span>
           <span>{officeSettings.execution.allowHttpProviders ? 'HTTP on' : 'HTTP off'}</span>
           <span>{`${officeSettings.execution.maxConcurrentAgentRuns} concurrent`}</span>
+          <span>{`${officeSettings.execution.httpMaxRetries} HTTP retries`}</span>
         </div>
         <label className="gomi-field">
           <span>Workspace Trust</span>
@@ -1427,6 +1442,16 @@ function OfficeSettingsPanel({
             max={8}
             value={officeSettings.execution.maxConcurrentAgentRuns}
             onChange={(event) => onMaxConcurrentAgentRunsChange(Number(event.target.value))}
+          />
+        </label>
+        <label className="gomi-field">
+          <span>HTTP max retries</span>
+          <input
+            type="number"
+            min={0}
+            max={5}
+            value={officeSettings.execution.httpMaxRetries}
+            onChange={(event) => onHttpProviderMaxRetriesChange(Number(event.target.value))}
           />
         </label>
       </div>

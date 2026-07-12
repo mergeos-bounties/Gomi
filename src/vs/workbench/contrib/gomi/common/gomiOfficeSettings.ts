@@ -15,6 +15,7 @@ export const GOMI_DEFAULT_MEMORY_BROADCAST_THRESHOLD = 0.74;
 export const GOMI_DEFAULT_MEMORY_RETENTION_DAYS = 30;
 export const GOMI_DEFAULT_MAX_PROJECT_MEMORY_ITEMS = 420;
 export const GOMI_DEFAULT_MAX_CONCURRENT_AGENT_RUNS = 2;
+export const GOMI_DEFAULT_HTTP_MAX_RETRIES = 2;
 
 export const GOMI_HIRABLE_DEPARTMENT_IDS: GomiAgentId[] = [
   'system-analyst',
@@ -212,7 +213,8 @@ export const DEFAULT_GOMI_OFFICE_SETTINGS: GomiOfficeSettings = {
     allowCliProviders: false,
     allowHttpProviders: false,
     requirePatchApprovalForLiveProviders: true,
-    maxConcurrentAgentRuns: GOMI_DEFAULT_MAX_CONCURRENT_AGENT_RUNS
+    maxConcurrentAgentRuns: GOMI_DEFAULT_MAX_CONCURRENT_AGENT_RUNS,
+    httpMaxRetries: GOMI_DEFAULT_HTTP_MAX_RETRIES
   }
 };
 
@@ -449,6 +451,15 @@ export function setMaxConcurrentAgentRuns(
   });
 }
 
+export function setHttpProviderMaxRetries(
+  settings: GomiOfficeSettings,
+  httpMaxRetries: number
+): GomiOfficeSettings {
+  return updateExecutionSettings(settings, {
+    httpMaxRetries: clampInteger(httpMaxRetries, 0, 5, GOMI_DEFAULT_HTTP_MAX_RETRIES)
+  });
+}
+
 export function getSeatForAgent(
   settings: GomiOfficeSettings,
   agentId: GomiAgentId
@@ -556,6 +567,13 @@ export function normalizeGomiOfficeSettings(value: unknown): GomiOfficeSettings 
     numberSetting(
       rawExecution.maxConcurrentAgentRuns,
       DEFAULT_GOMI_OFFICE_SETTINGS.execution.maxConcurrentAgentRuns
+    )
+  );
+  normalizedSettings = setHttpProviderMaxRetries(
+    normalizedSettings,
+    numberSetting(
+      rawExecution.httpMaxRetries,
+      DEFAULT_GOMI_OFFICE_SETTINGS.execution.httpMaxRetries
     )
   );
 
