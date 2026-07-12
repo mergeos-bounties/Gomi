@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { GomiPatchProposal } from '../common/gomiTypes';
-import { applyParsedPatchFile, parseUnifiedDiff } from './patchApplier';
+import { applyParsedPatchFile, parseUnifiedDiff, type ParsedPatchFile } from './patchApplier';
 
 export interface GomiPatchApplyOptions {
   dryRun?: boolean;
@@ -16,6 +16,13 @@ export interface GomiPatchApplyResult {
   deletedFiles: string[];
 }
 
+interface PreparedWorkspacePatchFile {
+  parsedFile: ParsedPatchFile;
+  targetAbsolutePath: string;
+  oldAbsolutePath?: string;
+  newAbsolutePath?: string;
+}
+
 export async function applyPatchProposalToWorkspace(
   patch: GomiPatchProposal,
   workspaceRoot: string,
@@ -28,35 +35,33 @@ export async function applyPatchProposalToWorkspace(
   }
 
   const parsedFiles = parseUnifiedDiff(patch.diff);
+  const preparedFiles = await Promise.all(
+    parsedFiles.map((parsedFile) => prepareWorkspacePatchFile(workspaceRoot, parsedFile))
+  );
   const appliedFiles: string[] = [];
   const deletedFiles: string[] = [];
 
-  for (const parsedFile of parsedFiles) {
-    const targetPath = parsedFile.newPath ?? parsedFile.oldPath;
-
-    if (!targetPath) {
-      throw new Error('Patch file is missing both old and new paths.');
-    }
-
-    const absolutePath = await resolveWorkspacePatchPathSafe(workspaceRoot, targetPath);
-    const existingContent = await readTextFileIfExists(absolutePath);
+  for (const { parsedFile, targetAbsolutePath, oldAbsolutePath, newAbsolutePath } of preparedFiles) {
+    const existingContent = await readTextFileIfExists(targetAbsolutePath);
     const nextContent = applyParsedPatchFile(existingContent, parsedFile);
 
     if (parsedFile.newPath === undefined) {
-      deletedFiles.push(toPortableRelativePath(workspaceRoot, absolutePath));
+      deletedFiles.push(toPortableRelativePath(workspaceRoot, targetAbsolutePath));
 
       if (!options.dryRun) {
-        await fs.rm(absolutePath, { force: true });
+        await fs.rm(targetAbsolutePath, { force: true });
       }
 
       continue;
     }
 
-    appliedFiles.push(toPortableRelativePath(workspaceRoot, absolutePath));
+    const writeAbsolutePath = newAbsolutePath ?? targetAbsolutePath;
+
+    appliedFiles.push(toPortableRelativePath(workspaceRoot, writeAbsolutePath));
 
     if (!options.dryRun) {
-      await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-      await fs.writeFile(absolutePath, nextContent, 'utf8');
+      await fs.mkdir(path.dirname(writeAbsolutePath), { recursive: true });
+      await fs.writeFile(writeAbsolutePath, nextContent, 'utf8');
     }
 
     const isRename =
@@ -64,8 +69,7 @@ export async function applyPatchProposalToWorkspace(
       parsedFile.newPath !== undefined &&
       parsedFile.oldPath !== parsedFile.newPath;
 
-    if (isRename && parsedFile.oldPath) {
-      const oldAbsolutePath = await resolveWorkspacePatchPathSafe(workspaceRoot, parsedFile.oldPath);
+    if (isRename && oldAbsolutePath) {
       deletedFiles.push(toPortableRelativePath(workspaceRoot, oldAbsolutePath));
 
       if (!options.dryRun) {
@@ -82,17 +86,43 @@ export async function applyPatchProposalToWorkspace(
   };
 }
 
+async function prepareWorkspacePatchFile(
+  workspaceRoot: string,
+  parsedFile: ParsedPatchFile
+): Promise<PreparedWorkspacePatchFile> {
+  const oldAbsolutePath =
+    parsedFile.oldPath === undefined
+      ? undefined
+      : await resolveWorkspacePatchPathSafe(workspaceRoot, parsedFile.oldPath);
+  const newAbsolutePath =
+    parsedFile.newPath === undefined
+      ? undefined
+      : await resolveWorkspacePatchPathSafe(workspaceRoot, parsedFile.newPath);
+  const targetAbsolutePath = newAbsolutePath ?? oldAbsolutePath;
+
+  if (!targetAbsolutePath) {
+    throw new Error('Patch file is missing both old and new paths.');
+  }
+
+  return {
+    parsedFile,
+    targetAbsolutePath,
+    oldAbsolutePath,
+    newAbsolutePath
+  };
+}
+
 async function resolveWorkspacePatchPathSafe(workspaceRoot: string, patchPath: string): Promise<string> {
-  if (path.isAbsolute(patchPath)) {
+  if (isAbsolutePatchPath(patchPath)) {
     throw new Error(`Patch path must be relative to the workspace: ${patchPath}`);
   }
 
-  const normalizedPatchPath = patchPath.split('/').join(path.sep);
+  const normalizedPatchPath = patchPath.split(/[\\/]/).join(path.sep);
   const root = path.resolve(workspaceRoot);
   const absolutePath = path.resolve(root, normalizedPatchPath);
   const relativePath = path.relative(root, absolutePath);
 
-  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+  if (isOutsideWorkspaceRelativePath(relativePath)) {
     throw new Error(`Patch path escapes the workspace root: ${patchPath}`);
   }
 
@@ -102,12 +132,20 @@ async function resolveWorkspacePatchPathSafe(workspaceRoot: string, patchPath: s
     const realRoot = await fs.realpath(root).catch(() => root);
     const realRelative = path.relative(realRoot, realAncestor);
 
-    if (realRelative.startsWith('..') || path.isAbsolute(realRelative)) {
+    if (isOutsideWorkspaceRelativePath(realRelative)) {
       throw new Error(`Patch path resolves outside the workspace root through a symlink: ${patchPath}`);
     }
   }
 
   return absolutePath;
+}
+
+function isAbsolutePatchPath(patchPath: string): boolean {
+  return path.isAbsolute(patchPath) || /^[A-Za-z]:[\\/]/.test(patchPath) || /^\\\\/.test(patchPath);
+}
+
+function isOutsideWorkspaceRelativePath(relativePath: string): boolean {
+  return relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath);
 }
 
 async function realPathOfNearestAncestor(absolutePath: string): Promise<string | undefined> {
