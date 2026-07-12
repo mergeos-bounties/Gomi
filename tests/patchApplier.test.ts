@@ -97,6 +97,27 @@ describe('patchApplier', () => {
     expect(content).toContain('# Gomi Plan');
   });
 
+  it('accepts nested valid patch paths', async () => {
+    const result = await applyPatchProposalToWorkspace(
+      createPatch({
+        diff: [
+          'diff --git a/packages/gomi/src/feature.ts b/packages/gomi/src/feature.ts',
+          'new file mode 100644',
+          '--- /dev/null',
+          '+++ b/packages/gomi/src/feature.ts',
+          '@@ -0,0 +1 @@',
+          '+export const enabled = true;'
+        ].join('\n')
+      }),
+      workspaceRoot
+    );
+
+    const content = await fs.readFile(path.join(workspaceRoot, 'packages', 'gomi', 'src', 'feature.ts'), 'utf8');
+
+    expect(result.appliedFiles).toEqual(['packages/gomi/src/feature.ts']);
+    expect(content).toContain('export const enabled = true;');
+  });
+
   it('rejects unapproved patches and paths outside the workspace', async () => {
     await expect(
       applyPatchProposalToWorkspace(
@@ -128,6 +149,78 @@ describe('patchApplier', () => {
         workspaceRoot
       )
     ).rejects.toThrow('escapes the workspace root');
+  });
+
+  it('rejects absolute patch paths', async () => {
+    const absolutePath = path.join(os.tmpdir(), 'gomi-outside.txt');
+
+    await expect(
+      applyPatchProposalToWorkspace(
+        createPatch({
+          diff: [
+            `diff --git a/src/app.ts ${absolutePath}`,
+            '--- /dev/null',
+            `+++ ${absolutePath}`,
+            '@@ -0,0 +1 @@',
+            '+escape'
+          ].join('\n')
+        }),
+        workspaceRoot
+      )
+    ).rejects.toThrow('Patch path must be relative to the workspace');
+  });
+
+  it('rejects Windows absolute patch paths on every platform', async () => {
+    await expect(
+      applyPatchProposalToWorkspace(
+        createPatch({
+          diff: [
+            'diff --git a/src/app.ts b/C:/Users/agent/outside.txt',
+            '--- /dev/null',
+            '+++ b/C:/Users/agent/outside.txt',
+            '@@ -0,0 +1 @@',
+            '+escape'
+          ].join('\n')
+        }),
+        workspaceRoot
+      )
+    ).rejects.toThrow('Patch path must be relative to the workspace');
+  });
+
+  it('rejects a multi-file patch all-or-nothing when one path escapes the workspace', async () => {
+    await fs.mkdir(path.join(workspaceRoot, 'src'), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, 'src', 'app.ts'),
+      'export const name = "Gomi";\nexport const mode = "demo";\n',
+      'utf8'
+    );
+
+    await expect(
+      applyPatchProposalToWorkspace(
+        createPatch({
+          diff: [
+            'diff --git a/src/app.ts b/src/app.ts',
+            '--- a/src/app.ts',
+            '+++ b/src/app.ts',
+            '@@ -1,2 +1,2 @@',
+            ' export const name = "Gomi";',
+            '-export const mode = "demo";',
+            '+export const mode = "office";',
+            'diff --git a/../outside.txt b/../outside.txt',
+            'new file mode 100644',
+            '--- /dev/null',
+            '+++ b/../outside.txt',
+            '@@ -0,0 +1 @@',
+            '+escape'
+          ].join('\n')
+        }),
+        workspaceRoot
+      )
+    ).rejects.toThrow('escapes the workspace root');
+
+    await expect(fs.readFile(path.join(workspaceRoot, 'src', 'app.ts'), 'utf8')).resolves.toContain(
+      'export const mode = "demo";'
+    );
   });
 });
 
