@@ -29,6 +29,8 @@ import {
   createMemoryContent,
   type GomiMemoryHit,
   type GomiMemoryItem,
+  type GomiMemoryPruneReport,
+  type GomiMemoryScope,
   type GomiMemoryStore
 } from './memoryStore';
 import { GomiMessageBus } from './messageBus';
@@ -72,6 +74,11 @@ interface GomiQueuedAgentRun {
   result: GomiAgentResult;
 }
 
+export interface GomiRuntimeMemoryPruneReport extends GomiMemoryPruneReport {
+  lexical: GomiMemoryPruneReport;
+  vector: GomiMemoryPruneReport;
+}
+
 export class GomiAgentRuntime {
   private readonly planner = new GomiTaskPlanner();
   private readonly bus = new GomiMessageBus<GomiRuntimeEvent>();
@@ -99,6 +106,14 @@ export class GomiAgentRuntime {
     return this.bus.subscribe(type, listener);
   }
 
+  async pruneMemory(): Promise<GomiRuntimeMemoryPruneReport> {
+    const workspace = await this.workspaceReader();
+
+    return this.pruneMemoryScope({
+      workspaceId: workspace.rootName
+    });
+  }
+
   async *run(request: string, options: GomiRuntimeRunOptions = {}): AsyncGenerator<GomiRuntimeEvent> {
     const sessionId = `gomi-${Date.now()}`;
     const signal = options.signal;
@@ -119,8 +134,7 @@ export class GomiAgentRuntime {
     };
     const sharedMemoryEnabled = this.officeSettings.memory.sharedMemoryEnabled;
 
-    this.memoryStore.prune(memoryScope, this.officeSettings.memory);
-    this.vectorMemoryStore.prune(memoryScope, this.officeSettings.memory);
+    this.pruneMemoryScope(memoryScope);
 
     const memoryPolicyResult = applyWorkspaceMemoryPolicy(rawWorkspace, this.officeSettings.memory);
     const workspace = memoryPolicyResult.workspace;
@@ -259,6 +273,18 @@ export class GomiAgentRuntime {
   private async *emit(event: GomiRuntimeEvent): AsyncGenerator<GomiRuntimeEvent> {
     this.bus.publish(event);
     yield event;
+  }
+
+  private pruneMemoryScope(scope: GomiMemoryScope): GomiRuntimeMemoryPruneReport {
+    const lexical = this.memoryStore.prune(scope, this.officeSettings.memory);
+    const vector = this.vectorMemoryStore.prune(scope, this.officeSettings.memory);
+
+    return {
+      removed: lexical.removed + vector.removed,
+      remaining: lexical.remaining + vector.remaining,
+      lexical,
+      vector
+    };
   }
 
   private async *say(

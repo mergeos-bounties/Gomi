@@ -7,7 +7,12 @@ import type {
   GomiPatchPreviewResult,
   GomiRuntimeEvent
 } from '../common/gomiTypes';
-import { GomiAgentRuntime, type GomiRuntimeOptions, type GomiRuntimeRunOptions } from './agentRuntime';
+import {
+  GomiAgentRuntime,
+  type GomiRuntimeMemoryPruneReport,
+  type GomiRuntimeOptions,
+  type GomiRuntimeRunOptions
+} from './agentRuntime';
 import type { GomiCliCommandRunner } from './cliAgentProvider';
 import {
   createConfiguredEmbeddingProvider,
@@ -29,6 +34,7 @@ import { createWorkbenchGomiAgentProvider } from './workbenchAgentProvider';
 
 export interface GomiRuntimeRunner {
   run(request: string, options?: GomiRuntimeRunOptions): AsyncGenerator<GomiRuntimeEvent>;
+  pruneMemory?: () => Promise<GomiRuntimeMemoryPruneReport>;
 }
 
 export interface GomiWorkbenchControllerOptions {
@@ -142,6 +148,11 @@ export class GomiWorkbenchController {
       return;
     }
 
+    if (message.type === 'gomi.pruneMemory') {
+      await this.pruneMemory(message);
+      return;
+    }
+
     if (message.type === 'gomi.applyPatch') {
       await this.applyPatchMessage(message);
       return;
@@ -203,6 +214,28 @@ export class GomiWorkbenchController {
 
     this.postSystemMessage('Stopping the current Gomi Office session...');
     this.abortController.abort(reason);
+  }
+
+  private async pruneMemory(
+    message: Extract<GomiBridgeMessage, { type: 'gomi.pruneMemory' }>
+  ): Promise<void> {
+    try {
+      const runtime = this.runtime ?? this.runtimeFactory(message.officeSettings);
+
+      if (!runtime.pruneMemory) {
+        throw new Error('Memory pruning is not configured for this Gomi workbench controller.');
+      }
+
+      this.bridge.postMessage({
+        type: 'gomi.pruneMemoryResult',
+        report: await runtime.pruneMemory()
+      });
+    } catch (error) {
+      this.bridge.postMessage({
+        type: 'gomi.pruneMemoryResult',
+        error: error instanceof Error ? error.message : 'Unknown memory prune error.'
+      });
+    }
   }
 
   private async applyPatchMessage(

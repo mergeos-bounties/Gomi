@@ -12,6 +12,8 @@ import {
 } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
 import { GomiAgentRuntime } from '../src/vs/workbench/contrib/gomi/node/agentRuntime';
 import { createDemoGomiAgentProvider, type GomiAgentRunContext } from '../src/vs/workbench/contrib/gomi/node/agentProvider';
+import { createInMemoryGomiMemoryStore } from '../src/vs/workbench/contrib/gomi/node/memoryStore';
+import { createInMemoryVectorMemoryStore } from '../src/vs/workbench/contrib/gomi/node/vectorMemoryStore';
 
 describe('GomiAgentRuntime', () => {
   it('streams a final report and patch proposal', async () => {
@@ -134,6 +136,67 @@ describe('GomiAgentRuntime', () => {
 
     expect(memorySources).toContain('session');
     expect(memorySources).not.toContain('project');
+  });
+
+  it('prunes memory explicitly and returns a combined removal report', async () => {
+    const memoryStore = createInMemoryGomiMemoryStore();
+    const vectorMemoryStore = createInMemoryVectorMemoryStore();
+    const scope = { workspaceId: 'ManualPruneWorkspace' };
+    const memorySettings = {
+      ...DEFAULT_GOMI_OFFICE_SETTINGS.memory,
+      maxProjectMemoryItems: 1
+    };
+
+    await memoryStore.put(scope, {
+      key: 'workspace:oldest',
+      value: 'Oldest lexical context'
+    });
+    await memoryStore.put(scope, {
+      key: 'workspace:middle',
+      value: 'Middle lexical context'
+    });
+    await memoryStore.put(scope, {
+      key: 'workspace:newest',
+      value: 'Newest lexical context'
+    });
+    await vectorMemoryStore.upsert(scope, {
+      key: 'agent:older',
+      value: 'Older vector context'
+    });
+    await vectorMemoryStore.upsert(scope, {
+      key: 'agent:newer',
+      value: 'Newer vector context'
+    });
+
+    const runtime = new GomiAgentRuntime({
+      delayMs: 0,
+      memoryStore,
+      vectorMemoryStore,
+      officeSettings: {
+        ...DEFAULT_GOMI_OFFICE_SETTINGS,
+        memory: memorySettings
+      },
+      workspaceReader: () => ({
+        rootName: 'ManualPruneWorkspace',
+        files: [],
+        openEditors: [],
+        gitSummary: 'Git clean.',
+        terminalSummary: 'Idle.'
+      })
+    });
+
+    await expect(runtime.pruneMemory()).resolves.toEqual({
+      removed: 3,
+      remaining: 2,
+      lexical: {
+        removed: 2,
+        remaining: 1
+      },
+      vector: {
+        removed: 1,
+        remaining: 1
+      }
+    });
   });
 
   it('sanitizes workspace context before indexing and planning', async () => {

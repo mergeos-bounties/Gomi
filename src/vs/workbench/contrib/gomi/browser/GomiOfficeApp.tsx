@@ -80,7 +80,7 @@ import type {
   GomiWorkspaceTrustState,
   GomiWorkspaceSnapshot
 } from '../common/gomiTypes';
-import { GomiAgentRuntime } from '../node/agentRuntime';
+import { GomiAgentRuntime, type GomiRuntimeMemoryPruneReport } from '../node/agentRuntime';
 import {
   approvePatchReview,
   canApplyPatch,
@@ -153,6 +153,9 @@ export function GomiOfficeApp() {
   const [report, setReport] = useState<GomiFinalReport | undefined>();
   const [patchReview, setPatchReview] = useState<GomiPatchReviewState | undefined>();
   const [workspace, setWorkspace] = useState<GomiWorkspaceSnapshot | undefined>();
+  const [memoryPruneReport, setMemoryPruneReport] = useState<GomiRuntimeMemoryPruneReport | undefined>();
+  const [memoryPruneError, setMemoryPruneError] = useState<string | undefined>();
+  const [isPruningMemory, setIsPruningMemory] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => isCompactAgentPanelViewport());
   const [bottomCollapsed, setBottomCollapsed] = useState(false);
@@ -237,6 +240,18 @@ export function GomiOfficeApp() {
 
           return markPatchPreviewOpened(currentReview, message.result);
         });
+      }
+
+      if (message.type === 'gomi.pruneMemoryResult') {
+        setIsPruningMemory(false);
+
+        if (message.error || !message.report) {
+          setMemoryPruneError(message.error ?? 'Memory prune did not return a report.');
+          return;
+        }
+
+        setMemoryPruneError(undefined);
+        setMemoryPruneReport(message.report);
       }
     });
   }, [workbenchBridge]);
@@ -373,6 +388,31 @@ export function GomiOfficeApp() {
 
       return markPatchApplied(applyingReview);
     });
+  }
+
+  async function pruneMemoryNow() {
+    if (isPruningMemory) {
+      return;
+    }
+
+    setIsPruningMemory(true);
+    setMemoryPruneError(undefined);
+
+    if (workbenchBridge) {
+      workbenchBridge.postMessage({
+        type: 'gomi.pruneMemory',
+        officeSettings
+      });
+      return;
+    }
+
+    try {
+      setMemoryPruneReport(await runtime.pruneMemory());
+    } catch (error) {
+      setMemoryPruneError(error instanceof Error ? error.message : 'Unknown memory prune error.');
+    } finally {
+      setIsPruningMemory(false);
+    }
   }
 
   function applyRuntimeEvent(event: GomiRuntimeEvent) {
@@ -716,6 +756,9 @@ export function GomiOfficeApp() {
           report={report}
           officeSettings={officeSettings}
           memoryItems={memoryItems}
+          memoryPruneReport={memoryPruneReport}
+          memoryPruneError={memoryPruneError}
+          isPruningMemory={isPruningMemory}
           onProviderChange={assignProvider}
           onToggleSeatSleep={toggleSeatSleep}
           onClosePanel={closeRightPanel}
@@ -739,6 +782,7 @@ export function GomiOfficeApp() {
           onHttpProvidersEnabledChange={updateHttpProvidersEnabled}
           onLiveProviderPatchApprovalRequiredChange={updateLiveProviderPatchApprovalRequired}
           onMaxConcurrentAgentRunsChange={updateMaxConcurrentAgentRuns}
+          onPruneMemory={pruneMemoryNow}
         />
       </div>
 
@@ -827,6 +871,9 @@ function RightPanel({
   report,
   officeSettings,
   memoryItems,
+  memoryPruneReport,
+  memoryPruneError,
+  isPruningMemory,
   onProviderChange,
   onToggleSeatSleep,
   onClosePanel,
@@ -849,13 +896,17 @@ function RightPanel({
   onCliProvidersEnabledChange,
   onHttpProvidersEnabledChange,
   onLiveProviderPatchApprovalRequiredChange,
-  onMaxConcurrentAgentRunsChange
+  onMaxConcurrentAgentRunsChange,
+  onPruneMemory
 }: {
   agents: GomiAgent[];
   tasks: GomiTask[];
   report?: GomiFinalReport;
   officeSettings: GomiOfficeSettings;
   memoryItems: GomiMemoryBoardItem[];
+  memoryPruneReport?: GomiRuntimeMemoryPruneReport;
+  memoryPruneError?: string;
+  isPruningMemory: boolean;
   onProviderChange: (seatId: string, providerId: GomiAgentCliProviderId) => void;
   onToggleSeatSleep: (seat: GomiAgentSeat) => void;
   onClosePanel: () => void;
@@ -879,6 +930,7 @@ function RightPanel({
   onHttpProvidersEnabledChange: (allowHttpProviders: boolean) => void;
   onLiveProviderPatchApprovalRequiredChange: (requirePatchApprovalForLiveProviders: boolean) => void;
   onMaxConcurrentAgentRunsChange: (maxConcurrentAgentRuns: number) => void;
+  onPruneMemory: () => void;
 }) {
   return (
     <aside className="gomi-right-panel" aria-label="Agent Status Panel">
@@ -920,6 +972,9 @@ function RightPanel({
         <OfficeSettingsPanel
           officeSettings={officeSettings}
           memoryItems={memoryItems}
+          memoryPruneReport={memoryPruneReport}
+          memoryPruneError={memoryPruneError}
+          isPruningMemory={isPruningMemory}
           onProviderChange={onProviderChange}
           onToggleSeatSleep={onToggleSeatSleep}
           onHireEmployee={onHireEmployee}
@@ -942,6 +997,7 @@ function RightPanel({
           onHttpProvidersEnabledChange={onHttpProvidersEnabledChange}
           onLiveProviderPatchApprovalRequiredChange={onLiveProviderPatchApprovalRequiredChange}
           onMaxConcurrentAgentRunsChange={onMaxConcurrentAgentRunsChange}
+          onPruneMemory={onPruneMemory}
         />
       </div>
     </aside>
@@ -985,6 +1041,9 @@ function TaskRow({ task }: { task: GomiTask }) {
 function OfficeSettingsPanel({
   officeSettings,
   memoryItems,
+  memoryPruneReport,
+  memoryPruneError,
+  isPruningMemory,
   onProviderChange,
   onToggleSeatSleep,
   onHireEmployee,
@@ -1006,10 +1065,14 @@ function OfficeSettingsPanel({
   onCliProvidersEnabledChange,
   onHttpProvidersEnabledChange,
   onLiveProviderPatchApprovalRequiredChange,
-  onMaxConcurrentAgentRunsChange
+  onMaxConcurrentAgentRunsChange,
+  onPruneMemory
 }: {
   officeSettings: GomiOfficeSettings;
   memoryItems: GomiMemoryBoardItem[];
+  memoryPruneReport?: GomiRuntimeMemoryPruneReport;
+  memoryPruneError?: string;
+  isPruningMemory: boolean;
   onProviderChange: (seatId: string, providerId: GomiAgentCliProviderId) => void;
   onToggleSeatSleep: (seat: GomiAgentSeat) => void;
   onHireEmployee: (departmentId: GomiAgentId) => void;
@@ -1032,6 +1095,7 @@ function OfficeSettingsPanel({
   onHttpProvidersEnabledChange: (allowHttpProviders: boolean) => void;
   onLiveProviderPatchApprovalRequiredChange: (requirePatchApprovalForLiveProviders: boolean) => void;
   onMaxConcurrentAgentRunsChange: (maxConcurrentAgentRuns: number) => void;
+  onPruneMemory: () => void;
 }) {
   const leaders = officeSettings.seats.filter((seat) => seat.seatKind !== 'employee');
   const employees = officeSettings.seats.filter((seat) => seat.seatKind === 'employee');
@@ -1157,7 +1221,17 @@ function OfficeSettingsPanel({
       </div>
 
       <div className="gomi-settings-group">
-        <div className="gomi-settings-title">Shared Memory</div>
+        <div className="gomi-settings-title-row">
+          <div className="gomi-settings-title">Shared Memory</div>
+          <button
+            className="gomi-action-button"
+            onClick={onPruneMemory}
+            disabled={isPruningMemory}
+          >
+            <Database size={14} />
+            <span>{isPruningMemory ? 'Pruning' : 'Prune Now'}</span>
+          </button>
+        </div>
         <div className="gomi-memory-summary">
           <span>{officeSettings.memory.retrievalMode}</span>
           <span>{getMemoryEmbeddingProviderLabel(officeSettings.memory.embeddingProvider)}</span>
@@ -1168,6 +1242,19 @@ function OfficeSettingsPanel({
           <span>{`${officeSettings.memory.retentionDays}d retention`}</span>
           <span>{officeSettings.memory.requirePatchApproval ? 'approval required' : 'auto apply allowed'}</span>
         </div>
+        {memoryPruneReport ? (
+          <div className="gomi-memory-summary" aria-live="polite">
+            <span>{`${memoryPruneReport.removed} removed`}</span>
+            <span>{`${memoryPruneReport.remaining} remaining`}</span>
+            <span>{`lexical ${memoryPruneReport.lexical.removed}/${memoryPruneReport.lexical.remaining}`}</span>
+            <span>{`vector ${memoryPruneReport.vector.removed}/${memoryPruneReport.vector.remaining}`}</span>
+          </div>
+        ) : undefined}
+        {memoryPruneError ? (
+          <div className="gomi-seat-note" role="alert">
+            {memoryPruneError}
+          </div>
+        ) : undefined}
         <label className="gomi-toggle-field">
           <input
             type="checkbox"
