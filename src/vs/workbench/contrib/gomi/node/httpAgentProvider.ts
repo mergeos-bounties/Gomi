@@ -4,6 +4,7 @@ import {
   parseAgentResultJson
 } from './agentOutputParsing';
 import { BASE_GOMI_AGENTS } from '../common/gomiConstants';
+import { estimateGomiUsage } from '../common/gomiUsageEstimate';
 import {
   GOMI_AGENT_CLI_PROVIDERS,
   GOMI_DEFAULT_HTTP_MAX_RETRIES,
@@ -141,12 +142,17 @@ export class HttpGomiAgentProvider implements GomiAgentProvider {
     }
 
     try {
-      const response = await this.completeWithRoute(route, createAgentRequest(context), context.signal, {
+      const request = createAgentRequest(context);
+      const response = await this.completeWithRoute(route, request, context.signal, {
         maxRetries: context.executionPolicy?.httpMaxRetries,
         reportProgress: context.reportProgress
       });
 
-      return createAgentResultFromHttpResponse(context, response);
+      return createAgentResultFromHttpResponse(context, response, {
+        providerId,
+        model: resolveRouteModel(route, this.env),
+        inputText: requestToEstimateText(request)
+      });
     } catch (error) {
       return createConfigurationErrorResult(
         context,
@@ -493,7 +499,12 @@ function parseHttpProviderResponse(
 
 function createAgentResultFromHttpResponse(
   context: GomiAgentRunContext,
-  response: GomiAgentResponse
+  response: GomiAgentResponse,
+  usageContext: {
+    providerId: GomiAgentCliProviderId;
+    model: string;
+    inputText: string;
+  }
 ): GomiAgentResult {
   const parsed = parseProviderJson(response.text);
   const proposedFiles = normalizeProposedFiles(
@@ -519,7 +530,14 @@ function createAgentResultFromHttpResponse(
       'Keep important findings in shared memory for later agents.'
     ]),
     proposedFiles,
-    confidence: normalizeConfidence(parsed?.confidence)
+    confidence: normalizeConfidence(parsed?.confidence),
+    usageEstimate: estimateGomiUsage({
+      providerId: usageContext.providerId,
+      model: usageContext.model,
+      inputText: usageContext.inputText,
+      outputText: response.text,
+      usage: response.usage
+    })
   };
 }
 
@@ -620,6 +638,15 @@ function readRuntimeEnv(): Record<string, string | undefined> {
   };
 
   return runtime.process?.env ?? {};
+}
+
+function requestToEstimateText(request: GomiAgentRequest): string {
+  return [
+    request.system,
+    ...request.messages.map((message) => `${message.role}: ${message.content}`)
+  ]
+    .filter((part): part is string => typeof part === 'string' && part.length > 0)
+    .join('\n\n');
 }
 
 function shortenText(value: string, maxLength: number): string {

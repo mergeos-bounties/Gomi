@@ -585,6 +585,50 @@ button {
   gap: 10px;
 }
 
+.gomi-usage-panel {
+  gap: 10px;
+}
+
+.gomi-usage-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.gomi-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.gomi-usage-metric {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #111827;
+  padding: 8px;
+}
+
+.gomi-usage-metric span {
+  overflow: hidden;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gomi-usage-metric strong {
+  overflow: hidden;
+  color: #f9fafb;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .gomi-patch-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

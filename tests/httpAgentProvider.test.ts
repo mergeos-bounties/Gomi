@@ -81,6 +81,14 @@ describe('HTTP agent provider', () => {
     expect(result.summary).toBe('Cloud backend agent reviewed the login API.');
     expect(result.proposedFiles).toEqual(['src/api/login.ts']);
     expect(result.confidence).toBe(0.88);
+    expect(result.usageEstimate).toMatchObject({
+      providerId: 'openai-compatible-api',
+      model: 'gomi-cloud-test',
+      inputTokens: 120,
+      outputTokens: 40,
+      totalTokens: 160,
+      hasEstimatedTokens: false
+    });
   });
 
   it('calls an Ollama-compatible local chat endpoint', async () => {
@@ -120,6 +128,14 @@ describe('HTTP agent provider', () => {
     expect(body.stream).toBe(false);
     expect(result.summary).toContain('Local QA model');
     expect(result.proposedFiles).toEqual(['tests/agentRuntime.test.ts']);
+    expect(result.usageEstimate).toMatchObject({
+      providerId: 'ollama-local-model',
+      model: 'gomi-local-test',
+      inputTokens: 80,
+      outputTokens: 20,
+      totalTokens: 100,
+      hasEstimatedTokens: false
+    });
   });
 
   it('falls back to the demo provider when HTTP execution is disabled', async () => {

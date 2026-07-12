@@ -57,6 +57,58 @@ describe('GomiAgentRuntime', () => {
     expect(eventTypes.at(-1)).toBe('session_completed');
   });
 
+  it('aggregates agent usage estimates into the final report', async () => {
+    const demoProvider = createDemoGomiAgentProvider();
+    const runtime = new GomiAgentRuntime({
+      delayMs: 0,
+      agentProvider: {
+        id: demoProvider.id,
+        label: demoProvider.label,
+        kind: demoProvider.kind,
+        capabilities: demoProvider.capabilities,
+        complete: (request, signal) => demoProvider.complete(request, signal),
+        runAgentTask: async (context) => ({
+          agentId: context.task.agentId,
+          taskId: context.task.id,
+          summary: `${context.task.id} used HTTP tokens`,
+          findings: [],
+          recommendations: [],
+          proposedFiles: [],
+          confidence: 1,
+          usageEstimate: {
+            providerId: 'openai-compatible-api',
+            model: 'gomi-cloud-test',
+            inputTokens: 120,
+            outputTokens: 40,
+            totalTokens: 160,
+            estimatedCostUsd: 0.00024,
+            hasEstimatedTokens: false,
+            pricing: {
+              inputUsdPerMillionTokens: 1,
+              outputUsdPerMillionTokens: 3,
+              label: 'Display estimate'
+            }
+          }
+        })
+      }
+    });
+    let finalReportUsage;
+
+    for await (const event of runtime.run('Review usage estimates')) {
+      if (event.type === 'report') {
+        finalReportUsage = event.report.usageEstimate;
+      }
+    }
+
+    expect(finalReportUsage).toMatchObject({
+      runCount: 7,
+      inputTokens: 840,
+      outputTokens: 280,
+      totalTokens: 1120,
+      hasEstimatedTokens: false
+    });
+  });
+
   it('uses an injected workspace reader for project context', async () => {
     const runtime = new GomiAgentRuntime({
       delayMs: 0,

@@ -151,6 +151,35 @@ export interface GomiReportSection {
 export interface GomiFinalReport {
   summary: string;
   sections: GomiReportSection[];
+  usageEstimate?: GomiUsageSummary;
+}
+
+export interface GomiUsagePricing {
+  inputUsdPerMillionTokens: number;
+  outputUsdPerMillionTokens: number;
+  label: string;
+}
+
+export interface GomiUsageEstimate {
+  providerId?: GomiAgentCliProviderId;
+  model?: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+  hasEstimatedTokens: boolean;
+  pricing: GomiUsagePricing;
+}
+
+export interface GomiUsageSummary {
+  runCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+  hasEstimatedTokens: boolean;
+  pricing: GomiUsagePricing;
+  items: GomiUsageEstimate[];
 }
 
 export interface GomiPatchProposal {
@@ -195,6 +224,7 @@ export interface GomiAgentResult {
   recommendations: string[];
   proposedFiles: string[];
   confidence: number;
+  usageEstimate?: GomiUsageEstimate;
 }
 
 export interface GomiMemoryEntry {
