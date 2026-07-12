@@ -1,5 +1,10 @@
 import type { GomiBridgeMessage, GomiWorkbenchBridge } from '../electron-sandbox/gomiBridge';
-import { isGomiBridgeMessage } from './gomiWebviewBridge';
+import {
+  createGomiBridgeErrorMessage,
+  isGomiBridgeMessage,
+  shouldReportInvalidGomiBridgeMessage,
+  withGomiBridgeProtocol
+} from './gomiWebviewBridge';
 
 export interface GomiDisposable {
   dispose(): void;
@@ -21,6 +26,10 @@ export class GomiWebviewHostBridge implements GomiWorkbenchBridge, GomiDisposabl
   constructor(private readonly webview: GomiNativeWebviewHost) {
     this.disposable = this.webview.onMessage((event) => {
       if (!isGomiBridgeMessage(event.message)) {
+        if (shouldReportInvalidGomiBridgeMessage(event.message)) {
+          void this.webview.postMessage(createGomiBridgeErrorMessage());
+        }
+
         return;
       }
 
@@ -31,7 +40,7 @@ export class GomiWebviewHostBridge implements GomiWorkbenchBridge, GomiDisposabl
   }
 
   postMessage(message: GomiBridgeMessage): void {
-    void this.webview.postMessage(message);
+    void this.webview.postMessage(withGomiBridgeProtocol(message));
   }
 
   onMessage(listener: (message: GomiBridgeMessage) => void): () => void {

@@ -48,6 +48,7 @@ describe('Gomi webview bridge', () => {
       reason: 'Stop bridge test'
     });
     target.emit({
+      protocolVersion: 1,
       type: 'gomi.applyPatchResult',
       patchId: 'patch-1',
       result: {
@@ -60,16 +61,19 @@ describe('Gomi webview bridge', () => {
     target.emit({ type: 'not-gomi' });
     unsubscribe?.();
     target.emit({
+      protocolVersion: 1,
       type: 'gomi.applyPatchResult',
       patchId: 'patch-2'
     });
 
     expect(api.outbox).toEqual([
       {
+        protocolVersion: 1,
         type: 'gomi.run',
         request: 'Review workspace'
       },
       {
+        protocolVersion: 1,
         type: 'gomi.stop',
         reason: 'Stop bridge test'
       }
@@ -101,6 +105,7 @@ describe('Gomi webview bridge', () => {
     expect(api.state).toEqual({ persisted: true });
     expect(context?.stateStore.getState()).toEqual({ persisted: true });
     expect(api.outbox[0]).toMatchObject({
+      protocolVersion: 1,
       type: 'gomi.run',
       request: 'Persisted bridge'
     });
@@ -120,9 +125,44 @@ describe('Gomi webview bridge', () => {
   });
 
   it('filters bridge messages by Gomi namespace', () => {
-    expect(isGomiBridgeMessage({ type: 'gomi.event' })).toBe(true);
-    expect(isGomiBridgeMessage({ type: 'workspace.event' })).toBe(false);
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.stop' })).toBe(true);
+    expect(isGomiBridgeMessage({ type: 'gomi.stop' })).toBe(false);
+    expect(isGomiBridgeMessage({ protocolVersion: 2, type: 'gomi.stop' })).toBe(false);
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.danger' })).toBe(false);
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'workspace.event' })).toBe(false);
     expect(isGomiBridgeMessage(undefined)).toBe(false);
+  });
+
+  it('rejects malformed or oversized privileged webview payloads', () => {
+    expect(isGomiBridgeMessage({
+      protocolVersion: 1,
+      type: 'gomi.run',
+      request: 'x'.repeat(70_000)
+    })).toBe(false);
+    expect(isGomiBridgeMessage({
+      protocolVersion: 1,
+      type: 'gomi.run',
+      request: 'Review workspace',
+      officeSettings: {
+        seats: 'not-an-array',
+        memory: {},
+        execution: {}
+      }
+    })).toBe(false);
+    expect(isGomiBridgeMessage({
+      protocolVersion: 1,
+      type: 'gomi.applyPatch',
+      patch: {
+        id: 'patch-escape',
+        filePath: '../secret.txt',
+        targetFiles: ['README.md'],
+        summary: 'Unsafe patch.',
+        diff: 'diff --git a/README.md b/README.md\n@@ -1 +1 @@\n-old\n+new',
+        approvalStatus: 'approved',
+        riskLevel: 'low',
+        createdByAgentId: 'ceo'
+      }
+    })).toBe(false);
   });
 
   it('can be constructed directly with an injected api and target', () => {
@@ -136,6 +176,7 @@ describe('Gomi webview bridge', () => {
     });
 
     expect(api.outbox[0]).toMatchObject({
+      protocolVersion: 1,
       type: 'gomi.run',
       request: 'Direct bridge'
     });
