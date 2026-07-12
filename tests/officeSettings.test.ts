@@ -29,6 +29,7 @@ import {
   simulateStaffingScenario,
   setWorkspaceTrustState,
   setSharedMemoryEnabled,
+  setTerminalSnippetIndexing,
   setWorkspaceContextIndexing,
   setAvatarStyle
 } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
@@ -154,6 +155,8 @@ describe('Gomi office settings', () => {
     expect(quietSettings.memory.sharedMemoryEnabled).toBe(false);
     expect(quietSettings.memory.indexWorkspaceContext).toBe(false);
     expect(relaxedApproval.memory.requirePatchApproval).toBe(false);
+    expect(DEFAULT_GOMI_OFFICE_SETTINGS.memory.indexTerminalSnippets).toBe(false);
+    expect(setTerminalSnippetIndexing(DEFAULT_GOMI_OFFICE_SETTINGS, true).memory.indexTerminalSnippets).toBe(true);
   });
 
   it('updates embedding provider execution while keeping local hashing offline', () => {
@@ -242,7 +245,8 @@ describe('Gomi office settings', () => {
         maxProjectMemoryItems: 1,
         broadcastThreshold: 0.1,
         privacyMode: 'strict',
-        redactSecrets: false
+        redactSecrets: false,
+        indexTerminalSnippets: true
       },
       execution: {
         workspaceTrust: 'trusted',
@@ -272,6 +276,7 @@ describe('Gomi office settings', () => {
     expect(settings.memory.embeddingExecutionEnabled).toBe(true);
     expect(settings.memory.privacyMode).toBe('strict');
     expect(settings.memory.redactSecrets).toBe(true);
+    expect(settings.memory.indexTerminalSnippets).toBe(true);
     expect(settings.memory.retentionDays).toBe(365);
     expect(settings.memory.maxProjectMemoryItems).toBe(40);
     expect(settings.memory.broadcastThreshold).toBe(0.45);

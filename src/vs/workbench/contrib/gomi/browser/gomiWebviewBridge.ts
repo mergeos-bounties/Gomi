@@ -389,6 +389,7 @@ function isMemorySettings(value: unknown): boolean {
       'embeddingExecutionEnabled',
       'sharedMemoryEnabled',
       'indexWorkspaceContext',
+      'indexTerminalSnippets',
       'privacyMode',
       'redactSecrets',
       'retentionDays',
@@ -406,6 +407,7 @@ function isMemorySettings(value: unknown): boolean {
     typeof value.embeddingExecutionEnabled === 'boolean' &&
     typeof value.sharedMemoryEnabled === 'boolean' &&
     typeof value.indexWorkspaceContext === 'boolean' &&
+    typeof value.indexTerminalSnippets === 'boolean' &&
     isOneOf(value.privacyMode, GOMI_MEMORY_PRIVACY_MODES) &&
     typeof value.redactSecrets === 'boolean' &&
     isNumberInRange(value.retentionDays, 1, 3650) &&

@@ -214,6 +214,7 @@ export const DEFAULT_GOMI_OFFICE_SETTINGS: GomiOfficeSettings = {
     embeddingExecutionEnabled: false,
     sharedMemoryEnabled: true,
     indexWorkspaceContext: true,
+    indexTerminalSnippets: false,
     privacyMode: 'standard',
     redactSecrets: true,
     retentionDays: GOMI_DEFAULT_MEMORY_RETENTION_DAYS,
@@ -331,6 +332,15 @@ export function setWorkspaceContextIndexing(
 ): GomiOfficeSettings {
   return updateMemorySettings(settings, {
     indexWorkspaceContext
+  });
+}
+
+export function setTerminalSnippetIndexing(
+  settings: GomiOfficeSettings,
+  indexTerminalSnippets: boolean
+): GomiOfficeSettings {
+  return updateMemorySettings(settings, {
+    indexTerminalSnippets
   });
 }
 
@@ -559,6 +569,10 @@ export function normalizeGomiOfficeSettings(value: unknown): GomiOfficeSettings 
   normalizedSettings = setWorkspaceContextIndexing(
     normalizedSettings,
     booleanSetting(rawMemory.indexWorkspaceContext, DEFAULT_GOMI_OFFICE_SETTINGS.memory.indexWorkspaceContext)
+  );
+  normalizedSettings = setTerminalSnippetIndexing(
+    normalizedSettings,
+    booleanSetting(rawMemory.indexTerminalSnippets, DEFAULT_GOMI_OFFICE_SETTINGS.memory.indexTerminalSnippets)
   );
   normalizedSettings = setMemoryEmbeddingProvider(
     normalizedSettings,
