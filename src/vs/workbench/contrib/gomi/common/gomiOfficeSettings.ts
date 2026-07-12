@@ -14,6 +14,7 @@ import type {
 export const GOMI_DEFAULT_MEMORY_BROADCAST_THRESHOLD = 0.74;
 export const GOMI_DEFAULT_MEMORY_RETENTION_DAYS = 30;
 export const GOMI_DEFAULT_MAX_PROJECT_MEMORY_ITEMS = 420;
+export const GOMI_DEFAULT_MAX_CONCURRENT_AGENT_RUNS = 2;
 
 export const GOMI_HIRABLE_DEPARTMENT_IDS: GomiAgentId[] = [
   'system-analyst',
@@ -210,7 +211,8 @@ export const DEFAULT_GOMI_OFFICE_SETTINGS: GomiOfficeSettings = {
     liveProviderMode: 'trusted-workspaces',
     allowCliProviders: false,
     allowHttpProviders: false,
-    requirePatchApprovalForLiveProviders: true
+    requirePatchApprovalForLiveProviders: true,
+    maxConcurrentAgentRuns: GOMI_DEFAULT_MAX_CONCURRENT_AGENT_RUNS
   }
 };
 
@@ -433,6 +435,20 @@ export function setLiveProviderPatchApprovalRequired(
   });
 }
 
+export function setMaxConcurrentAgentRuns(
+  settings: GomiOfficeSettings,
+  maxConcurrentAgentRuns: number
+): GomiOfficeSettings {
+  return updateExecutionSettings(settings, {
+    maxConcurrentAgentRuns: clampInteger(
+      maxConcurrentAgentRuns,
+      1,
+      8,
+      GOMI_DEFAULT_MAX_CONCURRENT_AGENT_RUNS
+    )
+  });
+}
+
 export function getSeatForAgent(
   settings: GomiOfficeSettings,
   agentId: GomiAgentId
@@ -533,6 +549,13 @@ export function normalizeGomiOfficeSettings(value: unknown): GomiOfficeSettings 
     booleanSetting(
       rawExecution.requirePatchApprovalForLiveProviders,
       DEFAULT_GOMI_OFFICE_SETTINGS.execution.requirePatchApprovalForLiveProviders
+    )
+  );
+  normalizedSettings = setMaxConcurrentAgentRuns(
+    normalizedSettings,
+    numberSetting(
+      rawExecution.maxConcurrentAgentRuns,
+      DEFAULT_GOMI_OFFICE_SETTINGS.execution.maxConcurrentAgentRuns
     )
   );
 

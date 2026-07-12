@@ -3,6 +3,7 @@ import {
   DEFAULT_GOMI_OFFICE_SETTINGS,
   setMemoryPrivacyMode,
   setMemoryBroadcastThreshold,
+  setMaxConcurrentAgentRuns,
   setSecretRedactionEnabled,
   setSeatWorkMode,
   setSharedMemoryEnabled,
@@ -280,6 +281,119 @@ describe('GomiAgentRuntime', () => {
 
     expect(seenSignals[0]).toBe(abortController.signal);
   });
+
+  it('limits concurrent provider runs while starting queued tasks in order', async () => {
+    const demoProvider = createDemoGomiAgentProvider();
+    const startedTaskIds: string[] = [];
+    const finishedTaskIds: string[] = [];
+    const releaseQueuedRun: Array<() => void> = [];
+    let activeRuns = 0;
+    let maxActiveRuns = 0;
+    let holdRuns = true;
+    const abortController = new AbortController();
+    const runtime = new GomiAgentRuntime({
+      delayMs: 0,
+      officeSettings: setMaxConcurrentAgentRuns(DEFAULT_GOMI_OFFICE_SETTINGS, 2),
+      agentProvider: {
+        id: demoProvider.id,
+        label: demoProvider.label,
+        kind: demoProvider.kind,
+        capabilities: demoProvider.capabilities,
+        complete: (request, signal) => demoProvider.complete(request, signal),
+        runAgentTask: async (context) => {
+          startedTaskIds.push(context.task.id);
+          activeRuns += 1;
+          maxActiveRuns = Math.max(maxActiveRuns, activeRuns);
+
+          if (holdRuns) {
+            await new Promise<void>((resolve) => {
+              releaseQueuedRun.push(resolve);
+            });
+          }
+
+          activeRuns -= 1;
+          finishedTaskIds.push(context.task.id);
+
+          return {
+            agentId: context.task.agentId,
+            taskId: context.task.id,
+            summary: `${context.task.id} done`,
+            findings: [],
+            recommendations: [],
+            proposedFiles: [],
+            confidence: 1
+          };
+        }
+      }
+    });
+    const runPromise = drainRuntime(runtime, 'Review API UI database and deployment', abortController.signal);
+
+    try {
+      await waitFor(() => releaseQueuedRun.length === 2);
+      expect(startedTaskIds.slice(0, 2)).toEqual(['task-1-system-analyst', 'task-2-frontend']);
+      expect(finishedTaskIds).toHaveLength(0);
+      expect(maxActiveRuns).toBe(2);
+
+      releaseQueuedRun.shift()?.();
+      await waitFor(() => startedTaskIds.length === 3);
+      expect(startedTaskIds[2]).toBe('task-3-designer');
+
+      holdRuns = false;
+      while (releaseQueuedRun.length > 0) {
+        releaseQueuedRun.shift()?.();
+      }
+      await runPromise;
+    } catch (error) {
+      abortController.abort('concurrency test cleanup');
+      while (releaseQueuedRun.length > 0) {
+        releaseQueuedRun.shift()?.();
+      }
+      await runPromise;
+      throw error;
+    }
+  });
+
+  it('stops queued provider work when the run is cancelled', async () => {
+    const abortController = new AbortController();
+    const demoProvider = createDemoGomiAgentProvider();
+    const startedTaskIds: string[] = [];
+    const eventTypes: string[] = [];
+    const runtime = new GomiAgentRuntime({
+      delayMs: 0,
+      officeSettings: setMaxConcurrentAgentRuns(DEFAULT_GOMI_OFFICE_SETTINGS, 1),
+      agentProvider: {
+        id: demoProvider.id,
+        label: demoProvider.label,
+        kind: demoProvider.kind,
+        capabilities: demoProvider.capabilities,
+        complete: (request, signal) => demoProvider.complete(request, signal),
+        runAgentTask: async (context) => {
+          startedTaskIds.push(context.task.id);
+          abortController.abort('cancel queued work');
+
+          return {
+            agentId: context.task.agentId,
+            taskId: context.task.id,
+            summary: `${context.task.id} cancelled`,
+            findings: [],
+            recommendations: [],
+            proposedFiles: [],
+            confidence: 1
+          };
+        }
+      }
+    });
+
+    for await (const event of runtime.run('Review API UI database and deployment', {
+      signal: abortController.signal
+    })) {
+      eventTypes.push(event.type);
+    }
+
+    expect(startedTaskIds).toEqual(['task-1-system-analyst']);
+    expect(eventTypes).toContain('session_stopped');
+    expect(eventTypes.at(-1)).toBe('session_completed');
+  });
 });
 
 async function countSpecialistMessages(runtime: GomiAgentRuntime): Promise<number> {
@@ -295,4 +409,28 @@ async function countSpecialistMessages(runtime: GomiAgentRuntime): Promise<numbe
   }
 
   return messageCount;
+}
+
+async function drainRuntime(
+  runtime: GomiAgentRuntime,
+  request: string,
+  signal: AbortSignal
+): Promise<void> {
+  for await (const event of runtime.run(request, { signal })) {
+    if (event.type === 'session_completed') {
+      break;
+    }
+  }
+}
+
+async function waitFor(predicate: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (predicate()) {
+      return;
+    }
+
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 10));
+  }
+
+  throw new Error('Timed out waiting for runtime condition.');
 }

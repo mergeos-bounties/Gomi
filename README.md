@@ -379,7 +379,7 @@ Implemented in this repository:
 - Collapsible side/bottom panels plus Standard, Expanded, and Full Office layout modes.
 - Responsive agent/settings drawer for compact workbench widths.
 - CEO Agent planning simulation.
-- Specialist agent runtime flow.
+- Specialist agent runtime flow with a configurable fair queue for concurrent department agent execution.
 - Designer Agent role for UX, visual language, office atmosphere, and avatar direction.
 - Office settings for CEO and department-head CLI routing.
 - Department-head sleep mode plus employee hire, offboard, restore, and staffing-demo controls.
@@ -568,4 +568,3 @@ npm run electron:dev
 ```
 
 `GOMI_ELECTRON_DEV=1` makes Electron load the Vite server (default `http://127.0.0.1:5173`). Optional overrides: `GOMI_VITE_DEV_URL`, `GOMI_VITE_PORT`. Packaged builds ignore these flags and always load the built index.
-
