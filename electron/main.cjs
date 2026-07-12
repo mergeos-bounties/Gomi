@@ -1,5 +1,6 @@
 const { app, BrowserWindow, shell, Menu } = require('electron');
 const path = require('node:path');
+const { resolveRendererEntry } = require('./resolveRendererEntry.cjs');
 
 const isDev = !app.isPackaged;
 const rendererEntry = path.join(__dirname, '..', 'dist', 'index.html');
@@ -24,7 +25,17 @@ function createWindow() {
     window.show();
   });
 
-  void window.loadFile(rendererEntry);
+  const entry = resolveRendererEntry({
+    isPackaged: app.isPackaged,
+    env: process.env,
+    distIndexHtml: rendererEntry
+  });
+
+  if (entry.kind === 'url') {
+    void window.loadURL(entry.target);
+  } else {
+    void window.loadFile(entry.target);
+  }
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) {
@@ -35,6 +46,14 @@ function createWindow() {
   });
 
   window.webContents.on('will-navigate', (event, url) => {
+    const allowDevServer =
+      entry.kind === 'url' &&
+      (url === entry.target || url.startsWith(entry.target.replace(/\/$/, '') + '/'));
+
+    if (allowDevServer) {
+      return;
+    }
+
     if (!url.startsWith('file://')) {
       event.preventDefault();
 

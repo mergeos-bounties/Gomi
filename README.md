@@ -554,3 +554,18 @@ Commercial Gomi builds should preserve these principles:
 ## License And Distribution Notes
 
 This repository is a Gomi IDE product foundation. Before commercial distribution, review Code - OSS license obligations, third-party dependency licenses, marketplace terms, branding rules, and generated asset rights.
+
+## Electron desktop shell
+
+`npm run build && npm run electron:start` loads the production `dist/index.html` bundle.
+
+For live Office UI iteration, start Vite then open Electron in dev mode:
+
+```bash
+npm run dev
+# other terminal:
+npm run electron:dev
+```
+
+`GOMI_ELECTRON_DEV=1` makes Electron load the Vite server (default `http://127.0.0.1:5173`). Optional overrides: `GOMI_VITE_DEV_URL`, `GOMI_VITE_PORT`. Packaged builds ignore these flags and always load the built index.
+
