@@ -3,6 +3,7 @@ import {
   Bot,
   Braces,
   CheckCircle2,
+  ClipboardPaste,
   ClipboardList,
   Code2,
   Database,
@@ -23,8 +24,10 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Palette,
+  Plus,
   Play,
   RotateCcw,
+  Save,
   Search,
   Send,
   Settings,
@@ -45,6 +48,7 @@ import {
   GOMI_HIRABLE_DEPARTMENT_IDS,
   GOMI_MEMORY_EMBEDDING_PROVIDERS,
   assignSeatProvider,
+  deletePromptTemplate,
   fireEmployee,
   getMemoryEmbeddingProviderLabel,
   getProviderLabel,
@@ -67,6 +71,7 @@ import {
   setAvatarStyle,
   setPatchApprovalRequired,
   setSeatWorkMode,
+  savePromptTemplate,
   setSecretRedactionEnabled,
   setSharedMemoryEnabled,
   simulateStaffingScenario,
@@ -167,6 +172,8 @@ export function GomiOfficeApp() {
   const agentStatusesRef = useRef(new Map(BASE_GOMI_AGENTS.map((agent) => [agent.id, agent.status])));
   const nextToastIdRef = useRef(1);
   const [request, setRequest] = useState(GOMI_SAMPLE_REQUEST);
+  const [selectedPromptTemplateId, setSelectedPromptTemplateId] = useState('');
+  const [promptTemplateTitle, setPromptTemplateTitle] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [agents, setAgents] = useState<GomiAgent[]>(() =>
     applyOfficeSettingsToAgents(BASE_GOMI_AGENTS, officeSettings)
@@ -191,6 +198,13 @@ export function GomiOfficeApp() {
   const effectiveRightPanelCollapsed = rightPanelCollapsed || sidePanelsAutoCollapsed;
   const effectiveBottomCollapsed = bottomCollapsed || bottomAutoCollapsed;
   const isFullOffice = officeViewMode === 'full-office';
+  const selectedPromptTemplate = useMemo(
+    () =>
+      officeSettings.promptTemplates.find(
+        (promptTemplate) => promptTemplate.id === selectedPromptTemplateId
+      ),
+    [officeSettings.promptTemplates, selectedPromptTemplateId]
+  );
   const visualAgents = useMemo(
     () => applyOfficeSettingsToAgents(agents, officeSettings),
     [agents, officeSettings]
@@ -363,6 +377,62 @@ export function GomiOfficeApp() {
     }
 
     localAbortControllerRef.current?.abort('Gomi Office session stopped from the office controls.');
+  }
+
+  function selectPromptTemplate(templateId: string) {
+    const template = officeSettings.promptTemplates.find(
+      (promptTemplate) => promptTemplate.id === templateId
+    );
+
+    setSelectedPromptTemplateId(template?.id ?? '');
+    setPromptTemplateTitle(template?.title ?? '');
+  }
+
+  function startNewPromptTemplate() {
+    setSelectedPromptTemplateId('');
+    setPromptTemplateTitle(promptTemplateTitleFromBody(request));
+  }
+
+  function saveCurrentPromptTemplate() {
+    const body = request.trim();
+
+    if (!body) {
+      return;
+    }
+
+    const templateId = selectedPromptTemplate?.id ?? createPromptTemplateId();
+    const title = promptTemplateTitle.trim() || promptTemplateTitleFromBody(body);
+
+    setOfficeSettings((currentSettings) =>
+      savePromptTemplate(currentSettings, {
+        id: templateId,
+        title,
+        body,
+        updatedAt: new Date().toISOString()
+      })
+    );
+    setSelectedPromptTemplateId(templateId);
+    setPromptTemplateTitle(title);
+  }
+
+  function applySelectedPromptTemplate() {
+    if (!selectedPromptTemplate) {
+      return;
+    }
+
+    setRequest(selectedPromptTemplate.body);
+  }
+
+  function removeSelectedPromptTemplate() {
+    if (!selectedPromptTemplate) {
+      return;
+    }
+
+    setOfficeSettings((currentSettings) =>
+      deletePromptTemplate(currentSettings, selectedPromptTemplate.id)
+    );
+    setSelectedPromptTemplateId('');
+    setPromptTemplateTitle('');
   }
 
   function approvePatch() {
@@ -852,17 +922,82 @@ export function GomiOfficeApp() {
               aria-label="Project Request"
               spellCheck={false}
             />
-            <div className="gomi-request-actions">
-              <button className="gomi-send" onClick={runOfficeSession} disabled={isRunning}>
-                <Send size={17} />
-                <span>{isRunning ? 'Running' : 'Run CEO'}</span>
-              </button>
-              {isRunning ? (
-                <button className="gomi-send is-stop" onClick={stopOfficeSession}>
-                  <XCircle size={17} />
-                  <span>Stop</span>
+            <div className="gomi-request-sidebar">
+              <div className="gomi-template-tools" aria-label="Prompt Templates">
+                <label className="gomi-template-field">
+                  <span>Template</span>
+                  <select
+                    value={selectedPromptTemplateId}
+                    onChange={(event) => selectPromptTemplate(event.target.value)}
+                    aria-label="Saved prompt template"
+                  >
+                    <option value="">New template</option>
+                    {officeSettings.promptTemplates.map((promptTemplate) => (
+                      <option value={promptTemplate.id} key={promptTemplate.id}>
+                        {promptTemplate.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="gomi-template-field">
+                  <span>Name</span>
+                  <input
+                    value={promptTemplateTitle}
+                    onChange={(event) => setPromptTemplateTitle(event.target.value)}
+                    aria-label="Prompt template name"
+                    placeholder={promptTemplateTitleFromBody(request)}
+                  />
+                </label>
+                <div className="gomi-template-actions">
+                  <button
+                    className="gomi-icon-button"
+                    onClick={startNewPromptTemplate}
+                    title="New prompt template"
+                    aria-label="New prompt template"
+                  >
+                    <Plus size={16} />
+                  </button>
+                  <button
+                    className="gomi-icon-button"
+                    onClick={saveCurrentPromptTemplate}
+                    disabled={!request.trim()}
+                    title="Save prompt template"
+                    aria-label="Save prompt template"
+                  >
+                    <Save size={16} />
+                  </button>
+                  <button
+                    className="gomi-icon-button"
+                    onClick={applySelectedPromptTemplate}
+                    disabled={!selectedPromptTemplate}
+                    title="Apply prompt template"
+                    aria-label="Apply prompt template"
+                  >
+                    <ClipboardPaste size={16} />
+                  </button>
+                  <button
+                    className="gomi-icon-button is-danger"
+                    onClick={removeSelectedPromptTemplate}
+                    disabled={!selectedPromptTemplate}
+                    title="Delete prompt template"
+                    aria-label="Delete prompt template"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+              <div className="gomi-request-actions">
+                <button className="gomi-send" onClick={runOfficeSession} disabled={isRunning}>
+                  <Send size={17} />
+                  <span>{isRunning ? 'Running' : 'Run CEO'}</span>
                 </button>
-              ) : undefined}
+                {isRunning ? (
+                  <button className="gomi-send is-stop" onClick={stopOfficeSession}>
+                    <XCircle size={17} />
+                    <span>Stop</span>
+                  </button>
+                ) : undefined}
+              </div>
             </div>
           </section>
 
@@ -2098,6 +2233,16 @@ function formatCurrencyEstimate(value: number): string {
     minimumFractionDigits: 4,
     maximumFractionDigits: 4
   }).format(value);
+}
+
+function promptTemplateTitleFromBody(body: string): string {
+  const title = body.split(/\r?\n/, 1)[0]?.replace(/\s+/g, ' ').trim();
+
+  return title ? shortenText(title, 48) : 'Untitled template';
+}
+
+function createPromptTemplateId(): string {
+  return `prompt-template-${Date.now().toString(36)}`;
 }
 
 function isCompactAgentPanelViewport(): boolean {

@@ -5,12 +5,14 @@ import {
   GOMI_HIRABLE_DEPARTMENT_IDS,
   GOMI_MEMORY_EMBEDDING_PROVIDERS,
   assignSeatProvider,
+  deletePromptTemplate,
   fireEmployee,
   getMemoryEmbeddingProviderLabel,
   getSeatForAgent,
   hireEmployee,
   isAgentAvailableForTask,
   normalizeGomiOfficeSettings,
+  savePromptTemplate,
   setMaxProjectMemoryItems,
   setMemoryBroadcastThreshold,
   setMemoryPrivacyMode,
@@ -184,6 +186,39 @@ describe('Gomi office settings', () => {
     expect(geometricSettings.avatarStyle).toBe('geometric');
     expect(initialsSettings.avatarStyle).toBe('initials');
     expect(unsafeSettings.avatarStyle).toBe(DEFAULT_GOMI_OFFICE_SETTINGS.avatarStyle);
+  });
+
+  it('saves, updates, deletes, and normalizes prompt templates', () => {
+    const withTemplate = savePromptTemplate(DEFAULT_GOMI_OFFICE_SETTINGS, {
+      id: 'template-ceo-review',
+      title: ' CEO review ',
+      body: 'Summarize the repo risks.',
+      updatedAt: '2026-07-13T00:00:00.000Z'
+    });
+    const updatedTemplate = savePromptTemplate(withTemplate, {
+      id: 'template-ceo-review',
+      title: 'Risk review',
+      body: 'Summarize release risks and owner actions.',
+      updatedAt: '2026-07-13T00:05:00.000Z'
+    });
+    const normalized = normalizeGomiOfficeSettings({
+      ...updatedTemplate,
+      promptTemplates: [
+        ...updatedTemplate.promptTemplates,
+        { id: '', title: 'Missing id', body: 'ignored' },
+        { id: 'blank-body', title: 'Blank body', body: '   ' }
+      ]
+    });
+
+    expect(normalized.promptTemplates).toEqual([
+      {
+        id: 'template-ceo-review',
+        title: 'Risk review',
+        body: 'Summarize release risks and owner actions.',
+        updatedAt: '2026-07-13T00:05:00.000Z'
+      }
+    ]);
+    expect(deletePromptTemplate(normalized, 'template-ceo-review').promptTemplates).toEqual([]);
   });
 
   it('normalizes persisted settings across versions and rejects unsafe seat state', () => {

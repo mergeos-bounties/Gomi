@@ -9,6 +9,7 @@ import type {
   GomiMemoryEmbeddingProviderId,
   GomiMemoryPrivacyMode,
   GomiOfficeSettings,
+  GomiPromptTemplate,
   GomiRecentProject,
   GomiWorkspaceTrustState
 } from './gomiTypes';
@@ -19,6 +20,7 @@ export const GOMI_DEFAULT_MAX_PROJECT_MEMORY_ITEMS = 420;
 export const GOMI_DEFAULT_MAX_CONCURRENT_AGENT_RUNS = 2;
 export const GOMI_DEFAULT_HTTP_MAX_RETRIES = 2;
 export const GOMI_MAX_RECENT_PROJECTS = 8;
+export const GOMI_MAX_PROMPT_TEMPLATES = 24;
 
 export const GOMI_AVATAR_STYLE_OPTIONS: Array<{
   id: GomiAvatarStyle;
@@ -208,6 +210,7 @@ export const DEFAULT_GOMI_OFFICE_SETTINGS: GomiOfficeSettings = {
     createEmployeeSeat('employee-designer-01', 'designer', 'Product Designer', 'Visual and interaction support'),
     createEmployeeSeat('employee-qa-01', 'qa', 'QA Engineer', 'Test execution support')
   ],
+  promptTemplates: [],
   memory: {
     retrievalMode: 'hybrid-vector',
     embeddingProvider: 'local-hashing',
@@ -231,6 +234,13 @@ export const DEFAULT_GOMI_OFFICE_SETTINGS: GomiOfficeSettings = {
     httpMaxRetries: GOMI_DEFAULT_HTTP_MAX_RETRIES
   }
 };
+
+export interface GomiPromptTemplateDraft {
+  id: string;
+  title?: string;
+  body: string;
+  updatedAt?: string;
+}
 
 export function assignSeatProvider(
   settings: GomiOfficeSettings,
@@ -514,6 +524,35 @@ export function setHttpProviderMaxRetries(
   });
 }
 
+export function savePromptTemplate(
+  settings: GomiOfficeSettings,
+  templateDraft: GomiPromptTemplateDraft
+): GomiOfficeSettings {
+  const template = normalizePromptTemplate(templateDraft);
+
+  if (!template) {
+    return settings;
+  }
+
+  return {
+    ...settings,
+    promptTemplates: [
+      template,
+      ...settings.promptTemplates.filter((currentTemplate) => currentTemplate.id !== template.id)
+    ].slice(0, GOMI_MAX_PROMPT_TEMPLATES)
+  };
+}
+
+export function deletePromptTemplate(
+  settings: GomiOfficeSettings,
+  templateId: string
+): GomiOfficeSettings {
+  return {
+    ...settings,
+    promptTemplates: settings.promptTemplates.filter((template) => template.id !== templateId)
+  };
+}
+
 export function getSeatForAgent(
   settings: GomiOfficeSettings,
   agentId: GomiAgentId
@@ -547,7 +586,8 @@ export function normalizeGomiOfficeSettings(value: unknown): GomiOfficeSettings 
     ...DEFAULT_GOMI_OFFICE_SETTINGS,
     avatarStyle: avatarStyleSetting(rawSettings.avatarStyle),
     recentProjects: normalizeRecentProjects(rawSettings.recentProjects),
-    seats: normalizeSeatSettings(rawSettings.seats)
+    seats: normalizeSeatSettings(rawSettings.seats),
+    promptTemplates: normalizePromptTemplates(rawSettings.promptTemplates)
   };
   const rawMemory: Record<string, unknown> = isRecord(rawSettings.memory) ? rawSettings.memory : {};
   const rawExecution: Record<string, unknown> = isRecord(rawSettings.execution) ? rawSettings.execution : {};
@@ -670,6 +710,52 @@ function updateExecutionSettings(
       ...settings.execution,
       ...executionPatch
     }
+  };
+}
+
+function normalizePromptTemplates(value: unknown): GomiPromptTemplate[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seenTemplateIds = new Set<string>();
+  const promptTemplates: GomiPromptTemplate[] = [];
+
+  for (const rawTemplate of value) {
+    const template = normalizePromptTemplate(rawTemplate);
+
+    if (!template || seenTemplateIds.has(template.id)) {
+      continue;
+    }
+
+    seenTemplateIds.add(template.id);
+    promptTemplates.push(template);
+
+    if (promptTemplates.length >= GOMI_MAX_PROMPT_TEMPLATES) {
+      break;
+    }
+  }
+
+  return promptTemplates;
+}
+
+function normalizePromptTemplate(value: unknown): GomiPromptTemplate | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const id = stringSetting(value.id).trim();
+  const body = stringSetting(value.body).trim();
+
+  if (!id || !body) {
+    return undefined;
+  }
+
+  return {
+    id: id.slice(0, 96),
+    title: promptTemplateTitleSetting(value.title, body),
+    body: body.slice(0, 12000),
+    updatedAt: isoDateSetting(value.updatedAt)
   };
 }
 
@@ -973,6 +1059,26 @@ function trimBoundedString(value: unknown, maxLength: number): string | undefine
   const trimmed = value.trim();
 
   return trimmed.length > 0 ? trimmed.slice(0, maxLength) : undefined;
+}
+
+function stringSetting(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function promptTemplateTitleSetting(value: unknown, body: string): string {
+  const explicitTitle = stringSetting(value).trim();
+  const fallbackTitle = body.split(/\r?\n/, 1)[0]?.trim() || 'Untitled template';
+
+  return (explicitTitle || fallbackTitle).slice(0, 80);
+}
+
+function isoDateSetting(value: unknown): string {
+  const candidate = stringSetting(value).trim();
+  const timestamp = candidate ? Date.parse(candidate) : NaN;
+
+  return Number.isFinite(timestamp)
+    ? new Date(timestamp).toISOString()
+    : new Date(0).toISOString();
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
