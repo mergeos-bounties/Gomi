@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import type {
   GomiAgent,
   GomiAgentSeat,
+  GomiAvatarStyle,
   GomiChatMessage,
   GomiMemoryBoardItem,
   GomiOfficeSettings,
@@ -53,6 +54,17 @@ const roleColors: Record<GomiAgent['id'], number> = {
   database: 0x38bdf8,
   qa: 0xfbbf24,
   devops: 0x34d399
+};
+
+const roleEmojis: Record<GomiAgent['id'], string> = {
+  ceo: '🧭',
+  'system-analyst': '🧩',
+  backend: '🛠️',
+  frontend: '🎨',
+  designer: '✨',
+  database: '🗄️',
+  qa: '✅',
+  devops: '🚀'
 };
 
 export function PhaserOffice({
@@ -148,7 +160,12 @@ export function PhaserOffice({
         this.drawStatusWall(graphics, officeLayout.statusWall, nextAgents, nextTasks, nextOfficeSettings.seats);
         this.drawGomiRoute(graphics, officeLayout.gomiHub, officeLayout.seats, nextAgents);
         this.drawConversationRoute(graphics, activeConversation);
-        this.drawDepartmentStaff(graphics, officeLayout.rooms, nextOfficeSettings.seats);
+        this.drawDepartmentStaff(
+          graphics,
+          officeLayout.rooms,
+          nextOfficeSettings.seats,
+          nextOfficeSettings.avatarStyle
+        );
 
         for (const agent of nextAgents) {
           const seat = officeLayout.seats.find((candidate) => candidate.agentId === agent.id);
@@ -160,6 +177,7 @@ export function PhaserOffice({
 
           this.drawAgent(
             agent,
+            nextOfficeSettings.avatarStyle,
             width,
             height,
             isConversationAgent ? undefined : agentBubbleText,
@@ -383,7 +401,8 @@ export function PhaserOffice({
       private drawDepartmentStaff(
         graphics: Phaser.GameObjects.Graphics,
         rooms: GomiOfficeRoomLayout[],
-        seats: GomiAgentSeat[]
+        seats: GomiAgentSeat[],
+        avatarStyle: GomiAvatarStyle
       ) {
         const employees = seats.filter((seat) => seat.seatKind === 'employee');
 
@@ -394,7 +413,7 @@ export function PhaserOffice({
           const firedEmployees = departmentEmployees.filter((seat) => seat.workMode === 'fired');
 
           activeEmployees.slice(0, 6).forEach((seat, index) => {
-            this.drawEmployeeAvatar(seat, roomLayout, index, activeEmployees.length);
+            this.drawEmployeeAvatar(seat, roomLayout, index, activeEmployees.length, avatarStyle);
           });
 
           if (activeEmployees.length > 6) {
@@ -411,7 +430,8 @@ export function PhaserOffice({
         seat: GomiAgentSeat,
         roomLayout: GomiOfficeRoomLayout,
         index: number,
-        total: number
+        total: number,
+        avatarStyle: GomiAvatarStyle
       ) {
         const columns = roomLayout.width < 120 ? 2 : 3;
         const spacingX = Math.min(31, Math.max(22, roomLayout.width / (columns + 1)));
@@ -435,12 +455,25 @@ export function PhaserOffice({
         const group = this.add.container(x, y);
 
         group.add(this.add.ellipse(0, 15, 28, 10, 0x475569, 0.16));
-        group.add(this.add.circle(0, -4, 11, 0xffedd5, 1));
+        group.add(this.add.circle(0, -4, 11, avatarStyle === 'geometric' ? 0xffffff : 0xffedd5, 1));
         group.add(this.add.rectangle(0, 13, 18, 18, color, 0.95).setOrigin(0.5));
         group.add(this.add.rectangle(0, -13, 17, 7, color, 0.92).setOrigin(0.5));
-        group.add(this.add.circle(-4, -5, 1.4, 0x111827, 1));
-        group.add(this.add.circle(4, -5, 1.4, 0x111827, 1));
-        group.add(this.add.arc(0, -1, 4, 20, 160, false).setStrokeStyle(1, 0x111827));
+        if (avatarStyle === 'emoji') {
+          group.add(this.add.text(0, -13, roleEmojis[seat.agentId], {
+            fontFamily: 'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif',
+            fontSize: '14px'
+          }).setOrigin(0.5, 0));
+        } else if (avatarStyle === 'initials') {
+          group.add(this.add.text(0, -10, this.initialsForLabel(seat.name), {
+            color: '#0f172a',
+            fontFamily: 'Inter, Arial',
+            fontSize: '8px',
+            fontStyle: '800'
+          }).setOrigin(0.5, 0));
+        } else {
+          group.add(this.add.circle(-5, -5, 4, color, 0.95));
+          group.add(this.add.triangle(5, -5, 0, -5, 8, 5, -8, 5, color, 0.88));
+        }
         group.add(this.add.circle(10, -14, 3.8, 0x22c55e, 1));
 
         if (total > 1) {
@@ -520,6 +553,7 @@ export function PhaserOffice({
 
       private drawAgent(
         agent: GomiAgent,
+        avatarStyle: GomiAvatarStyle,
         width: number,
         height: number,
         bubbleText?: string,
@@ -544,14 +578,35 @@ export function PhaserOffice({
         group.add(this.add.ellipse(0, 28, 54, 18, 0x475569, 0.18));
         group.add(leftLeg);
         group.add(rightLeg);
-        group.add(this.add.rectangle(0, 11, 34, 36, color, 1).setOrigin(0.5));
-        group.add(this.add.circle(0, -18, 22, 0xffedd5, 1));
-        group.add(this.add.rectangle(0, -33, 36, 14, color, 1).setOrigin(0.5));
-        group.add(this.add.circle(-8, -20, 2.4, 0x111827, 1));
-        group.add(this.add.circle(8, -20, 2.4, 0x111827, 1));
-        group.add(this.add.circle(-13, -13, 3, 0xfca5a5, 0.75));
-        group.add(this.add.circle(13, -13, 3, 0xfca5a5, 0.75));
-        group.add(this.add.arc(0, -13, 8, 20, 160, false).setStrokeStyle(2, 0x111827));
+        group.add(this.add.rectangle(0, 13, 34, 34, color, 1).setOrigin(0.5));
+
+        if (avatarStyle === 'geometric') {
+          group.add(this.add.circle(0, -19, 24, 0xf8fafc, 1).setStrokeStyle(4, color));
+          group.add(this.add.triangle(0, -19, 0, -16, 17, 12, -17, 12, color, 0.95));
+          group.add(this.add.rectangle(0, -23, 22, 9, statusColor, 0.9).setOrigin(0.5));
+        } else if (avatarStyle === 'initials') {
+          group.add(this.add.circle(0, -19, 24, 0xffffff, 1).setStrokeStyle(4, color));
+          group.add(
+            this.add
+              .text(0, -29, this.initialsForLabel(agent.name), {
+                color: '#0f172a',
+                fontFamily: 'Inter, Arial',
+                fontSize: '18px',
+                fontStyle: '800'
+              })
+              .setOrigin(0.5, 0)
+          );
+        } else {
+          group.add(this.add.circle(0, -19, 24, 0xffffff, 1).setStrokeStyle(4, color));
+          group.add(
+            this.add
+              .text(0, -33, roleEmojis[agent.id], {
+                fontFamily: 'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif',
+                fontSize: '24px'
+              })
+              .setOrigin(0.5, 0)
+          );
+        }
 
         const badge = this.add.circle(24, -34, 7, statusColor, 1);
         group.add(badge);
@@ -936,6 +991,16 @@ export function PhaserOffice({
         }
 
         return `${value.slice(0, Math.max(0, maxLength - 3))}...`;
+      }
+
+      private initialsForLabel(value: string): string {
+        return value
+          .replace(/\bAgent\b/g, '')
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((part) => part[0]?.toUpperCase() ?? '')
+          .join('');
       }
     }
 
