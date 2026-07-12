@@ -2,11 +2,31 @@ import { describe, expect, it } from 'vitest';
 import type { GomiAgentId, GomiTask } from '../src/vs/workbench/contrib/gomi/common/gomiTypes';
 import type { GomiAgentRunContext } from '../src/vs/workbench/contrib/gomi/node/agentProvider';
 import {
+  calculateHttpRetryBackoffMs,
   createHttpGomiAgentProvider,
+  isRetryableHttpStatus,
   type GomiHttpFetch
 } from '../src/vs/workbench/contrib/gomi/node/httpAgentProvider';
 
 describe('HTTP agent provider', () => {
+  it('classifies retryable HTTP responses and calculates exponential backoff', () => {
+    expect(isRetryableHttpStatus(429)).toBe(true);
+    expect(isRetryableHttpStatus(500)).toBe(true);
+    expect(isRetryableHttpStatus(503)).toBe(true);
+    expect(isRetryableHttpStatus(401)).toBe(false);
+    expect(isRetryableHttpStatus(403)).toBe(false);
+    expect(isRetryableHttpStatus(404)).toBe(false);
+
+    expect(
+      calculateHttpRetryBackoffMs({
+        attempt: 2,
+        baseDelayMs: 100,
+        jitterRatio: 0,
+        random: () => 0.5
+      })
+    ).toBe(200);
+  });
+
   it('calls an OpenAI-compatible chat endpoint and maps JSON model output', async () => {
     const calls: Array<{ input: string; init?: RequestInit }> = [];
     const fetchImpl: GomiHttpFetch = async (input, init) => {
@@ -116,6 +136,131 @@ describe('HTTP agent provider', () => {
 
     expect(fetchWasCalled).toBe(false);
     expect(result.summary).toContain('Demo provider response');
+  });
+
+  it('retries 429 and 5xx responses with visible attempt progress', async () => {
+    const statuses = [429, 503, 200];
+    const calls: number[] = [];
+    const sleptMs: number[] = [];
+    const progressDetails: string[] = [];
+    const fetchImpl: GomiHttpFetch = async () => {
+      const status = statuses[calls.length];
+      calls.push(status);
+
+      if (status === 200) {
+        return new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    summary: 'HTTP route recovered after retries.',
+                    findings: [],
+                    recommendations: [],
+                    proposedFiles: [],
+                    confidence: 0.8
+                  })
+                }
+              }
+            ]
+          }),
+          { status }
+        );
+      }
+
+      return new Response(`temporary ${status}`, { status });
+    };
+    const provider = createHttpGomiAgentProvider({
+      enabled: true,
+      fetchImpl,
+      env: {
+        GOMI_CLOUD_LLM_ENDPOINT: 'https://llm.example.test/v1/chat/completions',
+        GOMI_CLOUD_LLM_MODEL: 'gomi-cloud-test'
+      },
+      maxRetries: 2,
+      retryBaseDelayMs: 50,
+      retryJitterRatio: 0,
+      sleep: async (ms) => {
+        sleptMs.push(ms);
+      }
+    });
+
+    const result = await provider.runAgentTask({
+      ...createRunContext('backend', 'openai-compatible-api'),
+      reportProgress: (update) => {
+        if (update.statusDetail) {
+          progressDetails.push(update.statusDetail);
+        }
+      }
+    });
+
+    expect(calls).toEqual([429, 503, 200]);
+    expect(sleptMs).toEqual([50, 100]);
+    expect(progressDetails).toEqual([
+      'Retry attempt 2/3 after HTTP 429',
+      'Retry attempt 3/3 after HTTP 503'
+    ]);
+    expect(result.summary).toBe('HTTP route recovered after retries.');
+  });
+
+  it('does not retry authorization failures', async () => {
+    const calls: number[] = [];
+    const fetchImpl: GomiHttpFetch = async () => {
+      calls.push(401);
+      return new Response('unauthorized', { status: 401 });
+    };
+    const provider = createHttpGomiAgentProvider({
+      enabled: true,
+      fetchImpl,
+      env: {
+        GOMI_CLOUD_LLM_ENDPOINT: 'https://llm.example.test/v1/chat/completions',
+        GOMI_CLOUD_LLM_MODEL: 'gomi-cloud-test'
+      },
+      maxRetries: 2,
+      sleep: async () => {
+        throw new Error('sleep should not run for 401');
+      }
+    });
+
+    const result = await provider.runAgentTask(createRunContext('backend', 'openai-compatible-api'));
+
+    expect(calls).toEqual([401]);
+    expect(result.summary).toContain('HTTP 401');
+  });
+
+  it('stops retrying when the run is aborted during backoff', async () => {
+    const abortController = new AbortController();
+    const calls: number[] = [];
+    const fetchImpl: GomiHttpFetch = async () => {
+      calls.push(503);
+      return new Response('temporary 503', { status: 503 });
+    };
+    const provider = createHttpGomiAgentProvider({
+      enabled: true,
+      fetchImpl,
+      env: {
+        GOMI_CLOUD_LLM_ENDPOINT: 'https://llm.example.test/v1/chat/completions',
+        GOMI_CLOUD_LLM_MODEL: 'gomi-cloud-test'
+      },
+      maxRetries: 2,
+      retryBaseDelayMs: 50,
+      retryJitterRatio: 0,
+      sleep: async (_ms, signal) => {
+        abortController.abort('stop retry test');
+
+        if (signal?.aborted) {
+          throw new Error('Provider request cancelled.');
+        }
+      }
+    });
+
+    const result = await provider.runAgentTask({
+      ...createRunContext('backend', 'openai-compatible-api'),
+      signal: abortController.signal
+    });
+
+    expect(calls).toEqual([503]);
+    expect(result.summary).toContain('Provider request cancelled');
   });
 });
 

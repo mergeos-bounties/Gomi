@@ -4,7 +4,11 @@ import {
   parseAgentResultJson
 } from './agentOutputParsing';
 import { BASE_GOMI_AGENTS } from '../common/gomiConstants';
-import { GOMI_AGENT_CLI_PROVIDERS, getProviderLabel } from '../common/gomiOfficeSettings';
+import {
+  GOMI_AGENT_CLI_PROVIDERS,
+  GOMI_DEFAULT_HTTP_MAX_RETRIES,
+  getProviderLabel
+} from '../common/gomiOfficeSettings';
 import type {
   GomiAgentCliProvider,
   GomiAgentCliProviderId,
@@ -32,9 +36,18 @@ export interface GomiHttpProviderRoute {
   model?: string;
   modelEnv?: string;
   timeoutMs?: number;
+  maxRetries?: number;
+  retryBaseDelayMs?: number;
+  retryJitterRatio?: number;
 }
 
 export type GomiHttpFetch = (input: string, init?: RequestInit) => Promise<Response>;
+export type GomiHttpSleep = (ms: number, signal?: AbortSignal) => Promise<void>;
+
+export interface GomiHttpRetryProgress {
+  maxRetries?: number;
+  reportProgress?: (update: { progress?: number; statusDetail?: string }) => void;
+}
 
 export interface HttpGomiAgentProviderOptions {
   enabled?: boolean;
@@ -44,10 +57,17 @@ export interface HttpGomiAgentProviderOptions {
   fetchImpl?: GomiHttpFetch;
   env?: Record<string, string | undefined>;
   timeoutMs?: number;
+  maxRetries?: number;
+  retryBaseDelayMs?: number;
+  retryJitterRatio?: number;
+  sleep?: GomiHttpSleep;
+  random?: () => number;
 }
 
 const defaultOpenAiEndpoint = 'https://api.openai.com/v1/chat/completions';
 const defaultOllamaEndpoint = 'http://127.0.0.1:11434/api/chat';
+const defaultRetryBaseDelayMs = 300;
+const defaultRetryJitterRatio = 0.2;
 
 const roleFocus: Record<GomiAgentId, string> = {
   ceo: 'coordination, delegation, and final synthesis',
@@ -76,6 +96,11 @@ export class HttpGomiAgentProvider implements GomiAgentProvider {
   private readonly fetchImpl: GomiHttpFetch;
   private readonly env: Record<string, string | undefined>;
   private readonly timeoutMs: number;
+  private readonly maxRetries: number;
+  private readonly retryBaseDelayMs: number;
+  private readonly retryJitterRatio: number;
+  private readonly sleep: GomiHttpSleep;
+  private readonly random: () => number;
   private readonly routes: Partial<Record<GomiAgentCliProviderId, GomiHttpProviderRoute>>;
 
   constructor(options: HttpGomiAgentProviderOptions = {}) {
@@ -85,6 +110,11 @@ export class HttpGomiAgentProvider implements GomiAgentProvider {
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.env = options.env ?? readRuntimeEnv();
     this.timeoutMs = options.timeoutMs ?? 120000;
+    this.maxRetries = clampHttpMaxRetries(options.maxRetries ?? GOMI_DEFAULT_HTTP_MAX_RETRIES);
+    this.retryBaseDelayMs = options.retryBaseDelayMs ?? defaultRetryBaseDelayMs;
+    this.retryJitterRatio = options.retryJitterRatio ?? defaultRetryJitterRatio;
+    this.sleep = options.sleep ?? sleepWithAbort;
+    this.random = options.random ?? Math.random;
     this.routes = {
       ...createRoutesFromCatalog(this.providerCatalog),
       ...options.routes
@@ -111,7 +141,10 @@ export class HttpGomiAgentProvider implements GomiAgentProvider {
     }
 
     try {
-      const response = await this.completeWithRoute(route, createAgentRequest(context), context.signal);
+      const response = await this.completeWithRoute(route, createAgentRequest(context), context.signal, {
+        maxRetries: context.executionPolicy?.httpMaxRetries,
+        reportProgress: context.reportProgress
+      });
 
       return createAgentResultFromHttpResponse(context, response);
     } catch (error) {
@@ -125,7 +158,8 @@ export class HttpGomiAgentProvider implements GomiAgentProvider {
   private async completeWithRoute(
     route: GomiHttpProviderRoute,
     request: GomiAgentRequest,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    retryProgress: GomiHttpRetryProgress = {}
   ): Promise<GomiAgentResponse> {
     const endpoint = resolveRouteEndpoint(route, this.env);
     const model = resolveRouteModel(route, this.env);
@@ -136,6 +170,11 @@ export class HttpGomiAgentProvider implements GomiAgentProvider {
     }, timeout);
     const linkedAbort = () => abortController.abort();
     const messages = createProviderMessages(request);
+    const maxRetries = clampHttpMaxRetries(
+      retryProgress.maxRetries ?? route.maxRetries ?? this.maxRetries
+    );
+    const retryBaseDelayMs = route.retryBaseDelayMs ?? this.retryBaseDelayMs;
+    const retryJitterRatio = route.retryJitterRatio ?? this.retryJitterRatio;
 
     try {
       signal?.addEventListener('abort', linkedAbort, { once: true });
@@ -143,21 +182,51 @@ export class HttpGomiAgentProvider implements GomiAgentProvider {
         abortController.abort(signal.reason);
       }
 
-      const response = await this.fetchImpl(endpoint, {
-        method: 'POST',
-        headers: createHeaders(route, this.env),
-        body: JSON.stringify(createRequestBody(route.mode, model, messages, request.temperature)),
-        signal: abortController.signal
-      });
+      for (let attempt = 0; ; attempt += 1) {
+        const response = await this.fetchImpl(endpoint, {
+          method: 'POST',
+          headers: createHeaders(route, this.env),
+          body: JSON.stringify(createRequestBody(route.mode, model, messages, request.temperature)),
+          signal: abortController.signal
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${shortenText(await response.text(), 240)}`);
+        if (response.ok) {
+          const payload = await response.json() as unknown;
+          return parseHttpProviderResponse(route.mode, payload);
+        }
+
+        const responseText = await response.text();
+        const canRetry = isRetryableHttpStatus(response.status) && attempt < maxRetries;
+
+        if (!canRetry) {
+          const attemptSuffix = attempt > 0 ? ` after ${attempt + 1} attempts` : '';
+
+          throw new Error(`HTTP ${response.status}${attemptSuffix}: ${shortenText(responseText, 240)}`);
+        }
+
+        const nextAttempt = attempt + 2;
+        const maxAttempts = maxRetries + 1;
+        retryProgress.reportProgress?.({
+          progress: 42,
+          statusDetail: `Retry attempt ${nextAttempt}/${maxAttempts} after HTTP ${response.status}`
+        });
+
+        await this.sleep(
+          calculateHttpRetryBackoffMs({
+            attempt: attempt + 1,
+            baseDelayMs: retryBaseDelayMs,
+            jitterRatio: retryJitterRatio,
+            random: this.random
+          }),
+          abortController.signal
+        );
       }
-
-      const payload = await response.json() as unknown;
-      return parseHttpProviderResponse(route.mode, payload);
     } catch (error) {
       if (abortController.signal.aborted) {
+        if (signal?.aborted) {
+          throw new Error('Provider request cancelled.');
+        }
+
         throw new Error(`Provider timed out after ${timeout}ms.`);
       }
 
@@ -173,6 +242,65 @@ export function createHttpGomiAgentProvider(
   options: HttpGomiAgentProviderOptions = {}
 ): GomiAgentProvider {
   return new HttpGomiAgentProvider(options);
+}
+
+export function isRetryableHttpStatus(status: number): boolean {
+  return status === 429 || (status >= 500 && status <= 599);
+}
+
+export function calculateHttpRetryBackoffMs({
+  attempt,
+  baseDelayMs = defaultRetryBaseDelayMs,
+  jitterRatio = defaultRetryJitterRatio,
+  random = Math.random
+}: {
+  attempt: number;
+  baseDelayMs?: number;
+  jitterRatio?: number;
+  random?: () => number;
+}): number {
+  const safeAttempt = Math.max(1, Math.floor(attempt));
+  const exponentialDelay = Math.max(0, baseDelayMs) * 2 ** (safeAttempt - 1);
+  const jitterWindow = exponentialDelay * Math.max(0, jitterRatio);
+  const jitter = jitterWindow === 0 ? 0 : (random() * 2 - 1) * jitterWindow;
+
+  return Math.max(0, Math.round(exponentialDelay + jitter));
+}
+
+function clampHttpMaxRetries(maxRetries: number): number {
+  if (!Number.isFinite(maxRetries)) {
+    return GOMI_DEFAULT_HTTP_MAX_RETRIES;
+  }
+
+  return Math.min(5, Math.max(0, Math.round(maxRetries)));
+}
+
+async function sleepWithAbort(ms: number, signal?: AbortSignal): Promise<void> {
+  if (ms <= 0) {
+    return;
+  }
+
+  if (signal?.aborted) {
+    throw new Error('Provider request cancelled.');
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    let abort = () => undefined;
+    const cleanup = () => {
+      signal?.removeEventListener('abort', abort);
+    };
+    const timer = globalThis.setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+    abort = () => {
+      globalThis.clearTimeout(timer);
+      cleanup();
+      reject(new Error('Provider request cancelled.'));
+    };
+
+    signal?.addEventListener('abort', abort, { once: true });
+  });
 }
 
 function createRoutesFromCatalog(

@@ -345,6 +345,46 @@ describe('GomiAgentRuntime', () => {
     expect(seenSignals[0]).toBe(abortController.signal);
   });
 
+  it('streams provider progress details into task updates', async () => {
+    const demoProvider = createDemoGomiAgentProvider();
+    const statusDetails: string[] = [];
+    const runtime = new GomiAgentRuntime({
+      delayMs: 0,
+      officeSettings: setMaxConcurrentAgentRuns(DEFAULT_GOMI_OFFICE_SETTINGS, 1),
+      agentProvider: {
+        id: demoProvider.id,
+        label: demoProvider.label,
+        kind: demoProvider.kind,
+        capabilities: demoProvider.capabilities,
+        complete: (request, signal) => demoProvider.complete(request, signal),
+        runAgentTask: async (context) => {
+          context.reportProgress?.({
+            progress: 47,
+            statusDetail: 'Retry attempt 2/3 after HTTP 429'
+          });
+
+          return {
+            agentId: context.task.agentId,
+            taskId: context.task.id,
+            summary: `${context.task.id} retried`,
+            findings: [],
+            recommendations: [],
+            proposedFiles: [],
+            confidence: 1
+          };
+        }
+      }
+    });
+
+    for await (const event of runtime.run('Review API UI')) {
+      if (event.type === 'task_update' && event.task.statusDetail) {
+        statusDetails.push(event.task.statusDetail);
+      }
+    }
+
+    expect(statusDetails).toContain('Retry attempt 2/3 after HTTP 429');
+  });
+
   it('limits concurrent provider runs while starting queued tasks in order', async () => {
     const demoProvider = createDemoGomiAgentProvider();
     const startedTaskIds: string[] = [];

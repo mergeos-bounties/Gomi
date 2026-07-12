@@ -20,6 +20,7 @@ import {
   setHttpProvidersEnabled,
   setLiveProviderMode,
   setLiveProviderPatchApprovalRequired,
+  setHttpProviderMaxRetries,
   setMaxConcurrentAgentRuns,
   setSecretRedactionEnabled,
   setMemoryEmbeddingExecutionEnabled,
@@ -263,18 +264,21 @@ describe('Gomi office settings', () => {
   });
 
   it('updates live provider execution policy controls', () => {
-    const settings = setLiveProviderPatchApprovalRequired(
-      setHttpProvidersEnabled(
-        setCliProvidersEnabled(
-          setLiveProviderMode(
-            setWorkspaceTrustState(DEFAULT_GOMI_OFFICE_SETTINGS, 'trusted'),
-            'allow-all'
+    const settings = setHttpProviderMaxRetries(
+      setLiveProviderPatchApprovalRequired(
+        setHttpProvidersEnabled(
+          setCliProvidersEnabled(
+            setLiveProviderMode(
+              setWorkspaceTrustState(DEFAULT_GOMI_OFFICE_SETTINGS, 'trusted'),
+              'allow-all'
+            ),
+            true
           ),
           true
         ),
-        true
+        false
       ),
-      false
+      4
     );
 
     expect(settings.execution.workspaceTrust).toBe('trusted');
@@ -282,6 +286,9 @@ describe('Gomi office settings', () => {
     expect(settings.execution.allowCliProviders).toBe(true);
     expect(settings.execution.allowHttpProviders).toBe(true);
     expect(settings.execution.requirePatchApprovalForLiveProviders).toBe(false);
+    expect(settings.execution.httpMaxRetries).toBe(4);
+    expect(setHttpProviderMaxRetries(DEFAULT_GOMI_OFFICE_SETTINGS, -2).execution.httpMaxRetries).toBe(0);
+    expect(setHttpProviderMaxRetries(DEFAULT_GOMI_OFFICE_SETTINGS, 99).execution.httpMaxRetries).toBe(5);
   });
 
   it('updates and clamps provider concurrency limits', () => {
