@@ -1,6 +1,7 @@
 import type {
   GomiMemoryHit,
   GomiMemoryItem,
+  GomiMemoryPruneReport,
   GomiMemoryRetentionPolicy,
   GomiMemoryScope
 } from './memoryStore';
@@ -17,7 +18,7 @@ export interface GomiVectorMemoryRecord extends GomiMemoryItem {
 export interface GomiVectorMemoryStore {
   upsert(scope: GomiMemoryScope, item: Omit<GomiMemoryItem, 'createdAt' | 'updatedAt'>): Promise<GomiMemoryItem>;
   search(scope: GomiMemoryScope, query: string, limit?: number): Promise<GomiMemoryHit[]>;
-  prune(scope: GomiMemoryScope, policy: GomiMemoryRetentionPolicy): void;
+  prune(scope: GomiMemoryScope, policy: GomiMemoryRetentionPolicy): GomiMemoryPruneReport;
   clear(scope?: GomiMemoryScope): void;
 }
 
@@ -68,12 +69,13 @@ export class InMemoryVectorMemoryStore implements GomiVectorMemoryStore {
       .slice(0, limit);
   }
 
-  prune(scope: GomiMemoryScope, policy: GomiMemoryRetentionPolicy): void {
+  prune(scope: GomiMemoryScope, policy: GomiMemoryRetentionPolicy): GomiMemoryPruneReport {
     const scopePrefix = this.scopePrefix(scope);
     const cutoffTime = Date.now() - policy.retentionDays * 24 * 60 * 60 * 1000;
     const scopedRecords = Array.from(this.records.entries())
       .filter(([key]) => key.startsWith(scopePrefix))
       .sort((left, right) => memoryTimestamp(right[1]) - memoryTimestamp(left[1]));
+    const scopedCountBefore = scopedRecords.length;
 
     for (const [key, record] of scopedRecords) {
       if (memoryTimestamp(record) < cutoffTime) {
@@ -88,6 +90,15 @@ export class InMemoryVectorMemoryStore implements GomiVectorMemoryStore {
     for (const [key] of retainedScopedRecords.slice(policy.maxProjectMemoryItems)) {
       this.records.delete(key);
     }
+
+    const remaining = Array.from(this.records.keys()).filter((key) =>
+      key.startsWith(scopePrefix)
+    ).length;
+
+    return {
+      removed: scopedCountBefore - remaining,
+      remaining
+    };
   }
 
   clear(scope?: GomiMemoryScope): void {
