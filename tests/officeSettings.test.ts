@@ -20,6 +20,7 @@ import {
   setHttpProvidersEnabled,
   setLiveProviderMode,
   setLiveProviderPatchApprovalRequired,
+  setMaxConcurrentAgentRuns,
   setSecretRedactionEnabled,
   setMemoryEmbeddingExecutionEnabled,
   setMemoryEmbeddingProvider,
@@ -227,7 +228,8 @@ describe('Gomi office settings', () => {
       execution: {
         workspaceTrust: 'trusted',
         liveProviderMode: 'allow-all',
-        allowHttpProviders: true
+        allowHttpProviders: true,
+        maxConcurrentAgentRuns: 6
       }
     });
 
@@ -257,6 +259,7 @@ describe('Gomi office settings', () => {
     expect(settings.execution.workspaceTrust).toBe('trusted');
     expect(settings.execution.liveProviderMode).toBe('allow-all');
     expect(settings.execution.allowHttpProviders).toBe(true);
+    expect(settings.execution.maxConcurrentAgentRuns).toBe(6);
   });
 
   it('updates live provider execution policy controls', () => {
@@ -279,6 +282,13 @@ describe('Gomi office settings', () => {
     expect(settings.execution.allowCliProviders).toBe(true);
     expect(settings.execution.allowHttpProviders).toBe(true);
     expect(settings.execution.requirePatchApprovalForLiveProviders).toBe(false);
+  });
+
+  it('updates and clamps provider concurrency limits', () => {
+    expect(DEFAULT_GOMI_OFFICE_SETTINGS.execution.maxConcurrentAgentRuns).toBe(2);
+    expect(setMaxConcurrentAgentRuns(DEFAULT_GOMI_OFFICE_SETTINGS, 4).execution.maxConcurrentAgentRuns).toBe(4);
+    expect(setMaxConcurrentAgentRuns(DEFAULT_GOMI_OFFICE_SETTINGS, 0).execution.maxConcurrentAgentRuns).toBe(1);
+    expect(setMaxConcurrentAgentRuns(DEFAULT_GOMI_OFFICE_SETTINGS, 30).execution.maxConcurrentAgentRuns).toBe(8);
   });
 
   it('clamps project memory retention settings', () => {

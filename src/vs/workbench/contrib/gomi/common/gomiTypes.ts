@@ -99,6 +99,7 @@ export interface GomiOfficeExecutionSettings {
   allowCliProviders: boolean;
   allowHttpProviders: boolean;
   requirePatchApprovalForLiveProviders: boolean;
+  maxConcurrentAgentRuns: number;
 }
 
 export interface GomiOfficeSettings {

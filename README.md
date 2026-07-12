@@ -234,6 +234,7 @@ Office organization is separate from **how** agents execute. Routes are selected
 - `trusted-workspaces` — live providers only when the workspace is trusted  
 - `allow-all` — controlled/dev and enterprise-managed environments  
 - CLI and HTTP transports can be enabled independently  
+- Department agent execution uses a configurable fair queue for concurrent runs  
 - Patch approval can be required before live routes run  
 
 CLI and HTTP execution are **off by default** in the prototype for safety and deterministic CI.

@@ -48,6 +48,7 @@ import {
   setHttpProvidersEnabled,
   setLiveProviderMode,
   setLiveProviderPatchApprovalRequired,
+  setMaxConcurrentAgentRuns,
   setMaxProjectMemoryItems,
   setMemoryBroadcastThreshold,
   setMemoryEmbeddingExecutionEnabled,
@@ -583,6 +584,12 @@ export function GomiOfficeApp() {
     );
   }
 
+  function updateMaxConcurrentAgentRuns(maxConcurrentAgentRuns: number) {
+    setOfficeSettings((currentSettings) =>
+      setMaxConcurrentAgentRuns(currentSettings, maxConcurrentAgentRuns)
+    );
+  }
+
   function setLayoutMode(mode: GomiOfficeViewMode) {
     setOfficeViewMode(mode);
 
@@ -774,6 +781,7 @@ export function GomiOfficeApp() {
           onCliProvidersEnabledChange={updateCliProvidersEnabled}
           onHttpProvidersEnabledChange={updateHttpProvidersEnabled}
           onLiveProviderPatchApprovalRequiredChange={updateLiveProviderPatchApprovalRequired}
+          onMaxConcurrentAgentRunsChange={updateMaxConcurrentAgentRuns}
           onPruneMemory={pruneMemoryNow}
         />
       </div>
@@ -888,6 +896,7 @@ function RightPanel({
   onCliProvidersEnabledChange,
   onHttpProvidersEnabledChange,
   onLiveProviderPatchApprovalRequiredChange,
+  onMaxConcurrentAgentRunsChange,
   onPruneMemory
 }: {
   agents: GomiAgent[];
@@ -920,6 +929,7 @@ function RightPanel({
   onCliProvidersEnabledChange: (allowCliProviders: boolean) => void;
   onHttpProvidersEnabledChange: (allowHttpProviders: boolean) => void;
   onLiveProviderPatchApprovalRequiredChange: (requirePatchApprovalForLiveProviders: boolean) => void;
+  onMaxConcurrentAgentRunsChange: (maxConcurrentAgentRuns: number) => void;
   onPruneMemory: () => void;
 }) {
   return (
@@ -986,6 +996,7 @@ function RightPanel({
           onCliProvidersEnabledChange={onCliProvidersEnabledChange}
           onHttpProvidersEnabledChange={onHttpProvidersEnabledChange}
           onLiveProviderPatchApprovalRequiredChange={onLiveProviderPatchApprovalRequiredChange}
+          onMaxConcurrentAgentRunsChange={onMaxConcurrentAgentRunsChange}
           onPruneMemory={onPruneMemory}
         />
       </div>
@@ -1054,6 +1065,7 @@ function OfficeSettingsPanel({
   onCliProvidersEnabledChange,
   onHttpProvidersEnabledChange,
   onLiveProviderPatchApprovalRequiredChange,
+  onMaxConcurrentAgentRunsChange,
   onPruneMemory
 }: {
   officeSettings: GomiOfficeSettings;
@@ -1082,6 +1094,7 @@ function OfficeSettingsPanel({
   onCliProvidersEnabledChange: (allowCliProviders: boolean) => void;
   onHttpProvidersEnabledChange: (allowHttpProviders: boolean) => void;
   onLiveProviderPatchApprovalRequiredChange: (requirePatchApprovalForLiveProviders: boolean) => void;
+  onMaxConcurrentAgentRunsChange: (maxConcurrentAgentRuns: number) => void;
   onPruneMemory: () => void;
 }) {
   const leaders = officeSettings.seats.filter((seat) => seat.seatKind !== 'employee');
@@ -1359,6 +1372,7 @@ function OfficeSettingsPanel({
           <span>{officeSettings.execution.liveProviderMode}</span>
           <span>{officeSettings.execution.allowCliProviders ? 'CLI on' : 'CLI off'}</span>
           <span>{officeSettings.execution.allowHttpProviders ? 'HTTP on' : 'HTTP off'}</span>
+          <span>{`${officeSettings.execution.maxConcurrentAgentRuns} concurrent`}</span>
         </div>
         <label className="gomi-field">
           <span>Workspace Trust</span>
@@ -1404,6 +1418,16 @@ function OfficeSettingsPanel({
             onChange={(event) => onLiveProviderPatchApprovalRequiredChange(event.target.checked)}
           />
           <span>Approval required for live providers</span>
+        </label>
+        <label className="gomi-field">
+          <span>Max concurrent agent runs</span>
+          <input
+            type="number"
+            min={1}
+            max={8}
+            value={officeSettings.execution.maxConcurrentAgentRuns}
+            onChange={(event) => onMaxConcurrentAgentRunsChange(Number(event.target.value))}
+          />
         </label>
       </div>
     </section>

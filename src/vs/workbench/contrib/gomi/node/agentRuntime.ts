@@ -27,6 +27,7 @@ import {
   createAgentResultMemoryEntry,
   createInMemoryGomiMemoryStore,
   createMemoryContent,
+  type GomiMemoryHit,
   type GomiMemoryItem,
   type GomiMemoryPruneReport,
   type GomiMemoryScope,
@@ -64,6 +65,13 @@ export interface GomiRuntimeOptions {
 export interface GomiRuntimeRunOptions {
   signal?: AbortSignal;
   stopReason?: string;
+}
+
+interface GomiQueuedAgentRun {
+  id: number;
+  task: GomiTask;
+  sharedMemory: GomiMemoryHit[];
+  result: GomiAgentResult;
 }
 
 export interface GomiRuntimeMemoryPruneReport extends GomiMemoryPruneReport {
@@ -211,104 +219,19 @@ export class GomiAgentRuntime {
       yield* this.emit({ type: 'task_update', task });
     }
 
-    for (const task of tasks) {
-      if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
-        return;
-      }
+    const stoppedWhileRunningTasks = yield* this.runQueuedAgentTasks({
+      sessionId,
+      request,
+      workspace,
+      tasks,
+      signal,
+      stopReason,
+      sharedProjectMemory,
+      agentResults
+    });
 
-      if (!isAgentAvailableForTask(this.officeSettings, task.agentId)) {
-        yield* this.status(task.agentId, 'sleeping');
-        yield* this.say(
-          'pet-gomi',
-          'Pet Gomi',
-          `${this.agentName(task.agentId)} is sleeping. CEO keeps the head seat and skips only this task.`
-        );
-        continue;
-      }
-
-      const sharedMemory = sharedProjectMemory
-        ? await sharedProjectMemory.searchForTask(task, request)
-        : [];
-      yield* this.status(task.agentId, 'working', task.id);
-      yield* this.updateTask(task, 'running', 42);
-      const agentResult = await this.agentProvider.runAgentTask({
-        sessionId,
-        request,
-        workspace,
-        task,
-        memory: this.memoryStore.recent(sessionId, 12),
-        sharedMemory,
-        agentCli: this.getAgentCli(task.agentId),
-        executionPolicy: {
-          ...this.officeSettings.execution,
-          patchApprovalRequired: this.officeSettings.memory.requirePatchApproval
-        },
-        signal
-      });
-
-      if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
-        return;
-      }
-
-      const communicationDecision = evaluateAgentCommunication(agentResult, {
-        broadcastThreshold: this.officeSettings.memory.broadcastThreshold,
-        recalledMemory: sharedMemory
-      });
-      agentResults.push(agentResult);
-      const resultMemory = this.memoryStore.add(
-        createAgentResultMemoryEntry({
-          sessionId,
-          agentId: agentResult.agentId,
-          taskId: agentResult.taskId,
-          summary: agentResult.summary
-        })
-      );
-      const projectMemoryItem = sharedProjectMemory
-        ? await sharedProjectMemory.rememberAgentResult(
-            agentResult,
-            communicationDecision.importance
-          )
-        : undefined;
-      yield* this.emit({ type: 'agent_result', result: agentResult });
-      yield* this.memoryUpdate(
-        this.sessionMemoryToBoardItem(resultMemory, `${this.agentName(agentResult.agentId)} Result`, {
-          shouldBroadcast: communicationDecision.shouldBroadcast
-        })
-      );
-      if (projectMemoryItem) {
-        yield* this.memoryUpdate(
-          this.projectMemoryToBoardItem(projectMemoryItem, `${this.agentName(agentResult.agentId)} Memory`, {
-            agentId: agentResult.agentId,
-            taskId: agentResult.taskId,
-            shouldBroadcast: communicationDecision.shouldBroadcast
-          })
-        );
-      }
-      if (communicationDecision.shouldBroadcast) {
-        const recipientId = this.communicationRecipientFor(task.agentId, tasks);
-        yield* this.say(
-          task.agentId,
-          this.agentName(task.agentId),
-          this.agentQuestion(task, agentResult, communicationDecision.broadcastSummary, recipientId),
-          recipientId,
-          this.agentName(recipientId)
-        );
-      }
-      await this.wait(signal);
-
-      if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
-        return;
-      }
-
-      yield* this.updateTask(task, 'running', 78);
-      await this.wait(signal);
-
-      if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
-        return;
-      }
-
-      yield* this.updateTask(task, 'done', 100);
-      yield* this.status(task.agentId, task.agentId === 'qa' ? 'reviewing' : 'done');
+    if (stoppedWhileRunningTasks) {
+      return;
     }
 
     yield* this.status('ceo', 'working');
@@ -418,6 +341,204 @@ export class GomiAgentRuntime {
       type: 'memory_update',
       item
     });
+  }
+
+  private async *runQueuedAgentTasks({
+    sessionId,
+    request,
+    workspace,
+    tasks,
+    signal,
+    stopReason,
+    sharedProjectMemory,
+    agentResults
+  }: {
+    sessionId: string;
+    request: string;
+    workspace: Parameters<GomiAgentProvider['runAgentTask']>[0]['workspace'];
+    tasks: GomiTask[];
+    signal?: AbortSignal;
+    stopReason: string;
+    sharedProjectMemory?: GomiSharedProjectMemory;
+    agentResults: GomiAgentResult[];
+  }): AsyncGenerator<GomiRuntimeEvent, boolean> {
+    const maxConcurrentRuns = Math.min(
+      8,
+      Math.max(1, Math.floor(this.officeSettings.execution.maxConcurrentAgentRuns || 1))
+    );
+    const runningRuns = new Map<number, Promise<GomiQueuedAgentRun>>();
+    let nextTaskIndex = 0;
+    let nextRunId = 0;
+
+    while (nextTaskIndex < tasks.length || runningRuns.size > 0) {
+      while (runningRuns.size < maxConcurrentRuns && nextTaskIndex < tasks.length) {
+        if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
+          return true;
+        }
+
+        const task = tasks[nextTaskIndex];
+        nextTaskIndex += 1;
+
+        if (!isAgentAvailableForTask(this.officeSettings, task.agentId)) {
+          yield* this.status(task.agentId, 'sleeping');
+          yield* this.say(
+            'pet-gomi',
+            'Pet Gomi',
+            `${this.agentName(task.agentId)} is sleeping. CEO keeps the head seat and skips only this task.`
+          );
+          continue;
+        }
+
+        const sharedMemory = sharedProjectMemory
+          ? await sharedProjectMemory.searchForTask(task, request)
+          : [];
+
+        if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
+          return true;
+        }
+
+        yield* this.status(task.agentId, 'working', task.id);
+        yield* this.updateTask(task, 'running', 42);
+
+        const runId = nextRunId;
+        nextRunId += 1;
+        runningRuns.set(
+          runId,
+          this.agentProvider.runAgentTask({
+            sessionId,
+            request,
+            workspace,
+            task,
+            memory: this.memoryStore.recent(sessionId, 12),
+            sharedMemory,
+            agentCli: this.getAgentCli(task.agentId),
+            executionPolicy: {
+              ...this.officeSettings.execution,
+              patchApprovalRequired: this.officeSettings.memory.requirePatchApproval
+            },
+            signal
+          }).then((result) => ({
+            id: runId,
+            task,
+            sharedMemory,
+            result
+          }))
+        );
+      }
+
+      if (runningRuns.size === 0) {
+        continue;
+      }
+
+      const completedRun = await Promise.race(runningRuns.values());
+      runningRuns.delete(completedRun.id);
+
+      if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
+        return true;
+      }
+
+      const stoppedAfterResult = yield* this.processAgentResult({
+        sessionId,
+        task: completedRun.task,
+        tasks,
+        agentResult: completedRun.result,
+        sharedMemory: completedRun.sharedMemory,
+        sharedProjectMemory,
+        agentResults,
+        signal,
+        stopReason
+      });
+
+      if (stoppedAfterResult) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private async *processAgentResult({
+    sessionId,
+    task,
+    tasks,
+    agentResult,
+    sharedMemory,
+    sharedProjectMemory,
+    agentResults,
+    signal,
+    stopReason
+  }: {
+    sessionId: string;
+    task: GomiTask;
+    tasks: GomiTask[];
+    agentResult: GomiAgentResult;
+    sharedMemory: GomiMemoryHit[];
+    sharedProjectMemory?: GomiSharedProjectMemory;
+    agentResults: GomiAgentResult[];
+    signal?: AbortSignal;
+    stopReason: string;
+  }): AsyncGenerator<GomiRuntimeEvent, boolean> {
+    const communicationDecision = evaluateAgentCommunication(agentResult, {
+      broadcastThreshold: this.officeSettings.memory.broadcastThreshold,
+      recalledMemory: sharedMemory
+    });
+    agentResults.push(agentResult);
+    const resultMemory = this.memoryStore.add(
+      createAgentResultMemoryEntry({
+        sessionId,
+        agentId: agentResult.agentId,
+        taskId: agentResult.taskId,
+        summary: agentResult.summary
+      })
+    );
+    const projectMemoryItem = sharedProjectMemory
+      ? await sharedProjectMemory.rememberAgentResult(
+          agentResult,
+          communicationDecision.importance
+        )
+      : undefined;
+    yield* this.emit({ type: 'agent_result', result: agentResult });
+    yield* this.memoryUpdate(
+      this.sessionMemoryToBoardItem(resultMemory, `${this.agentName(agentResult.agentId)} Result`, {
+        shouldBroadcast: communicationDecision.shouldBroadcast
+      })
+    );
+    if (projectMemoryItem) {
+      yield* this.memoryUpdate(
+        this.projectMemoryToBoardItem(projectMemoryItem, `${this.agentName(agentResult.agentId)} Memory`, {
+          agentId: agentResult.agentId,
+          taskId: agentResult.taskId,
+          shouldBroadcast: communicationDecision.shouldBroadcast
+        })
+      );
+    }
+    if (communicationDecision.shouldBroadcast) {
+      const recipientId = this.communicationRecipientFor(task.agentId, tasks);
+      yield* this.say(
+        task.agentId,
+        this.agentName(task.agentId),
+        this.agentQuestion(task, agentResult, communicationDecision.broadcastSummary, recipientId),
+        recipientId,
+        this.agentName(recipientId)
+      );
+    }
+    await this.wait(signal);
+
+    if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
+      return true;
+    }
+
+    yield* this.updateTask(task, 'running', 78);
+    await this.wait(signal);
+
+    if (yield* this.stopIfAborted(sessionId, signal, stopReason)) {
+      return true;
+    }
+
+    yield* this.updateTask(task, 'done', 100);
+    yield* this.status(task.agentId, task.agentId === 'qa' ? 'reviewing' : 'done');
+
+    return false;
   }
 
   private async *stopIfAborted(
