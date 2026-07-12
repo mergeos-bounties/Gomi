@@ -1,11 +1,17 @@
 import { normalizeGomiOfficeSettings } from '../common/gomiOfficeSettings';
 import type { GomiOfficeSettings, GomiPatchPreviewResult, GomiRuntimeEvent } from '../common/gomiTypes';
 import type { GomiBridgeMessage, GomiWorkbenchBridge } from '../electron-sandbox/gomiBridge';
-import { GomiAgentRuntime, type GomiRuntimeOptions, type GomiRuntimeRunOptions } from '../node/agentRuntime';
+import {
+  GomiAgentRuntime,
+  type GomiRuntimeMemoryPruneReport,
+  type GomiRuntimeOptions,
+  type GomiRuntimeRunOptions
+} from '../node/agentRuntime';
 import type { GomiPatchApplyResult } from '../node/workspacePatchApplier';
 
 export interface GomiWebviewRuntimeRunner {
   run(request: string, options?: GomiRuntimeRunOptions): AsyncGenerator<GomiRuntimeEvent>;
+  pruneMemory?: () => Promise<GomiRuntimeMemoryPruneReport>;
 }
 
 export interface GomiWebviewHostControllerOptions {
@@ -56,6 +62,11 @@ export class GomiWebviewHostController {
 
     if (message.type === 'gomi.stop') {
       this.stopOfficeSession(message.reason);
+      return;
+    }
+
+    if (message.type === 'gomi.pruneMemory') {
+      await this.pruneMemory(message);
       return;
     }
 
@@ -120,6 +131,26 @@ export class GomiWebviewHostController {
 
     this.postSystemMessage('Stopping the current Gomi Office session...');
     this.abortController.abort(reason);
+  }
+
+  private async pruneMemory(message: Extract<GomiBridgeMessage, { type: 'gomi.pruneMemory' }>): Promise<void> {
+    try {
+      const runtime = this.options.runtime ?? this.createRuntime(message.officeSettings);
+
+      if (!runtime.pruneMemory) {
+        throw new Error('Memory pruning is not configured for this Gomi webview host.');
+      }
+
+      this.options.bridge.postMessage({
+        type: 'gomi.pruneMemoryResult',
+        report: await runtime.pruneMemory()
+      });
+    } catch (error) {
+      this.options.bridge.postMessage({
+        type: 'gomi.pruneMemoryResult',
+        error: error instanceof Error ? error.message : 'Unknown memory prune error.'
+      });
+    }
   }
 
   private async applyPatch(message: Extract<GomiBridgeMessage, { type: 'gomi.applyPatch' }>): Promise<void> {
