@@ -1,4 +1,5 @@
 import {
+  GOMI_AGENT_RESULT_SCHEMA_VERSION,
   matchWorkspaceFilesInOutput,
   parseAgentResultJson
 } from './agentOutputParsing';
@@ -211,7 +212,7 @@ function createAgentRequest(context: GomiAgentRunContext): GomiAgentRequest {
     system: [
       `You are ${agentName} inside Gomi Office IDE.`,
       `Role focus: ${roleFocus[context.task.agentId]}.`,
-      'Return JSON when possible with summary, findings[], recommendations[], proposedFiles[], confidence.'
+      `Return JSON when possible with schemaVersion: ${GOMI_AGENT_RESULT_SCHEMA_VERSION}, summary, findings[], recommendations[], proposedFiles[], confidence.`
     ].join('\n'),
     messages: [
       {

@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import {
+  GOMI_AGENT_RESULT_SCHEMA_VERSION,
   matchWorkspaceFilesInOutput,
   parseAgentResultJson
 } from './agentOutputParsing';
@@ -354,7 +355,7 @@ function createCliPrompt(context: GomiAgentRunContext): string {
     memoryHits || '- No relevant memory hits.',
     'Context snippets:',
     snippets || '- No snippets available.',
-    'Return either plain English or JSON with: summary, findings[], recommendations[], proposedFiles[], confidence.'
+    `Return either plain English or JSON with: schemaVersion: ${GOMI_AGENT_RESULT_SCHEMA_VERSION}, summary, findings[], recommendations[], proposedFiles[], confidence.`
   ].join('\n\n');
 }
 

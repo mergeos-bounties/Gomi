@@ -238,6 +238,23 @@ Office organization is separate from **how** agents execute. Routes are selected
 
 CLI and HTTP execution are **off by default** in the prototype for safety and deterministic CI.
 
+### Agent Result JSON Schema
+
+CLI and HTTP providers may return plain English, but structured responses should use schema version `1`:
+
+```json
+{
+  "schemaVersion": 1,
+  "summary": "Short result summary.",
+  "findings": ["Concrete observation."],
+  "recommendations": ["Actionable next step."],
+  "proposedFiles": ["src/example.ts"],
+  "confidence": 0.82
+}
+```
+
+`schemaVersion` is optional for older providers. When present, version `1` is the supported contract. The parser ignores unsupported future versions so provider callers can continue using the existing plain-text fallback path. If a provider response is interrupted after a mostly complete JSON object, the parser attempts to close missing arrays and objects before falling back to the original text.
+
 ---
 
 ## Shared project memory
