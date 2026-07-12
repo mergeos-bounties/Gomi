@@ -7,7 +7,13 @@ import type {
 import type { GomiRuntimeMemoryPruneReport } from '../node/agentRuntime';
 import type { GomiPatchApplyResult } from '../node/workspacePatchApplier';
 
-export type GomiBridgeMessage =
+export const GOMI_BRIDGE_PROTOCOL_VERSION = 1;
+
+export type GomiBridgeProtocolVersion = typeof GOMI_BRIDGE_PROTOCOL_VERSION;
+
+export type GomiBridgeMessage = {
+  protocolVersion?: GomiBridgeProtocolVersion;
+} & (
   | {
       type: 'gomi.run';
       request: string;
@@ -49,7 +55,13 @@ export type GomiBridgeMessage =
       patchId: string;
       result?: GomiPatchApplyResult;
       error?: string;
-    };
+    }
+  | {
+      type: 'gomi.bridgeError';
+      code: 'invalid_message';
+      message: string;
+    }
+);
 
 export interface GomiWorkbenchBridge {
   postMessage(message: GomiBridgeMessage): void;
