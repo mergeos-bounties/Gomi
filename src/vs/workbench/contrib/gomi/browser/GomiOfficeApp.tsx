@@ -651,7 +651,7 @@ export function GomiOfficeApp() {
   }
 
   return (
-    <div className={shellClassName}>
+    <div className={shellClassName} data-testid="gomi-shell">
       <header className="gomi-titlebar">
         <div className="gomi-titlebar__brand">
           <span className="gomi-logo">G</span>
@@ -705,7 +705,7 @@ export function GomiOfficeApp() {
               >
                 {effectiveRightPanelCollapsed ? <PanelRightOpen size={18} /> : <PanelRightClose size={18} />}
               </button>
-              <div className="gomi-view-mode-controls" role="group" aria-label="Office layout mode">
+              <div className="gomi-view-mode-controls" role="group" aria-label="Office layout mode" data-testid="layout-mode-group">
                 {officeViewModes.map(({ id, label, Icon }) => (
                   <button
                     className={`gomi-icon-button ${officeViewMode === id ? 'is-active' : ''}`}
@@ -726,10 +726,11 @@ export function GomiOfficeApp() {
               value={request}
               onChange={(event) => setRequest(event.target.value)}
               aria-label="Project Request"
+              data-testid="request-textarea"
               spellCheck={false}
             />
             <div className="gomi-request-actions">
-              <button className="gomi-send" onClick={runOfficeSession} disabled={isRunning}>
+              <button className="gomi-send" onClick={runOfficeSession} disabled={isRunning} data-testid="run-ceo-button">
                 <Send size={17} />
                 <span>{isRunning ? 'Running' : 'Run CEO'}</span>
               </button>
@@ -804,7 +805,7 @@ export function GomiOfficeApp() {
         />
       </div>
 
-      <footer className="gomi-statusbar">
+      <footer className="gomi-statusbar" data-testid="status-bar">
         <span>{workbenchBridge ? 'Gomi Workbench Bridge' : 'Gomi Demo Runtime'}</span>
         <span>{isRunning ? 'Agents working' : 'Ready'}</span>
       </footer>
@@ -1032,7 +1033,7 @@ function AgentRow({ agent }: { agent: GomiAgent }) {
   const Icon = agent.status === 'sleeping' ? Bed : iconForAgent(agent.id);
 
   return (
-    <div className="gomi-agent-row">
+    <div className="gomi-agent-row" data-testid="agent-row">
       <div className="gomi-agent-avatar">
         <Icon size={17} />
       </div>
@@ -1143,7 +1144,7 @@ function OfficeSettingsPanel({
   ].filter(Boolean);
 
   return (
-    <section className="gomi-settings-panel" aria-label="Office Settings">
+    <section className="gomi-settings-panel" aria-label="Office Settings" data-testid="settings-panel">
       <div className="gomi-panel-header">
         <span>Office Settings</span>
         <Settings size={16} />
@@ -1535,7 +1536,7 @@ function ChatLog({ messages }: { messages: GomiChatMessage[] }) {
           <div className="gomi-report-empty">No messages yet.</div>
         ) : (
           messages.map((message) => (
-            <div className="gomi-message" key={message.id}>
+            <div className="gomi-message" key={message.id} data-testid="chat-message">
               <div className="gomi-message__head">
                 <span>
                   {message.senderName}
@@ -1568,7 +1569,7 @@ function FinalReport({
   nativePreviewRequired: boolean;
 }) {
   return (
-    <div className="gomi-report">
+    <div className="gomi-report" data-testid="final-report">
       <div className="gomi-panel-header">
         <span>Final Report</span>
         <ClipboardList size={16} />
