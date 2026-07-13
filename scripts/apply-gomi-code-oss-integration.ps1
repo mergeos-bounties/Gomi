@@ -4,10 +4,152 @@ param(
 
   [string]$ManifestPath,
   [switch]$ValidateOnly,
-  [switch]$DryRun
+  [switch]$DryRun,
+  [string]$ReportPath
 )
 
 $ErrorActionPreference = 'Stop'
+
+$script:GomiIntegrationReportActions = @()
+$script:GomiIntegrationRollbackActions = @()
+
+function Test-GomiPathIsUnderRoot {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$PathValue,
+
+    [Parameter(Mandatory = $true)]
+    [string]$RootPath
+  )
+
+  $comparison = if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
+    [System.StringComparison]::OrdinalIgnoreCase
+  } else {
+    [System.StringComparison]::Ordinal
+  }
+  $fullPath = [System.IO.Path]::GetFullPath($PathValue)
+  $fullRoot = [System.IO.Path]::GetFullPath($RootPath)
+  $rootPrefix = if ($fullRoot.EndsWith([System.IO.Path]::DirectorySeparatorChar)) {
+    $fullRoot
+  } else {
+    "$fullRoot$([System.IO.Path]::DirectorySeparatorChar)"
+  }
+
+  return $fullPath.Equals($fullRoot, $comparison) -or $fullPath.StartsWith($rootPrefix, $comparison)
+}
+
+function Resolve-GomiReportPath {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$PathValue,
+
+    [Parameter(Mandatory = $true)]
+    [string]$CodeRoot
+  )
+
+  $resolvedPath = if ([System.IO.Path]::IsPathRooted($PathValue)) {
+    [System.IO.Path]::GetFullPath($PathValue)
+  } else {
+    [System.IO.Path]::GetFullPath((Join-Path (Get-Location).Path $PathValue))
+  }
+
+  if ($DryRun -and (Test-GomiPathIsUnderRoot -PathValue $resolvedPath -RootPath $CodeRoot)) {
+    throw "Dry-run report path must be outside the Code - OSS checkout so dry-run leaves the target tree unchanged: $resolvedPath"
+  }
+
+  return $resolvedPath
+}
+
+function Add-GomiIntegrationReportAction {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Kind,
+
+    [string]$Source,
+    [string]$Destination,
+    [string]$Message,
+    [hashtable]$Data = @{}
+  )
+
+  $entry = [ordered]@{
+    kind = $Kind
+    source = $Source
+    destination = $Destination
+    message = $Message
+  }
+
+  foreach ($key in $Data.Keys) {
+    $entry[$key] = $Data[$key]
+  }
+
+  $script:GomiIntegrationReportActions += [pscustomobject]$entry
+}
+
+function Add-GomiIntegrationRollbackAction {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Kind,
+
+    [string]$Target,
+    [string]$Message,
+    [hashtable]$Data = @{}
+  )
+
+  $entry = [ordered]@{
+    kind = $Kind
+    target = $Target
+    message = $Message
+  }
+
+  foreach ($key in $Data.Keys) {
+    $entry[$key] = $Data[$key]
+  }
+
+  $script:GomiIntegrationRollbackActions += [pscustomobject]$entry
+}
+
+function Write-GomiIntegrationReport {
+  param(
+    [string]$PathValue,
+
+    [Parameter(Mandatory = $true)]
+    [string]$RepoRoot,
+
+    [Parameter(Mandatory = $true)]
+    [string]$CodeRoot,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ManifestFile
+  )
+
+  $report = [ordered]@{
+    schemaVersion = 1
+    generatedAt = (Get-Date).ToUniversalTime().ToString('o')
+    repoRoot = $RepoRoot
+    codeOssRoot = $CodeRoot
+    manifestPath = $ManifestFile
+    validateOnly = [bool]$ValidateOnly
+    dryRun = [bool]$DryRun
+    actions = @($script:GomiIntegrationReportActions)
+    rollbackActions = @($script:GomiIntegrationRollbackActions)
+  }
+
+  if (-not $PathValue) {
+    Write-Host "Integration report summary: $($script:GomiIntegrationReportActions.Count) actions, $($script:GomiIntegrationRollbackActions.Count) rollback steps." -ForegroundColor Green
+    return
+  }
+
+  $reportParent = Split-Path -Parent $PathValue
+
+  if ($reportParent) {
+    New-Item -ItemType Directory -Force -Path $reportParent | Out-Null
+  }
+
+  $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+  $reportJson = $report | ConvertTo-Json -Depth 32
+  [System.IO.File]::WriteAllText($PathValue, "$reportJson`n", $utf8NoBom)
+  Write-Host "Integration report written: $PathValue" -ForegroundColor Green
+}
 
 function Resolve-GomiPath {
   param(
@@ -35,6 +177,14 @@ function Copy-GomiIntegrationItem {
   )
 
   Write-Host "Copy $Source -> $Destination" -ForegroundColor DarkCyan
+  $destinationExists = Test-Path -LiteralPath $Destination
+  Add-GomiIntegrationReportAction -Kind 'copy' -Source $Source -Destination $Destination -Message 'Copy integration file or directory into the Code - OSS checkout.'
+
+  if ($destinationExists) {
+    Add-GomiIntegrationRollbackAction -Kind 'restore-path' -Target $Destination -Message 'Restore the previous destination contents from source control or a pre-apply backup.'
+  } else {
+    Add-GomiIntegrationRollbackAction -Kind 'remove-path' -Target $Destination -Message 'Remove the copied destination path.'
+  }
 
   if ($ValidateOnly -or $DryRun) {
     return
@@ -99,6 +249,11 @@ function Set-GomiProductJson {
     return
   }
 
+  Add-GomiIntegrationReportAction -Kind 'merge-product-json' -Source $Source -Destination $Destination -Message 'Merge Gomi product metadata into Code - OSS product.json.' -Data @{
+    removeKeys = @($RemoveKeys)
+  }
+  Add-GomiIntegrationRollbackAction -Kind 'restore-file' -Target $Destination -Message 'Restore product.json from source control or the pre-apply backup created by the caller.'
+
   if ($ValidateOnly -or $DryRun) {
     return
   }
@@ -137,10 +292,20 @@ function Add-GomiWorkbenchImport {
 
   if ($content.Contains($ImportLine)) {
     Write-Host "Import already present in $TargetFile" -ForegroundColor DarkCyan
+    Add-GomiIntegrationReportAction -Kind 'ensure-workbench-import' -Destination $TargetFile -Message 'Workbench import already exists.' -Data @{
+      import = $ImportLine
+      changed = $false
+    }
     return
   }
 
   Write-Host "Patch $TargetFile with: $ImportLine" -ForegroundColor DarkCyan
+  Add-GomiIntegrationReportAction -Kind 'append-workbench-import' -Destination $TargetFile -Message 'Append the native Gomi workbench contribution import.' -Data @{
+    import = $ImportLine
+  }
+  Add-GomiIntegrationRollbackAction -Kind 'remove-workbench-import' -Target $TargetFile -Message 'Remove the appended Gomi workbench contribution import line.' -Data @{
+    import = $ImportLine
+  }
 
   if ($ValidateOnly -or $DryRun) {
     return
@@ -163,6 +328,11 @@ $manifestFile = if ($ManifestPath) {
 } else {
   Resolve-GomiPath -PathValue (Join-Path $repoRoot 'build/gomi-code-oss.integration.json') -Description 'Gomi integration manifest'
 }
+$resolvedReportPath = if ($ReportPath) {
+  Resolve-GomiReportPath -PathValue $ReportPath -CodeRoot $codeRoot
+} else {
+  $null
+}
 
 $manifest = Get-Content -LiteralPath $manifestFile -Raw | ConvertFrom-Json
 
@@ -174,6 +344,9 @@ Write-Host "Applying Gomi Code - OSS integration manifest: $manifestFile" -Foreg
 Write-Host "Code - OSS root: $codeRoot" -ForegroundColor Green
 Write-Host "Validate only: $($ValidateOnly.IsPresent)" -ForegroundColor Green
 Write-Host "Dry run: $($DryRun.IsPresent)" -ForegroundColor Green
+if ($resolvedReportPath) {
+  Write-Host "Report path: $resolvedReportPath" -ForegroundColor Green
+}
 
 $productSource = Resolve-GomiPath -PathValue (Join-Path $repoRoot $manifest.productJson.source) -Description 'Gomi product.json'
 $productTarget = Join-Path $codeRoot $manifest.productJson.target
@@ -207,6 +380,10 @@ foreach ($copy in $manifest.webviewAssetCopies) {
     if ($ValidateOnly -or $DryRun) {
       Write-Host $message -ForegroundColor Yellow
       Write-Host "Copy $sourcePath -> $target" -ForegroundColor DarkCyan
+      Add-GomiIntegrationReportAction -Kind 'copy' -Source $sourcePath -Destination $target -Message $message -Data @{
+        sourceMissing = $true
+      }
+      Add-GomiIntegrationRollbackAction -Kind 'remove-path' -Target $target -Message 'Remove generated webview assets if a later non-dry-run apply creates them.'
       continue
     }
 
@@ -227,5 +404,7 @@ foreach ($workbenchImport in $manifest.workbenchImports) {
   $target = Join-Path $codeRoot $workbenchImport.target
   Add-GomiWorkbenchImport -TargetFile $target -ImportLine $workbenchImport.import
 }
+
+Write-GomiIntegrationReport -PathValue $resolvedReportPath -RepoRoot $repoRoot -CodeRoot $codeRoot -ManifestFile $manifestFile
 
 Write-Host 'Gomi Code - OSS integration manifest completed.' -ForegroundColor Green
