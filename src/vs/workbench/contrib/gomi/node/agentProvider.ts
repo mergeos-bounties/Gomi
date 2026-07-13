@@ -7,6 +7,7 @@ import type {
   GomiTask,
   GomiWorkspaceSnapshot
 } from '../common/gomiTypes';
+import { estimateGomiUsage } from '../common/gomiUsageEstimate';
 import type { GomiMemoryHit } from './memoryStore';
 
 export type GomiAgentProviderKind = 'cloud' | 'local' | 'cli' | 'demo';
@@ -161,7 +162,14 @@ export class DemoGomiAgentProvider implements GomiAgentProvider {
         `Route follow-up work to ${context.task.agentId} when this area changes.`
       ],
       proposedFiles,
-      confidence: context.workspace.files.length > 0 ? 0.78 : 0.52
+      confidence: context.workspace.files.length > 0 ? 0.78 : 0.52,
+      usageEstimate: estimateGomiUsage({
+        providerId: context.agentCli?.providerId ?? 'demo-runtime',
+        model: context.agentCli?.label ?? this.label,
+        inputText: context.request,
+        outputText: response.text,
+        usage: response.usage
+      })
     };
   }
 

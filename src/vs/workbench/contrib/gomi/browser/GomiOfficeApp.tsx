@@ -74,6 +74,7 @@ import type {
   GomiAgentSeat,
   GomiChatMessage,
   GomiFinalReport,
+  GomiUsageSummary,
   GomiLiveProviderMode,
   GomiMemoryBoardItem,
   GomiMemoryEmbeddingProviderId,
@@ -1584,6 +1585,7 @@ function FinalReport({
               onApplyPatch={onApplyPatch}
               nativePreviewRequired={nativePreviewRequired}
             />
+            <UsageEstimatePanel usageEstimate={report.usageEstimate} />
             <div className="gomi-project-row">
               <div className="gomi-project-name">{report.summary}</div>
             </div>
@@ -1600,6 +1602,58 @@ function FinalReport({
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function UsageEstimatePanel({ usageEstimate }: { usageEstimate?: GomiUsageSummary }) {
+  if (!usageEstimate) {
+    return undefined;
+  }
+
+  return (
+    <div className="gomi-project-row gomi-usage-panel" aria-label="Usage Estimate">
+      <div className="gomi-usage-panel__head">
+        <div>
+          <div className="gomi-project-name">Usage Estimate</div>
+          <div className="gomi-project-detail">
+            {usageEstimate.runCount} provider run{usageEstimate.runCount === 1 ? '' : 's'} · {usageEstimate.pricing.label}
+          </div>
+        </div>
+        <span className="gomi-status" data-status={usageEstimate.hasEstimatedTokens ? 'pending' : 'done'}>
+          {usageEstimate.hasEstimatedTokens ? 'estimated' : 'metered'}
+        </span>
+      </div>
+
+      <div className="gomi-usage-grid">
+        <UsageMetric label="Input" value={formatCount(usageEstimate.inputTokens)} />
+        <UsageMetric label="Output" value={formatCount(usageEstimate.outputTokens)} />
+        <UsageMetric label="Total" value={formatCount(usageEstimate.totalTokens)} />
+        <UsageMetric label="Cost" value={formatCurrencyEstimate(usageEstimate.estimatedCostUsd)} />
+      </div>
+
+      <div className="gomi-chip-row">
+        <span className="gomi-chip">
+          ${usageEstimate.pricing.inputUsdPerMillionTokens}/M input
+        </span>
+        <span className="gomi-chip">
+          ${usageEstimate.pricing.outputUsdPerMillionTokens}/M output
+        </span>
+        {usageEstimate.items.slice(0, 3).map((item, index) => (
+          <span className="gomi-chip" key={`${item.providerId ?? 'provider'}-${item.model ?? 'model'}-${index}`}>
+            {item.providerId ?? 'provider'}{item.model ? ` · ${item.model}` : ''}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function UsageMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="gomi-usage-metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   );
 }
@@ -1726,6 +1780,25 @@ function shortenText(value: string, maxLength: number): string {
   }
 
   return `${compactValue.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function formatCount(value: number): string {
+  return new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 0
+  }).format(value);
+}
+
+function formatCurrencyEstimate(value: number): string {
+  if (value > 0 && value < 0.0001) {
+    return '<$0.0001';
+  }
+
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4
+  }).format(value);
 }
 
 function isCompactAgentPanelViewport(): boolean {

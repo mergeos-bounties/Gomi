@@ -5,6 +5,7 @@ import type {
   GomiTask,
   GomiWorkspaceSnapshot
 } from '../common/gomiTypes';
+import { summarizeGomiUsage } from '../common/gomiUsageEstimate';
 
 export class GomiResultAggregator {
   createFinalReport(input: {
@@ -21,6 +22,7 @@ export class GomiResultAggregator {
 
     return {
       summary: `CEO Agent completed a ${input.results.length}-agent review for ${input.workspace.rootName}: ${input.request}`,
+      usageEstimate: summarizeGomiUsage(input.results.map((result) => result.usageEstimate)),
       sections: [
         {
           title: 'Agent Findings',
