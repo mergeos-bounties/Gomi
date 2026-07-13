@@ -5,6 +5,8 @@ import {
   shouldReportInvalidGomiBridgeMessage,
   withGomiBridgeProtocol
 } from './gomiWebviewBridge';
+import { GOMI_BRIDGE_PROTOCOL_VERSION } from '../electron-sandbox/gomiBridge';
+import { validateGomiBridgeMessage } from '../common/gomiMessageValidator';
 
 export interface GomiDisposable {
   dispose(): void;
@@ -27,7 +29,16 @@ export class GomiWebviewHostBridge implements GomiWorkbenchBridge, GomiDisposabl
     this.disposable = this.webview.onMessage((event) => {
       if (!isGomiBridgeMessage(event.message)) {
         if (shouldReportInvalidGomiBridgeMessage(event.message)) {
-          void this.webview.postMessage(createGomiBridgeErrorMessage());
+          // Use Zod validator for a specific rejection reason (size, version,
+          // unknown type, malformed payload) — capped at 2 000 chars.
+          const zod = validateGomiBridgeMessage(event.message);
+          const detail = zod.success ? '' : `: ${zod.error}`;
+          void this.webview.postMessage({
+            protocolVersion: GOMI_BRIDGE_PROTOCOL_VERSION,
+            type: 'gomi.bridgeError',
+            code: 'invalid_message',
+            message: `Rejected invalid Gomi bridge message${detail}`.slice(0, 2_000),
+          });
         }
 
         return;

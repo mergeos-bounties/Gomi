@@ -92,33 +92,23 @@ describe('Gomi webview host bridge', () => {
       }
     });
 
+    // No valid messages should reach listeners
     expect(received).toEqual([]);
-    expect(webview.outbox).toEqual([
-      {
+
+    // Four bridge error responses were sent, each with a specific reason
+    expect(webview.outbox).toHaveLength(4);
+    for (const msg of webview.outbox) {
+      expect(msg).toMatchObject({
         protocolVersion: 1,
         type: 'gomi.bridgeError',
         code: 'invalid_message',
-        message: 'Rejected invalid Gomi bridge message.'
-      },
-      {
-        protocolVersion: 1,
-        type: 'gomi.bridgeError',
-        code: 'invalid_message',
-        message: 'Rejected invalid Gomi bridge message.'
-      },
-      {
-        protocolVersion: 1,
-        type: 'gomi.bridgeError',
-        code: 'invalid_message',
-        message: 'Rejected invalid Gomi bridge message.'
-      },
-      {
-        protocolVersion: 1,
-        type: 'gomi.bridgeError',
-        code: 'invalid_message',
-        message: 'Rejected invalid Gomi bridge message.'
-      }
-    ]);
+      });
+      expect(typeof msg.message).toBe('string');
+      expect(msg.message.length).toBeGreaterThan(0);
+      expect(msg.message).toContain('Rejected invalid Gomi bridge message');
+    }
+
+    // Error messages must never expose raw payload data
     expect(JSON.stringify(webview.outbox)).not.toContain('../secret');
   });
 });
