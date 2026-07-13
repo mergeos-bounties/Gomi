@@ -457,7 +457,15 @@ export class GomiAgentRuntime {
               patchApprovalRequired: this.officeSettings.memory.requirePatchApproval
             },
             signal,
-            reportProgress: (update) => queueProgressUpdate(task, update)
+            reportProgress: (update) => queueProgressUpdate(task, update),
+            onChunk: (chunk) => {
+              this.bus.publish({
+                type: 'agent_progress',
+                agentId: task.agentId,
+                taskId: task.id,
+                chunk
+              });
+            }
           }).then((result) => ({
             id: runId,
             task,

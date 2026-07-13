@@ -273,6 +273,12 @@ export type GomiRuntimeEvent =
       task: GomiTask;
     }
   | {
+      type: 'agent_progress';
+      agentId: GomiAgentId;
+      taskId: string;
+      chunk: string;
+    }
+  | {
       type: 'agent_result';
       result: GomiAgentResult;
     }

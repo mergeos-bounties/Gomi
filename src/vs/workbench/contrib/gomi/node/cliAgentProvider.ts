@@ -22,6 +22,7 @@ import {
   type GomiAgentResponse,
   type GomiAgentRunContext
 } from './agentProvider';
+import { createStreamThrottle } from './streamThrottle';
 
 export interface GomiCliCommandInvocation {
   executable: string;
@@ -44,7 +45,8 @@ export interface GomiCliCommandResult {
 
 export type GomiCliCommandRunner = (
   invocation: GomiCliCommandInvocation,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  throttle?: { push: (chunk: string) => void }
 ) => Promise<GomiCliCommandResult>;
 
 export interface NodeCliGomiAgentProviderOptions {
@@ -61,7 +63,7 @@ export class NodeCliGomiAgentProvider implements GomiAgentProvider {
   readonly label = 'Node CLI Agent Router';
   readonly kind = 'cli';
   readonly capabilities = {
-    streaming: false,
+    streaming: true,
     tools: true,
     maxContextTokens: 64000
   };
@@ -119,6 +121,13 @@ export class NodeCliGomiAgentProvider implements GomiAgentProvider {
       );
     }
 
+    const throttle = context.onChunk
+      ? createStreamThrottle({
+          intervalMs: 120,
+          onFlush: (payload) => context.onChunk?.(payload)
+        })
+      : undefined;
+
     const providerLabel = context.agentCli?.label ?? provider?.label ?? providerId;
     const result = await this.runCliCommand({
       executable,
@@ -130,7 +139,9 @@ export class NodeCliGomiAgentProvider implements GomiAgentProvider {
       taskId: context.task.id,
       cwd: this.cwd,
       timeoutMs: this.timeoutMs
-    }, context.signal);
+    }, context.signal, throttle);
+
+    throttle?.dispose();
 
     if (result.timedOut) {
       return this.createConfigurationErrorResult(
@@ -158,10 +169,11 @@ export class NodeCliGomiAgentProvider implements GomiAgentProvider {
 
   private async runCliCommand(
     invocation: GomiCliCommandInvocation,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    throttle?: { push: (chunk: string) => void }
   ): Promise<GomiCliCommandResult> {
     try {
-      return await this.commandRunner(invocation, signal);
+      return await this.commandRunner(invocation, signal, throttle);
     } catch (error) {
       return {
         stdout: '',
@@ -215,7 +227,8 @@ const MAX_CLI_OUTPUT_BYTES = 10_000_000;
 
 export async function spawnGomiCliCommand(
   invocation: GomiCliCommandInvocation,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  throttle?: { push: (chunk: string) => void }
 ): Promise<GomiCliCommandResult> {
   return new Promise((resolve) => {
     const child = spawn(invocation.executable, invocation.args, {
@@ -267,7 +280,9 @@ export async function spawnGomiCliCommand(
         return;
       }
 
-      stdout += chunk.toString('utf8');
+      const text = chunk.toString('utf8');
+      stdout += text;
+      throttle?.push(text);
     });
     child.stderr.on('data', (chunk: Buffer) => {
       if (stderr.length >= MAX_CLI_OUTPUT_BYTES) {

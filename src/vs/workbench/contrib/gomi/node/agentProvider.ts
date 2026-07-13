@@ -67,6 +67,14 @@ export interface GomiAgentRunContext {
   };
   signal?: AbortSignal;
   reportProgress?: (update: GomiAgentProgressUpdate) => void;
+  /**
+   * Optional progress sink. Providers that support incremental output (CLI
+   * stdout, HTTP streaming) should call this with raw text chunks as they
+   * arrive so the caller can surface live progress in the Office UI.
+   * Providers without incremental output (demo, non-streaming HTTP) may
+   * simply omit calling it — runAgentTask must still resolve normally.
+   */
+  onChunk?: (chunk: string) => void;
 }
 
 export interface GomiAgentProvider {
