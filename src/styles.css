@@ -777,6 +777,29 @@ button {
   line-height: 1.45;
 }
 
+.gomi-avatar-style-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.gomi-avatar-style-controls button {
+  min-height: 34px;
+  border: 1px solid #334155;
+  border-radius: 7px;
+  background: #101826;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.gomi-avatar-style-controls button.is-active {
+  border-color: #2dd4bf;
+  background: #0f766e;
+  color: #ecfeff;
+}
+
 .gomi-memory-summary {
   display: flex;
   flex-wrap: wrap;

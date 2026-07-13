@@ -4,6 +4,7 @@ import type {
   GomiAgentId,
   GomiAgentSeat,
   GomiAgentWorkMode,
+  GomiAvatarStyle,
   GomiLiveProviderMode,
   GomiMemoryEmbeddingProviderId,
   GomiMemoryPrivacyMode,
@@ -16,6 +17,15 @@ export const GOMI_DEFAULT_MEMORY_RETENTION_DAYS = 30;
 export const GOMI_DEFAULT_MAX_PROJECT_MEMORY_ITEMS = 420;
 export const GOMI_DEFAULT_MAX_CONCURRENT_AGENT_RUNS = 2;
 export const GOMI_DEFAULT_HTTP_MAX_RETRIES = 2;
+
+export const GOMI_AVATAR_STYLE_OPTIONS: Array<{
+  id: GomiAvatarStyle;
+  label: string;
+}> = [
+  { id: 'emoji', label: 'Emoji' },
+  { id: 'geometric', label: 'Geometric' },
+  { id: 'initials', label: 'Initials' }
+];
 
 export const GOMI_HIRABLE_DEPARTMENT_IDS: GomiAgentId[] = [
   'system-analyst',
@@ -170,6 +180,7 @@ export const GOMI_AGENT_CLI_PROVIDERS: GomiAgentCliProvider[] = [
 ];
 
 export const DEFAULT_GOMI_OFFICE_SETTINGS: GomiOfficeSettings = {
+  avatarStyle: 'emoji',
   seats: [
     {
       id: 'seat-ceo',
@@ -383,6 +394,16 @@ export function setMaxProjectMemoryItems(
   });
 }
 
+export function setAvatarStyle(
+  settings: GomiOfficeSettings,
+  avatarStyle: GomiAvatarStyle
+): GomiOfficeSettings {
+  return {
+    ...settings,
+    avatarStyle
+  };
+}
+
 export function setPatchApprovalRequired(
   settings: GomiOfficeSettings,
   requirePatchApproval: boolean
@@ -491,6 +512,7 @@ export function normalizeGomiOfficeSettings(value: unknown): GomiOfficeSettings 
   const rawSettings = value as Partial<GomiOfficeSettings>;
   let normalizedSettings: GomiOfficeSettings = {
     ...DEFAULT_GOMI_OFFICE_SETTINGS,
+    avatarStyle: avatarStyleSetting(rawSettings.avatarStyle),
     seats: normalizeSeatSettings(rawSettings.seats)
   };
   const rawMemory: Record<string, unknown> = isRecord(rawSettings.memory) ? rawSettings.memory : {};
@@ -770,6 +792,12 @@ function memoryPrivacyModeSetting(value: unknown): GomiMemoryPrivacyMode {
   return value === 'strict' || value === 'standard'
     ? value
     : DEFAULT_GOMI_OFFICE_SETTINGS.memory.privacyMode;
+}
+
+function avatarStyleSetting(value: unknown): GomiAvatarStyle {
+  return GOMI_AVATAR_STYLE_OPTIONS.some((option) => option.id === value)
+    ? value as GomiAvatarStyle
+    : DEFAULT_GOMI_OFFICE_SETTINGS.avatarStyle;
 }
 
 function workspaceTrustSetting(value: unknown): GomiWorkspaceTrustState {

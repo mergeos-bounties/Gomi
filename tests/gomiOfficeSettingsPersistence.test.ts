@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GOMI_OFFICE_SETTINGS,
+  setAvatarStyle,
   setMemoryEmbeddingExecutionEnabled,
   setMemoryEmbeddingProvider,
   setSeatWorkMode
@@ -37,13 +38,17 @@ describe('Gomi office settings persistence', () => {
 
   it('falls back to browser local storage for the standalone office demo', () => {
     const localStorage = new MemoryLocalStorage();
-    const settings = setSeatWorkMode(DEFAULT_GOMI_OFFICE_SETTINGS, 'head-frontend', 'sleeping');
+    const settings = setAvatarStyle(
+      setSeatWorkMode(DEFAULT_GOMI_OFFICE_SETTINGS, 'head-frontend', 'sleeping'),
+      'initials'
+    );
 
     persistOfficeSettings(settings, { localStorage });
 
     const restoredSettings = loadPersistedOfficeSettings({ localStorage });
 
     expect(restoredSettings.seats.find((seat) => seat.id === 'head-frontend')?.workMode).toBe('sleeping');
+    expect(restoredSettings.avatarStyle).toBe('initials');
   });
 
   it('normalizes corrupted persisted payloads back to safe defaults', () => {

@@ -29,7 +29,8 @@ import {
   simulateStaffingScenario,
   setWorkspaceTrustState,
   setSharedMemoryEnabled,
-  setWorkspaceContextIndexing
+  setWorkspaceContextIndexing,
+  setAvatarStyle
 } from '../src/vs/workbench/contrib/gomi/common/gomiOfficeSettings';
 
 describe('Gomi office settings', () => {
@@ -166,6 +167,23 @@ describe('Gomi office settings', () => {
     expect(httpEmbeddings.memory.embeddingExecutionEnabled).toBe(true);
     expect(localHashing.memory.embeddingProvider).toBe('local-hashing');
     expect(localHashing.memory.embeddingExecutionEnabled).toBe(false);
+  });
+
+  it('updates and normalizes persisted avatar style settings', () => {
+    const geometricSettings = setAvatarStyle(DEFAULT_GOMI_OFFICE_SETTINGS, 'geometric');
+    const initialsSettings = normalizeGomiOfficeSettings({
+      ...geometricSettings,
+      avatarStyle: 'initials'
+    });
+    const unsafeSettings = normalizeGomiOfficeSettings({
+      ...geometricSettings,
+      avatarStyle: 'remote-image'
+    });
+
+    expect(DEFAULT_GOMI_OFFICE_SETTINGS.avatarStyle).toBe('emoji');
+    expect(geometricSettings.avatarStyle).toBe('geometric');
+    expect(initialsSettings.avatarStyle).toBe('initials');
+    expect(unsafeSettings.avatarStyle).toBe(DEFAULT_GOMI_OFFICE_SETTINGS.avatarStyle);
   });
 
   it('normalizes persisted settings across versions and rejects unsafe seat state', () => {

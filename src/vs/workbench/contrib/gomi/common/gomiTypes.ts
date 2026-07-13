@@ -29,6 +29,7 @@ export type GomiPatchApprovalStatus =
 export type GomiPatchRiskLevel = 'low' | 'medium' | 'high';
 export type GomiMemoryKind = 'request' | 'workspace' | 'agent_result' | 'patch' | 'report';
 export type GomiMemoryPrivacyMode = 'standard' | 'strict';
+export type GomiAvatarStyle = 'emoji' | 'geometric' | 'initials';
 export type GomiAgentCliProviderId =
   | 'codex-cli'
   | 'claude-code'
@@ -104,6 +105,7 @@ export interface GomiOfficeExecutionSettings {
 }
 
 export interface GomiOfficeSettings {
+  avatarStyle: GomiAvatarStyle;
   seats: GomiAgentSeat[];
   memory: GomiOfficeMemorySettings;
   execution: GomiOfficeExecutionSettings;

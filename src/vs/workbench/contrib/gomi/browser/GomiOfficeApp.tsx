@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { BASE_GOMI_AGENTS, GOMI_SAMPLE_REQUEST } from '../common/gomiConstants';
 import {
+  GOMI_AVATAR_STYLE_OPTIONS,
   GOMI_AGENT_CLI_PROVIDERS,
   GOMI_HIRABLE_DEPARTMENT_IDS,
   GOMI_MEMORY_EMBEDDING_PROVIDERS,
@@ -56,6 +57,7 @@ import {
   setMemoryEmbeddingProvider,
   setMemoryPrivacyMode,
   setMemoryRetentionDays,
+  setAvatarStyle,
   setPatchApprovalRequired,
   setSeatWorkMode,
   setSecretRedactionEnabled,
@@ -67,6 +69,7 @@ import {
 import type {
   GomiAgent,
   GomiAgentCliProviderId,
+  GomiAvatarStyle,
   GomiAgentId,
   GomiAgentSeat,
   GomiChatMessage,
@@ -550,6 +553,10 @@ export function GomiOfficeApp() {
     );
   }
 
+  function updateAvatarStyle(avatarStyle: GomiAvatarStyle) {
+    setOfficeSettings((currentSettings) => setAvatarStyle(currentSettings, avatarStyle));
+  }
+
   function updatePatchApprovalRequired(requirePatchApproval: boolean) {
     setOfficeSettings((currentSettings) =>
       setPatchApprovalRequired(currentSettings, requirePatchApproval)
@@ -783,6 +790,7 @@ export function GomiOfficeApp() {
           onSecretRedactionChange={updateSecretRedaction}
           onMemoryRetentionDaysChange={updateMemoryRetentionDays}
           onMaxProjectMemoryItemsChange={updateMaxProjectMemoryItems}
+          onAvatarStyleChange={updateAvatarStyle}
           onPatchApprovalRequiredChange={updatePatchApprovalRequired}
           onWorkspaceTrustChange={updateWorkspaceTrust}
           onLiveProviderModeChange={updateLiveProviderMode}
@@ -899,6 +907,7 @@ function RightPanel({
   onSecretRedactionChange,
   onMemoryRetentionDaysChange,
   onMaxProjectMemoryItemsChange,
+  onAvatarStyleChange,
   onPatchApprovalRequiredChange,
   onWorkspaceTrustChange,
   onLiveProviderModeChange,
@@ -933,6 +942,7 @@ function RightPanel({
   onSecretRedactionChange: (redactSecrets: boolean) => void;
   onMemoryRetentionDaysChange: (retentionDays: number) => void;
   onMaxProjectMemoryItemsChange: (maxProjectMemoryItems: number) => void;
+  onAvatarStyleChange: (avatarStyle: GomiAvatarStyle) => void;
   onPatchApprovalRequiredChange: (requirePatchApproval: boolean) => void;
   onWorkspaceTrustChange: (workspaceTrust: GomiWorkspaceTrustState) => void;
   onLiveProviderModeChange: (liveProviderMode: GomiLiveProviderMode) => void;
@@ -1001,6 +1011,7 @@ function RightPanel({
           onSecretRedactionChange={onSecretRedactionChange}
           onMemoryRetentionDaysChange={onMemoryRetentionDaysChange}
           onMaxProjectMemoryItemsChange={onMaxProjectMemoryItemsChange}
+          onAvatarStyleChange={onAvatarStyleChange}
           onPatchApprovalRequiredChange={onPatchApprovalRequiredChange}
           onWorkspaceTrustChange={onWorkspaceTrustChange}
           onLiveProviderModeChange={onLiveProviderModeChange}
@@ -1071,6 +1082,7 @@ function OfficeSettingsPanel({
   onSecretRedactionChange,
   onMemoryRetentionDaysChange,
   onMaxProjectMemoryItemsChange,
+  onAvatarStyleChange,
   onPatchApprovalRequiredChange,
   onWorkspaceTrustChange,
   onLiveProviderModeChange,
@@ -1101,6 +1113,7 @@ function OfficeSettingsPanel({
   onSecretRedactionChange: (redactSecrets: boolean) => void;
   onMemoryRetentionDaysChange: (retentionDays: number) => void;
   onMaxProjectMemoryItemsChange: (maxProjectMemoryItems: number) => void;
+  onAvatarStyleChange: (avatarStyle: GomiAvatarStyle) => void;
   onPatchApprovalRequiredChange: (requirePatchApproval: boolean) => void;
   onWorkspaceTrustChange: (workspaceTrust: GomiWorkspaceTrustState) => void;
   onLiveProviderModeChange: (liveProviderMode: GomiLiveProviderMode) => void;
@@ -1133,6 +1146,24 @@ function OfficeSettingsPanel({
       <div className="gomi-panel-header">
         <span>Office Settings</span>
         <Settings size={16} />
+      </div>
+
+      <div className="gomi-settings-group">
+        <div className="gomi-settings-title">Office Appearance</div>
+        <div className="gomi-avatar-style-controls" role="radiogroup" aria-label="Agent avatar style">
+          {GOMI_AVATAR_STYLE_OPTIONS.map((option) => (
+            <button
+              className={officeSettings.avatarStyle === option.id ? 'is-active' : ''}
+              key={option.id}
+              type="button"
+              role="radio"
+              aria-checked={officeSettings.avatarStyle === option.id}
+              onClick={() => onAvatarStyleChange(option.id)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="gomi-settings-group">
