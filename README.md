@@ -409,7 +409,7 @@ Stack: **TypeScript** · **React + Vite** · **Phaser** · **Lucide** · **Vites
 See [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md).  
 Changelog: [CHANGELOG.md](CHANGELOG.md).
 
-MergeOS bounties: star this repo + [mergeos](https://github.com/mergeos-bounties/mergeos), claim open issues, PR to **master**.
+MergeOS bounties: **follow** [mergeos-bounties](https://github.com/mergeos-bounties) + star [mergeos](https://github.com/mergeos-bounties/mergeos) + [mergeos-contracts](https://github.com/mergeos-bounties/mergeos-contracts), claim open issues, PR to **master**.
 
 ---
 
