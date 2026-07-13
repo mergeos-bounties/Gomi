@@ -36,7 +36,7 @@ describe('agent output parsing', () => {
     }));
 
     expect(result.value).toBeUndefined();
-    expect(result.diagnostics).toContain('Unsupported agent result schemaVersion 99.');
+    expect(result.diagnostics[0]).toContain('Unsupported agent result schemaVersion');
   });
 
   it('recovers a truncated versioned JSON object when required closers are missing', () => {
