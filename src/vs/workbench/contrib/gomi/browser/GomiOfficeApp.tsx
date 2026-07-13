@@ -107,6 +107,10 @@ import {
 import { resolveGomiWebviewBridgeContext } from './gomiWebviewBridge';
 import { PhaserOffice } from './PhaserOffice';
 import { formatGomiTaskStatusLabel } from './gomiTaskView';
+import {
+  enqueueStatusToast,
+  type GomiStatusToast
+} from './gomiStatusToasts';
 
 const activityItems = [
   { id: 'explorer', label: 'Explorer', Icon: Files },
@@ -148,6 +152,8 @@ export function GomiOfficeApp() {
   );
   const workbenchBridge = workbenchContext?.bridge;
   const localAbortControllerRef = useRef<AbortController | null>(null);
+  const agentStatusesRef = useRef(new Map(BASE_GOMI_AGENTS.map((agent) => [agent.id, agent.status])));
+  const nextToastIdRef = useRef(1);
   const [request, setRequest] = useState(GOMI_SAMPLE_REQUEST);
   const [isRunning, setIsRunning] = useState(false);
   const [agents, setAgents] = useState<GomiAgent[]>(() =>
@@ -162,6 +168,7 @@ export function GomiOfficeApp() {
   const [memoryPruneReport, setMemoryPruneReport] = useState<GomiRuntimeMemoryPruneReport | undefined>();
   const [memoryPruneError, setMemoryPruneError] = useState<string | undefined>();
   const [isPruningMemory, setIsPruningMemory] = useState(false);
+  const [statusToasts, setStatusToasts] = useState<GomiStatusToast[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => isCompactAgentPanelViewport());
   const [bottomCollapsed, setBottomCollapsed] = useState(false);
@@ -302,6 +309,8 @@ export function GomiOfficeApp() {
     setReport(undefined);
     setPatchReview(undefined);
     setWorkspace(undefined);
+    setStatusToasts([]);
+    agentStatusesRef.current = new Map(BASE_GOMI_AGENTS.map((agent) => [agent.id, agent.status]));
 
     if (workbenchBridge) {
       workbenchBridge.postMessage({
@@ -427,6 +436,8 @@ export function GomiOfficeApp() {
     }
 
     if (event.type === 'agent_status') {
+      queueAgentStatusToast(event.agentId, event.status);
+
       setAgents((currentAgents) =>
         currentAgents.map((agent) =>
           agent.id === event.agentId
@@ -437,6 +448,12 @@ export function GomiOfficeApp() {
     }
 
     if (event.type === 'session_stopped') {
+      for (const [agentId, status] of agentStatusesRef.current) {
+        if (['planning', 'working', 'waiting', 'reviewing'].includes(status)) {
+          queueAgentStatusToast(agentId, 'blocked');
+        }
+      }
+
       setAgents((currentAgents) =>
         currentAgents.map((agent) =>
           ['planning', 'working', 'waiting', 'reviewing'].includes(agent.status)
@@ -472,6 +489,33 @@ export function GomiOfficeApp() {
     if (event.type === 'report') {
       setReport(event.report);
     }
+  }
+
+  function queueAgentStatusToast(agentId: GomiAgentId, status: GomiAgent['status']) {
+    const previousStatus = agentStatusesRef.current.get(agentId);
+    agentStatusesRef.current.set(agentId, status);
+
+    if (previousStatus === status || (status !== 'done' && status !== 'blocked')) {
+      return;
+    }
+
+    const agent = BASE_GOMI_AGENTS.find((candidate) => candidate.id === agentId);
+    setStatusToasts((currentToasts) =>
+      enqueueStatusToast(currentToasts, {
+        id: nextToastIdRef.current++,
+        agentId,
+        agentName: agent?.name ?? agentId,
+        status
+      })
+    );
+  }
+
+  function focusAgent(agentId: GomiAgentId) {
+    setOfficeViewMode('standard');
+    setRightPanelCollapsed(false);
+    globalThis.setTimeout(() => {
+      globalThis.document?.getElementById(`gomi-agent-${agentId}`)?.focus();
+    });
   }
 
   function assignProvider(seatId: string, providerId: GomiAgentCliProviderId) {
@@ -804,6 +848,25 @@ export function GomiOfficeApp() {
         />
       </div>
 
+      <div className="gomi-toast-stack" aria-live="polite" aria-label="Agent status updates">
+        {statusToasts.map((toast) => (
+          <div className="gomi-toast" data-status={toast.status} key={toast.id}>
+            <button className="gomi-toast__focus" onClick={() => focusAgent(toast.agentId)}>
+              <strong>{toast.agentName}</strong>
+              <span>{toast.status === 'done' ? 'Finished' : 'Blocked'}</span>
+            </button>
+            <button
+              className="gomi-icon-button"
+              onClick={() => setStatusToasts((toasts) => toasts.filter((item) => item.id !== toast.id))}
+              title="Dismiss status update"
+              aria-label={`Dismiss ${toast.agentName} status update`}
+            >
+              <XCircle size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
+
       <footer className="gomi-statusbar">
         <span>{workbenchBridge ? 'Gomi Workbench Bridge' : 'Gomi Demo Runtime'}</span>
         <span>{isRunning ? 'Agents working' : 'Ready'}</span>
@@ -1032,7 +1095,7 @@ function AgentRow({ agent }: { agent: GomiAgent }) {
   const Icon = agent.status === 'sleeping' ? Bed : iconForAgent(agent.id);
 
   return (
-    <div className="gomi-agent-row">
+    <div className="gomi-agent-row" id={`gomi-agent-${agent.id}`} tabIndex={-1}>
       <div className="gomi-agent-avatar">
         <Icon size={17} />
       </div>

@@ -66,6 +66,53 @@ button {
   gap: 10px;
 }
 
+.gomi-toast-stack {
+  position: fixed;
+  top: 46px;
+  right: 12px;
+  z-index: 50;
+  display: grid;
+  width: min(320px, calc(100vw - 24px));
+  gap: 8px;
+}
+
+.gomi-toast {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: center;
+  border: 1px solid #334155;
+  border-left: 4px solid #22c55e;
+  border-radius: 6px;
+  background: #111827;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  color: #f8fafc;
+}
+
+.gomi-toast[data-status='blocked'] {
+  border-left-color: #f43f5e;
+}
+
+.gomi-toast__focus {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.gomi-toast__focus span {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.gomi-agent-row:focus {
+  outline: 2px solid #2dd4bf;
+  outline-offset: 2px;
+}
+
 .gomi-logo {
   display: inline-grid;
   place-items: center;
