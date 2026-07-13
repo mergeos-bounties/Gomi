@@ -14,6 +14,7 @@
     "generate:brand-assets": "node scripts/generate-gomi-brand-assets.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
+    "test:e2e": "npx playwright test",
     "typecheck": "tsc -b",
     "verify:release": "vitest run tests/releaseReadiness.test.ts tests/codeOssIntegrationManifest.test.ts tests/codeOssIntegrationDryRun.test.ts",
     "electron:start": "electron .",

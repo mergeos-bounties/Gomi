@@ -104,6 +104,15 @@ npm run electron:start
 # or: npm run desktop:build   # NSIS installer under release/desktop/
 ```
 
+End-to-end tests (Playwright, headless Chromium):
+
+```bash
+npx playwright install chromium   # one-time browser download
+npm run test:e2e                  # runs e2e/ specs against Vite dev server
+```
+
+The `test:e2e` script starts the Vite dev server automatically (or reuses a running one on port 5173). Tests cover app startup, a full demo CEO session, and layout mode toggling.
+
 Quality gate (matches CI):
 
 ```bash
