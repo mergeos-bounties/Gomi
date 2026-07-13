@@ -129,6 +129,53 @@ describe('Node CLI agent provider', () => {
     );
     expect(designerSummaries).toContain('designer via Gemini CLI');
   });
+
+  it('streams CLI stdout chunks via onChunk when enabled', async () => {
+    const chunks: string[] = [];
+    const provider = createNodeCliGomiAgentProvider({
+      enabled: true,
+      commandRunner: async (invocation, _signal, throttle) => {
+        throttle?.push('line-1\n');
+        throttle?.push('line-2\n');
+        throttle?.push('line-3\n');
+
+        return {
+          stdout: 'line-1\nline-2\nline-3\n',
+          stderr: '',
+          exitCode: 0
+        };
+      }
+    });
+
+    expect(provider.capabilities.streaming).toBe(true);
+
+    const result = await provider.runAgentTask({
+      ...createRunContext('backend', 'codex'),
+      onChunk: (chunk) => chunks.push(chunk)
+    });
+
+    expect(result.summary.length).toBeGreaterThan(0);
+    expect(chunks.join('')).toBe('line-1\nline-2\nline-3\n');
+  });
+
+  it('does not throw when onChunk is omitted', async () => {
+    const provider = createNodeCliGomiAgentProvider({
+      enabled: true,
+      commandRunner: async (_invocation, _signal, throttle) => {
+        throttle?.push('partial output\n');
+
+        return {
+          stdout: 'final result',
+          stderr: '',
+          exitCode: 0
+        };
+      }
+    });
+
+    await expect(
+      provider.runAgentTask(createRunContext('backend', 'codex'))
+    ).resolves.toMatchObject({ agentId: 'backend' });
+  });
 });
 
 function createRunContext(agentId: GomiAgentId, command: string): GomiAgentRunContext {
