@@ -758,6 +758,46 @@ button {
   white-space: nowrap;
 }
 
+.gomi-settings-toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.gomi-settings-toolbar label.gomi-action-button {
+  cursor: pointer;
+}
+
+.gomi-provider-status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0;
+}
+
+.gomi-provider-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #1e293b;
+  color: #64748b;
+  border: 1px solid #334155;
+}
+
+.gomi-provider-badge.is-active {
+  background: #0f2e1a;
+  color: #4ade80;
+  border-color: #166534;
+}
+
+.gomi-provider-badge-count {
+  font-size: 10px;
+  color: #475569;
+  padding: 2px 4px;
+}
+
 .gomi-seat-row {
   border-top: 1px solid #253247;
   padding-top: 10px;

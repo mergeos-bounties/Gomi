@@ -6,12 +6,14 @@ import {
   ClipboardList,
   Code2,
   Database,
+  Download,
   Bed,
   FileDiff,
   Files,
   GitBranch,
   Maximize2,
   Minimize2,
+  Upload,
   Moon,
   PanelBottomClose,
   PanelBottomOpen,
@@ -104,6 +106,10 @@ import {
   loadPersistedOfficeSettings,
   persistOfficeSettings
 } from './gomiOfficeSettingsPersistence';
+import {
+  exportSettingsToJson,
+  importSettingsFromJson
+} from '../common/gomiOfficeSettingsExport';
 import { resolveGomiWebviewBridgeContext } from './gomiWebviewBridge';
 import { PhaserOffice } from './PhaserOffice';
 import { formatGomiTaskStatusLabel } from './gomiTaskView';
@@ -516,6 +522,34 @@ export function GomiOfficeApp() {
     globalThis.setTimeout(() => {
       globalThis.document?.getElementById(`gomi-agent-${agentId}`)?.focus();
     });
+  }
+
+  function handleExportSettings() {
+    const json = exportSettingsToJson(officeSettings);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = globalThis.document?.createElement('a');
+    if (a) {
+      a.href = url;
+      a.download = 'gomi-office-settings.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  function handleImportSettings(file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const settings = importSettingsFromJson(reader.result as string);
+        setOfficeSettings(settings);
+      } catch (err) {
+        globalThis.alert?.(
+          `Failed to import settings: ${err instanceof Error ? err.message : 'Unknown error'}`
+        );
+      }
+    };
+    reader.readAsText(file);
   }
 
   function assignProvider(seatId: string, providerId: GomiAgentCliProviderId) {
@@ -1060,6 +1094,8 @@ function RightPanel({
           memoryPruneReport={memoryPruneReport}
           memoryPruneError={memoryPruneError}
           isPruningMemory={isPruningMemory}
+          onExportSettings={handleExportSettings}
+          onImportSettings={handleImportSettings}
           onProviderChange={onProviderChange}
           onToggleSeatSleep={onToggleSeatSleep}
           onHireEmployee={onHireEmployee}
@@ -1125,6 +1161,57 @@ function TaskRow({ task }: { task: GomiTask }) {
   );
 }
 
+function ProviderStatusBar({ officeSettings }: { officeSettings: GomiOfficeSettings }) {
+  const badges: Array<{ label: string; active: boolean; title: string }> = [
+    {
+      label: 'CLI',
+      active: officeSettings.execution.allowCliProviders,
+      title: officeSettings.execution.allowCliProviders ? 'CLI providers enabled' : 'CLI providers disabled'
+    },
+    {
+      label: 'HTTP',
+      active: officeSettings.execution.allowHttpProviders,
+      title: officeSettings.execution.allowHttpProviders ? 'HTTP providers enabled' : 'HTTP providers disabled'
+    },
+    {
+      label: officeSettings.execution.liveProviderMode === 'demo-only'
+        ? 'Demo'
+        : officeSettings.execution.liveProviderMode === 'trusted-workspaces'
+          ? 'Trusted'
+          : 'All',
+      active: officeSettings.execution.liveProviderMode !== 'demo-only',
+      title: `Live provider mode: ${officeSettings.execution.liveProviderMode}`
+    },
+    {
+      label: officeSettings.memory.embeddingProvider === 'local-hashing' ? 'Local' : 'Remote',
+      active: officeSettings.memory.embeddingProvider !== 'local-hashing',
+      title: `Embedding: ${getMemoryEmbeddingProviderLabel(officeSettings.memory.embeddingProvider)}`
+    },
+    {
+      label: 'Patch',
+      active: !officeSettings.memory.requirePatchApproval,
+      title: officeSettings.memory.requirePatchApproval ? 'Patch approval required' : 'Auto-apply enabled'
+    }
+  ];
+
+  const activeCount = badges.filter((b) => b.active).length;
+
+  return (
+    <div className="gomi-provider-status-bar" aria-label="Provider status">
+      {badges.map((badge) => (
+        <span
+          key={badge.label}
+          className={`gomi-provider-badge${badge.active ? ' is-active' : ''}`}
+          title={badge.title}
+        >
+          {badge.active ? '●' : '○'} {badge.label}
+        </span>
+      ))}
+      <span className="gomi-provider-badge-count" title="Active providers">{activeCount} active</span>
+    </div>
+  );
+}
+
 function OfficeSettingsPanel({
   officeSettings,
   memoryItems,
@@ -1162,6 +1249,8 @@ function OfficeSettingsPanel({
   memoryPruneReport?: GomiRuntimeMemoryPruneReport;
   memoryPruneError?: string;
   isPruningMemory: boolean;
+  onExportSettings: () => void;
+  onImportSettings: (file: File) => void;
   onProviderChange: (seatId: string, providerId: GomiAgentCliProviderId) => void;
   onToggleSeatSleep: (seat: GomiAgentSeat) => void;
   onHireEmployee: (departmentId: GomiAgentId) => void;
@@ -1211,6 +1300,29 @@ function OfficeSettingsPanel({
         <span>Office Settings</span>
         <Settings size={16} />
       </div>
+
+      <div className="gomi-settings-toolbar">
+        <button className="gomi-action-button" onClick={onExportSettings}>
+          <Download size={14} />
+          <span>Export</span>
+        </button>
+        <label className="gomi-action-button">
+          <Upload size={14} />
+          <span>Import</span>
+          <input
+            type="file"
+            accept=".json"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onImportSettings(file);
+              e.target.value = '';
+            }}
+          />
+        </label>
+      </div>
+
+      <ProviderStatusBar officeSettings={officeSettings} />
 
       <div className="gomi-settings-group">
         <div className="gomi-settings-title">Office Appearance</div>
