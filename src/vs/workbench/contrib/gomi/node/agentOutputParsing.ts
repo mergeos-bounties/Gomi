@@ -2,6 +2,7 @@ import type {
   GomiAgentResult,
   GomiAgentResultSchemaVersion
 } from '../common/gomiTypes';
+import { validateAgentResult, type AgentResultValidationResult } from '../common/gomiAgentResultSchema';
 
 export const GOMI_AGENT_RESULT_SCHEMA_VERSION = 1 satisfies GomiAgentResultSchemaVersion;
 
@@ -32,7 +33,7 @@ export function parseAgentResultJsonWithDiagnostics(text: string): GomiAgentResu
     const parsed = tryParseObject(candidate);
 
     if (parsed.value) {
-      return normalizeAgentResultObject(parsed.value);
+      return normalizeWithSchema(parsed.value);
     }
 
     diagnostics.push(parsed.error ?? 'Agent result JSON candidate could not be parsed.');
@@ -45,7 +46,7 @@ export function parseAgentResultJsonWithDiagnostics(text: string): GomiAgentResu
     const parsed = tryParseObject(completedCandidate);
 
     if (parsed.value) {
-      const normalized = normalizeAgentResultObject(parsed.value);
+      const normalized = normalizeWithSchema(parsed.value);
       return {
         value: normalized.value,
         diagnostics: [
@@ -62,6 +63,25 @@ export function parseAgentResultJsonWithDiagnostics(text: string): GomiAgentResu
     diagnostics: diagnostics.length > 0
       ? diagnostics
       : ['No agent result JSON object was found.']
+  };
+}
+
+/**
+ * Run the parsed object through the Zod schema validator.
+ * Merges schema validation errors/warnings into the diagnostics stream.
+ */
+function normalizeWithSchema(value: AgentResultRecord): GomiAgentResultParseResult {
+  const validation = validateAgentResult(value);
+
+  // Schema validation errors are fatal — no value returned
+  if (validation.errors.length > 0) {
+    return { diagnostics: validation.errors };
+  }
+
+  // Return validated value with any warnings as diagnostics
+  return {
+    value: (validation.value ?? value) as Partial<GomiAgentResult>,
+    diagnostics: validation.warnings
   };
 }
 
