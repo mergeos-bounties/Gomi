@@ -1164,3 +1164,97 @@ button {
     border-top: 1px solid #1f2937;
   }
 }
+
+/* ===== Help Overlay ===== */
+.help-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.help-overlay-card {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 420px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.help-overlay-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.help-overlay-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #f3f4f6;
+}
+
+.help-overlay-close {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+.help-overlay-close:hover {
+  color: #e5e7eb;
+}
+
+.help-overlay-body {
+  color: #d1d5db;
+}
+
+.help-overlay-body table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.help-overlay-body th {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid #374151;
+  color: #9ca3af;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.help-overlay-body td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #2d3748;
+}
+
+.help-overlay-body kbd {
+  display: inline-block;
+  background: #374151;
+  border: 1px solid #4b5563;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: #e5e7eb;
+}
+
+.help-overlay-hint {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
