@@ -22,6 +22,7 @@ Fork Code - OSS → rebrand as Gomi IDE → customize workbench
 
 - [Highlights](#highlights)
 - [Screenshots](#screenshots)
+- [First run on Windows](docs/windows-first-run.md)
 - [Product vision](#product-vision)
 - [Quick start](#quick-start)
 - [Desktop product path](#desktop-product-path)
@@ -67,6 +68,14 @@ Fork Code - OSS → rebrand as Gomi IDE → customize workbench
 <p align="center"><em>Full office layout with status wall and department rooms</em></p>
 
 ---
+
+
+
+### First run on Windows
+
+New to Gomi IDE on Windows? See [docs/windows-first-run.md](docs/windows-first-run.md)
+for a 10-minute walkthrough covering Node 22 setup, repository clone, `npm ci`,
+prototype launch, smoke tests, and the most common Windows-specific traps.
 
 ## Product vision
 
