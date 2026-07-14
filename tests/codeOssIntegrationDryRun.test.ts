@@ -85,9 +85,15 @@ describe('Code - OSS integration dry-run reporting', () => {
         rollbackActions?: unknown[];
       };
 
+      const norm = (p?: string) => (p || '').replace(/\\/g, '/');
       expect(report.dryRun).toBe(true);
       expect(report.actions?.some((action) => action.kind === 'merge-product-json')).toBe(true);
-      expect(report.actions?.some((action) => action.destination?.endsWith('src/vs/workbench/contrib/gomi'))).toBe(true);
+      // Windows dry-run reports use backslashes; normalize before endsWith checks.
+      expect(
+        report.actions?.some((action) =>
+          norm(action.destination).endsWith('src/vs/workbench/contrib/gomi'),
+        ),
+      ).toBe(true);
       expect(report.rollbackActions?.length).toBeGreaterThan(0);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
