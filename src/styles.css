@@ -1164,3 +1164,105 @@ button {
     border-top: 1px solid #1f2937;
   }
 }
+
+.gomi-shortcuts-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.gomi-shortcuts-modal {
+  width: min(720px, calc(100vw - 48px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  background: #0f172a;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  padding: 18px;
+}
+
+.gomi-shortcuts-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #1f2937;
+  padding-bottom: 14px;
+}
+
+.gomi-shortcuts-modal h2,
+.gomi-shortcuts-modal h3,
+.gomi-shortcuts-modal p,
+.gomi-shortcuts-modal dl {
+  margin: 0;
+}
+
+.gomi-eyebrow {
+  color: #2dd4bf;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.gomi-shortcuts-modal h2 {
+  color: #f9fafb;
+  font-size: 22px;
+}
+
+.gomi-shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+  padding-top: 16px;
+}
+
+.gomi-shortcuts-group {
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.72);
+  padding: 12px;
+}
+
+.gomi-shortcuts-group h3 {
+  color: #e2e8f0;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.gomi-shortcut-row {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 7px 0;
+  border-top: 1px solid rgba(51, 65, 85, 0.48);
+}
+
+.gomi-shortcut-row:first-child {
+  border-top: 0;
+}
+
+.gomi-shortcut-row kbd {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 82px;
+  border: 1px solid #475569;
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: #111827;
+  color: #f8fafc;
+  font: 700 11px/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  padding: 2px 7px;
+}
+
+.gomi-shortcut-row dd {
+  color: #cbd5e1;
+  font-size: 12px;
+  margin: 0;
+}

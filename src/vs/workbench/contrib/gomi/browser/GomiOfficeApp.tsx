@@ -10,6 +10,7 @@ import {
   FileDiff,
   Files,
   GitBranch,
+  Keyboard,
   Maximize2,
   Minimize2,
   Moon,
@@ -85,6 +86,7 @@ import type {
   GomiWorkspaceTrustState,
   GomiWorkspaceSnapshot
 } from '../common/gomiTypes';
+import { gomiShortcutGroups } from '../common/gomiKeyboardShortcuts';
 import { GomiAgentRuntime, type GomiRuntimeMemoryPruneReport } from '../node/agentRuntime';
 import {
   approvePatchReview,
@@ -173,6 +175,7 @@ export function GomiOfficeApp() {
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => isCompactAgentPanelViewport());
   const [bottomCollapsed, setBottomCollapsed] = useState(false);
   const [officeViewMode, setOfficeViewMode] = useState<GomiOfficeViewMode>('standard');
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const sidePanelsAutoCollapsed = officeViewMode !== 'standard';
   const bottomAutoCollapsed = officeViewMode === 'full-office';
   const effectiveSidebarCollapsed = sidebarCollapsed || sidePanelsAutoCollapsed;
@@ -293,6 +296,69 @@ export function GomiOfficeApp() {
       stateStore: workbenchContext?.stateStore
     });
   }, [officeSettings, workbenchContext]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isTyping = Boolean(
+        target?.closest?.('textarea, input, select, [contenteditable="true"]')
+      );
+
+      if (event.key === 'Escape' && showShortcutHelp) {
+        event.preventDefault();
+        setShowShortcutHelp(false);
+        return;
+      }
+
+      if (isTyping) {
+        return;
+      }
+
+      const usesPrimaryModifier = event.metaKey || event.ctrlKey;
+      if (event.key === '?' || (event.shiftKey && event.key === '/')) {
+        event.preventDefault();
+        setShowShortcutHelp(true);
+        return;
+      }
+      if (usesPrimaryModifier && event.key === 'Enter') {
+        event.preventDefault();
+        void runOfficeSession();
+        return;
+      }
+      if (usesPrimaryModifier && event.key === '1') {
+        event.preventDefault();
+        toggleSidebarPanel();
+        return;
+      }
+      if (usesPrimaryModifier && event.key === '2') {
+        event.preventDefault();
+        toggleBottomPanel();
+        return;
+      }
+      if (usesPrimaryModifier && event.key === '3') {
+        event.preventDefault();
+        toggleRightPanel();
+        return;
+      }
+      if (event.altKey && event.key === '1') {
+        event.preventDefault();
+        setLayoutMode('standard');
+        return;
+      }
+      if (event.altKey && event.key === '2') {
+        event.preventDefault();
+        setLayoutMode('expanded');
+        return;
+      }
+      if (event.altKey && event.key === '3') {
+        event.preventDefault();
+        setLayoutMode('full-office');
+      }
+    };
+
+    globalThis.addEventListener?.('keydown', onKeyDown);
+    return () => globalThis.removeEventListener?.('keydown', onKeyDown);
+  }, [showShortcutHelp, request, isRunning, effectiveSidebarCollapsed, effectiveBottomCollapsed, effectiveRightPanelCollapsed]);
 
   async function runOfficeSession() {
     const trimmedRequest = request.trim();
@@ -749,6 +815,14 @@ export function GomiOfficeApp() {
               >
                 {effectiveRightPanelCollapsed ? <PanelRightOpen size={18} /> : <PanelRightClose size={18} />}
               </button>
+              <button
+                className="gomi-icon-button"
+                onClick={() => setShowShortcutHelp(true)}
+                title="Keyboard shortcuts"
+                aria-label="Open keyboard shortcuts"
+              >
+                <Keyboard size={18} />
+              </button>
               <div className="gomi-view-mode-controls" role="group" aria-label="Office layout mode">
                 {officeViewModes.map(({ id, label, Icon }) => (
                   <button
@@ -867,10 +941,53 @@ export function GomiOfficeApp() {
         ))}
       </div>
 
+      {showShortcutHelp ? <ShortcutHelpOverlay onClose={() => setShowShortcutHelp(false)} /> : undefined}
+
       <footer className="gomi-statusbar">
         <span>{workbenchBridge ? 'Gomi Workbench Bridge' : 'Gomi Demo Runtime'}</span>
         <span>{isRunning ? 'Agents working' : 'Ready'}</span>
       </footer>
+    </div>
+  );
+}
+
+function ShortcutHelpOverlay({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="gomi-shortcuts-backdrop" role="presentation" onClick={onClose}>
+      <section
+        className="gomi-shortcuts-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="gomi-shortcuts-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="gomi-shortcuts-modal__header">
+          <div>
+            <p className="gomi-eyebrow">Keyboard reference</p>
+            <h2 id="gomi-shortcuts-title">Gomi Office shortcuts</h2>
+          </div>
+          <button className="gomi-icon-button" onClick={onClose} aria-label="Close keyboard shortcuts">
+            <XCircle size={18} />
+          </button>
+        </div>
+        <div className="gomi-shortcuts-grid">
+          {gomiShortcutGroups.map((group) => (
+            <div className="gomi-shortcuts-group" key={group.title}>
+              <h3>{group.title}</h3>
+              <dl>
+                {group.shortcuts.map((shortcut) => (
+                  <div className="gomi-shortcut-row" key={shortcut.keys}>
+                    <dt>
+                      <kbd>{shortcut.keys}</kbd>
+                    </dt>
+                    <dd>{shortcut.action}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
