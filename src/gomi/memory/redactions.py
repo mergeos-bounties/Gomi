@@ -1,3 +1,9 @@
+"""Privacy redactions for shared project memory.
+
+NOTE: This module contains regex patterns for DETECTING secrets.
+The patterns themselves (like ghp_, sk-) are not actual secrets -
+they are used to identify and redact real secrets in text.
+"""
 """Privacy redactions for shared project memory."""
 
 import re
