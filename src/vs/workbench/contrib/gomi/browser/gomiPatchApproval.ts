@@ -1,4 +1,4 @@
-import type { GomiPatchApprovalStatus, GomiPatchPreviewResult, GomiPatchProposal } from '../common/gomiTypes';
+import type { GomiPatchApprovalStatus, GomiPatchPreviewResult, GomiPatchProposal, GomiPatchRiskLevel } from '../common/gomiTypes';
 
 export type GomiDiffLineKind = 'addition' | 'deletion' | 'hunk' | 'meta' | 'context';
 export type GomiPatchPreviewStatus = 'idle' | 'opening' | 'opened' | 'failed';
@@ -154,4 +154,55 @@ export function getDiffLineKind(line: string): GomiDiffLineKind {
   }
 
   return 'context';
+}
+
+// ── Patch approval queue filters ────────────────────────────────────────────
+
+export function filterPatchesByFilePath(
+  patches: GomiPatchReviewState[],
+  query: string,
+): GomiPatchReviewState[] {
+  if (!query.trim()) {
+    return patches;
+  }
+  const q = query.toLowerCase().trim();
+  return patches.filter((state) => {
+    const fp = state.patch.filePath.toLowerCase();
+    const tfs = state.patch.targetFiles.map((f) => f.toLowerCase());
+    return fp.includes(q) || tfs.some((tf) => tf.includes(q));
+  });
+}
+
+export function filterPatchesByRiskLevel(
+  patches: GomiPatchReviewState[],
+  riskLevel: GomiPatchRiskLevel | 'all',
+): GomiPatchReviewState[] {
+  if (riskLevel === 'all') {
+    return patches;
+  }
+  return patches.filter((state) => state.patch.riskLevel === riskLevel);
+}
+
+export function filterPendingPatches(
+  patches: GomiPatchReviewState[],
+  options: {
+    filePathQuery?: string;
+    riskLevel?: GomiPatchRiskLevel | 'all';
+  } = {},
+): GomiPatchReviewState[] {
+  let result = patches.filter(
+    (state) =>
+      state.approvalStatus === 'pending' ||
+      state.approvalStatus === 'idle',
+  );
+
+  if (options.filePathQuery) {
+    result = filterPatchesByFilePath(result, options.filePathQuery);
+  }
+
+  if (options.riskLevel && options.riskLevel !== 'all') {
+    result = filterPatchesByRiskLevel(result, options.riskLevel);
+  }
+
+  return result;
 }
