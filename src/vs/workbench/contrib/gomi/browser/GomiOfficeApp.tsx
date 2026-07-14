@@ -1161,6 +1161,57 @@ function TaskRow({ task }: { task: GomiTask }) {
   );
 }
 
+function ProviderStatusBar({ officeSettings }: { officeSettings: GomiOfficeSettings }) {
+  const badges: Array<{ label: string; active: boolean; title: string }> = [
+    {
+      label: 'CLI',
+      active: officeSettings.execution.allowCliProviders,
+      title: officeSettings.execution.allowCliProviders ? 'CLI providers enabled' : 'CLI providers disabled'
+    },
+    {
+      label: 'HTTP',
+      active: officeSettings.execution.allowHttpProviders,
+      title: officeSettings.execution.allowHttpProviders ? 'HTTP providers enabled' : 'HTTP providers disabled'
+    },
+    {
+      label: officeSettings.execution.liveProviderMode === 'demo-only'
+        ? 'Demo'
+        : officeSettings.execution.liveProviderMode === 'trusted-workspaces'
+          ? 'Trusted'
+          : 'All',
+      active: officeSettings.execution.liveProviderMode !== 'demo-only',
+      title: `Live provider mode: ${officeSettings.execution.liveProviderMode}`
+    },
+    {
+      label: officeSettings.memory.embeddingProvider === 'local-hashing' ? 'Local' : 'Remote',
+      active: officeSettings.memory.embeddingProvider !== 'local-hashing',
+      title: `Embedding: ${getMemoryEmbeddingProviderLabel(officeSettings.memory.embeddingProvider)}`
+    },
+    {
+      label: 'Patch',
+      active: !officeSettings.memory.requirePatchApproval,
+      title: officeSettings.memory.requirePatchApproval ? 'Patch approval required' : 'Auto-apply enabled'
+    }
+  ];
+
+  const activeCount = badges.filter((b) => b.active).length;
+
+  return (
+    <div className="gomi-provider-status-bar" aria-label="Provider status">
+      {badges.map((badge) => (
+        <span
+          key={badge.label}
+          className={`gomi-provider-badge${badge.active ? ' is-active' : ''}`}
+          title={badge.title}
+        >
+          {badge.active ? '●' : '○'} {badge.label}
+        </span>
+      ))}
+      <span className="gomi-provider-badge-count" title="Active providers">{activeCount} active</span>
+    </div>
+  );
+}
+
 function OfficeSettingsPanel({
   officeSettings,
   memoryItems,
@@ -1270,6 +1321,8 @@ function OfficeSettingsPanel({
           />
         </label>
       </div>
+
+      <ProviderStatusBar officeSettings={officeSettings} />
 
       <div className="gomi-settings-group">
         <div className="gomi-settings-title">Office Appearance</div>
