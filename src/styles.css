@@ -758,6 +758,15 @@ button {
   white-space: nowrap;
 }
 
+.gomi-settings-toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.gomi-settings-toolbar label.gomi-action-button {
+  cursor: pointer;
+}
+
 .gomi-seat-row {
   border-top: 1px solid #253247;
   padding-top: 10px;
