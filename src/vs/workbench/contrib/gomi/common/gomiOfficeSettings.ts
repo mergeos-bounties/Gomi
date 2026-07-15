@@ -9,6 +9,7 @@ import type {
   GomiMemoryEmbeddingProviderId,
   GomiMemoryPrivacyMode,
   GomiOfficeSettings,
+  GomiRecentProject,
   GomiWorkspaceTrustState
 } from './gomiTypes';
 
@@ -17,6 +18,7 @@ export const GOMI_DEFAULT_MEMORY_RETENTION_DAYS = 30;
 export const GOMI_DEFAULT_MAX_PROJECT_MEMORY_ITEMS = 420;
 export const GOMI_DEFAULT_MAX_CONCURRENT_AGENT_RUNS = 2;
 export const GOMI_DEFAULT_HTTP_MAX_RETRIES = 2;
+export const GOMI_MAX_RECENT_PROJECTS = 8;
 
 export const GOMI_AVATAR_STYLE_OPTIONS: Array<{
   id: GomiAvatarStyle;
@@ -181,6 +183,7 @@ export const GOMI_AGENT_CLI_PROVIDERS: GomiAgentCliProvider[] = [
 
 export const DEFAULT_GOMI_OFFICE_SETTINGS: GomiOfficeSettings = {
   avatarStyle: 'emoji',
+  recentProjects: [],
   seats: [
     {
       id: 'seat-ceo',
@@ -404,6 +407,36 @@ export function setAvatarStyle(
   };
 }
 
+export function rememberRecentProject(
+  settings: GomiOfficeSettings,
+  project: Pick<GomiRecentProject, 'name' | 'path'> & Partial<Pick<GomiRecentProject, 'lastOpenedAt'>>,
+  lastOpenedAt = new Date().toISOString()
+): GomiOfficeSettings {
+  const recentProject = normalizeRecentProject({
+    ...project,
+    lastOpenedAt
+  });
+
+  if (!recentProject) {
+    return settings;
+  }
+
+  return {
+    ...settings,
+    recentProjects: [
+      recentProject,
+      ...settings.recentProjects.filter((item) => item.path !== recentProject.path)
+    ].slice(0, GOMI_MAX_RECENT_PROJECTS)
+  };
+}
+
+export function removeRecentProject(settings: GomiOfficeSettings, projectId: string): GomiOfficeSettings {
+  return {
+    ...settings,
+    recentProjects: settings.recentProjects.filter((project) => project.id !== projectId)
+  };
+}
+
 export function setPatchApprovalRequired(
   settings: GomiOfficeSettings,
   requirePatchApproval: boolean
@@ -513,6 +546,7 @@ export function normalizeGomiOfficeSettings(value: unknown): GomiOfficeSettings 
   let normalizedSettings: GomiOfficeSettings = {
     ...DEFAULT_GOMI_OFFICE_SETTINGS,
     avatarStyle: avatarStyleSetting(rawSettings.avatarStyle),
+    recentProjects: normalizeRecentProjects(rawSettings.recentProjects),
     seats: normalizeSeatSettings(rawSettings.seats)
   };
   const rawMemory: Record<string, unknown> = isRecord(rawSettings.memory) ? rawSettings.memory : {};
@@ -776,6 +810,70 @@ function normalizeAdditionalEmployeeSeats(
   return normalizedSeats;
 }
 
+function normalizeRecentProjects(value: unknown): GomiRecentProject[] {
+  if (!Array.isArray(value)) {
+    return DEFAULT_GOMI_OFFICE_SETTINGS.recentProjects;
+  }
+
+  const seenPaths = new Set<string>();
+  const normalizedProjects: GomiRecentProject[] = [];
+
+  for (const rawProject of value.filter(isRecord)) {
+    const project = normalizeRecentProject(rawProject);
+
+    if (!project || seenPaths.has(project.path)) {
+      continue;
+    }
+
+    normalizedProjects.push(project);
+    seenPaths.add(project.path);
+
+    if (normalizedProjects.length >= GOMI_MAX_RECENT_PROJECTS) {
+      break;
+    }
+  }
+
+  return normalizedProjects;
+}
+
+function normalizeRecentProject(value: unknown): GomiRecentProject | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const path = trimBoundedString(value.path, 500);
+
+  if (!path || path.includes('\0')) {
+    return undefined;
+  }
+
+  const name = trimBoundedString(value.name, 120) ?? nameFromProjectPath(path);
+  const lastOpenedAt = trimBoundedString(value.lastOpenedAt, 64) ?? new Date(0).toISOString();
+
+  return {
+    id: `project-${stableProjectHash(path)}`,
+    name,
+    path,
+    lastOpenedAt
+  };
+}
+
+function nameFromProjectPath(path: string): string {
+  const segments = path.replace(/\\/g, '/').split('/').filter(Boolean);
+  return trimBoundedString(segments.at(-1), 120) ?? path;
+}
+
+function stableProjectHash(path: string): string {
+  let hash = 2166136261;
+
+  for (const character of path) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return (hash >>> 0).toString(36);
+}
+
 function agentProviderSetting(value: unknown, fallback: GomiAgentCliProviderId): GomiAgentCliProviderId {
   return GOMI_AGENT_CLI_PROVIDERS.some((provider) => provider.id === value)
     ? value as GomiAgentCliProviderId
@@ -865,6 +963,16 @@ function booleanSetting(value: unknown, fallback: boolean): boolean {
 
 function numberSetting(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function trimBoundedString(value: unknown, maxLength: number): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed.length > 0 ? trimmed.slice(0, maxLength) : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

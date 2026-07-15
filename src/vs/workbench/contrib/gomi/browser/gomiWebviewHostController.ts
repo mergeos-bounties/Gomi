@@ -24,6 +24,9 @@ export interface GomiWebviewHostControllerOptions {
   patchPreviewer?: (
     message: Extract<GomiBridgeMessage, { type: 'gomi.previewPatch' }>
   ) => Promise<GomiPatchPreviewResult>;
+  projectOpener?: (
+    message: Extract<GomiBridgeMessage, { type: 'gomi.openProject' }>
+  ) => Promise<void>;
   runtimeOptions?: GomiRuntimeOptions;
 }
 
@@ -67,6 +70,11 @@ export class GomiWebviewHostController {
 
     if (message.type === 'gomi.pruneMemory') {
       await this.pruneMemory(message);
+      return;
+    }
+
+    if (message.type === 'gomi.openProject') {
+      await this.openProject(message);
       return;
     }
 
@@ -150,6 +158,19 @@ export class GomiWebviewHostController {
         type: 'gomi.pruneMemoryResult',
         error: error instanceof Error ? error.message : 'Unknown memory prune error.'
       });
+    }
+  }
+
+  private async openProject(message: Extract<GomiBridgeMessage, { type: 'gomi.openProject' }>): Promise<void> {
+    try {
+      if (!this.options.projectOpener) {
+        throw new Error('Recent project opening is not configured for this Gomi webview host.');
+      }
+
+      await this.options.projectOpener(message);
+      this.postSystemMessage(`Opening recent project: ${message.project.name}.`);
+    } catch (error) {
+      this.postSystemMessage(error instanceof Error ? error.message : 'Unknown recent project open error.');
     }
   }
 

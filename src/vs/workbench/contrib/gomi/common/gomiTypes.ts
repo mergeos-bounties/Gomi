@@ -104,8 +104,16 @@ export interface GomiOfficeExecutionSettings {
   httpMaxRetries: number;
 }
 
+export interface GomiRecentProject {
+  id: string;
+  name: string;
+  path: string;
+  lastOpenedAt: string;
+}
+
 export interface GomiOfficeSettings {
   avatarStyle: GomiAvatarStyle;
+  recentProjects: GomiRecentProject[];
   seats: GomiAgentSeat[];
   memory: GomiOfficeMemorySettings;
   execution: GomiOfficeExecutionSettings;
@@ -201,6 +209,7 @@ export interface GomiPatchPreviewResult {
 
 export interface GomiWorkspaceSnapshot {
   rootName: string;
+  rootPath?: string;
   files: string[];
   openEditors: string[];
   gitSummary: string;

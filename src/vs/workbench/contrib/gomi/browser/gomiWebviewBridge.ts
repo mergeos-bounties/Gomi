@@ -10,6 +10,7 @@ import type {
   GomiPatchApprovalStatus,
   GomiPatchProposal,
   GomiPatchRiskLevel,
+  GomiRecentProject,
   GomiWorkspaceTrustState
 } from '../common/gomiTypes';
 import {
@@ -151,6 +152,7 @@ const GOMI_MEMORY_EMBEDDING_PROVIDERS: readonly GomiMemoryEmbeddingProviderId[] 
   'ollama-embed'
 ];
 const GOMI_MEMORY_PRIVACY_MODES: readonly GomiMemoryPrivacyMode[] = ['standard', 'strict'];
+const GOMI_AVATAR_STYLES = ['emoji', 'geometric', 'initials'] as const;
 const GOMI_WORKSPACE_TRUST_STATES: readonly GomiWorkspaceTrustState[] = ['trusted', 'untrusted'];
 const GOMI_LIVE_PROVIDER_MODES: readonly GomiLiveProviderMode[] = [
   'demo-only',
@@ -210,6 +212,8 @@ export function isGomiBridgeMessage(value: unknown): value is GomiBridgeMessage 
         hasOnlyKeys(value, ['protocolVersion', 'type', 'officeSettings']) &&
         isOptionalOfficeSettings(value.officeSettings)
       );
+    case 'gomi.openProject':
+      return hasOnlyKeys(value, ['protocolVersion', 'type', 'project']) && isRecentProject(value.project);
     case 'gomi.applyPatch':
     case 'gomi.previewPatch':
       return hasOnlyKeys(value, ['protocolVersion', 'type', 'patch']) && isPatchProposal(value.patch);
@@ -301,16 +305,42 @@ function isPatchProposal(value: unknown): value is GomiPatchProposal {
   );
 }
 
+function isRecentProject(value: unknown): value is GomiRecentProject {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ['id', 'name', 'path', 'lastOpenedAt'])
+  ) {
+    return false;
+  }
+
+  return (
+    isSafeString(value.id, 128) &&
+    isSafeString(value.name, 120) &&
+    isSafeProjectPath(value.path) &&
+    isSafeString(value.lastOpenedAt, 64)
+  );
+}
+
 function isOptionalOfficeSettings(value: unknown): boolean {
   if (value === undefined) {
     return true;
   }
 
-  if (!isRecord(value) || !hasOnlyKeys(value, ['seats', 'memory', 'execution'])) {
+  if (!isRecord(value) || !hasOnlyKeys(value, ['avatarStyle', 'recentProjects', 'seats', 'memory', 'execution'])) {
     return false;
   }
 
-  return isSeatArray(value.seats) && isMemorySettings(value.memory) && isExecutionSettings(value.execution);
+  return (
+    (value.avatarStyle === undefined || isOneOf(value.avatarStyle, GOMI_AVATAR_STYLES)) &&
+    (value.recentProjects === undefined || isRecentProjectArray(value.recentProjects)) &&
+    isSeatArray(value.seats) &&
+    isMemorySettings(value.memory) &&
+    isExecutionSettings(value.execution)
+  );
+}
+
+function isRecentProjectArray(value: unknown): value is GomiRecentProject[] {
+  return Array.isArray(value) && value.length <= 8 && value.every(isRecentProject);
 }
 
 function isSeatArray(value: unknown): value is GomiAgentSeat[] {
@@ -394,7 +424,8 @@ function isExecutionSettings(value: unknown): boolean {
       'allowCliProviders',
       'allowHttpProviders',
       'requirePatchApprovalForLiveProviders',
-      'maxConcurrentAgentRuns'
+      'maxConcurrentAgentRuns',
+      'httpMaxRetries'
     ])
   ) {
     return false;
@@ -406,7 +437,8 @@ function isExecutionSettings(value: unknown): boolean {
     typeof value.allowCliProviders === 'boolean' &&
     typeof value.allowHttpProviders === 'boolean' &&
     typeof value.requirePatchApprovalForLiveProviders === 'boolean' &&
-    isNumberInRange(value.maxConcurrentAgentRuns, 1, 16)
+    isNumberInRange(value.maxConcurrentAgentRuns, 1, 16) &&
+    (value.httpMaxRetries === undefined || isNumberInRange(value.httpMaxRetries, 0, 10))
   );
 }
 
@@ -438,6 +470,10 @@ function isSafeRelativePath(value: unknown): value is string {
   }
 
   return normalized.split('/').every((segment) => segment.length > 0 && segment !== '.' && segment !== '..');
+}
+
+function isSafeProjectPath(value: unknown): value is string {
+  return isSafeString(value, 500) && !value.includes('\0');
 }
 
 function isNumberInRange(value: unknown, min: number, max: number): value is number {
