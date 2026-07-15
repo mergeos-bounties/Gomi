@@ -194,6 +194,16 @@ button {
   color: #f9fafb;
 }
 
+.gomi-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.gomi-icon-button:disabled:hover {
+  background: transparent;
+  color: #94a3b8;
+}
+
 .gomi-icon-button.is-danger {
   color: #fca5a5;
 }
@@ -480,6 +490,13 @@ button {
   align-items: center;
 }
 
+.gomi-project-row__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 8px;
+}
+
 .gomi-agent-avatar {
   display: inline-grid;
   place-items: center;
@@ -515,6 +532,59 @@ button {
   color: #9ca3af;
   font-size: 12px;
   line-height: 1.45;
+}
+
+.gomi-recent-projects {
+  display: grid;
+  gap: 6px;
+}
+
+.gomi-recent-project {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 6px;
+}
+
+.gomi-recent-project__main {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid #253247;
+  border-radius: 8px;
+  background: #111c2f;
+  color: #e5e7eb;
+  cursor: pointer;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.gomi-recent-project__main:hover {
+  border-color: #2dd4bf;
+}
+
+.gomi-recent-project__main span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.gomi-recent-project__main strong,
+.gomi-recent-project__main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gomi-recent-project__main strong {
+  font-size: 12px;
+}
+
+.gomi-recent-project__main small {
+  color: #94a3b8;
+  font-size: 11px;
 }
 
 .gomi-status {

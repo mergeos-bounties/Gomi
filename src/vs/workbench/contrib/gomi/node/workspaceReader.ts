@@ -7,6 +7,7 @@ export type GomiWorkspaceSnapshotReader = () =>
 export function createDemoWorkspaceSnapshot(rootName = 'Gomi'): GomiWorkspaceSnapshot {
   return {
     rootName,
+    rootPath: '.',
     files: [
       'product.json',
       'package.json',

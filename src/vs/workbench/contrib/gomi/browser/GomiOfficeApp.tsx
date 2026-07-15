@@ -10,6 +10,7 @@ import {
   Bed,
   FileDiff,
   Files,
+  FolderOpen,
   GitBranch,
   Maximize2,
   Minimize2,
@@ -29,7 +30,9 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Star,
   Terminal,
+  Trash2,
   UserPlus,
   UserX,
   Users,
@@ -47,6 +50,8 @@ import {
   getProviderLabel,
   getSeatForAgent,
   hireEmployee,
+  rememberRecentProject,
+  removeRecentProject,
   setCliProvidersEnabled,
   setHttpProvidersEnabled,
   setHttpProviderMaxRetries,
@@ -82,6 +87,7 @@ import type {
   GomiMemoryEmbeddingProviderId,
   GomiMemoryPrivacyMode,
   GomiOfficeSettings,
+  GomiRecentProject,
   GomiRuntimeEvent,
   GomiTask,
   GomiWorkspaceTrustState,
@@ -552,6 +558,39 @@ export function GomiOfficeApp() {
     reader.readAsText(file);
   }
 
+  function rememberCurrentProject() {
+    const project = recentProjectFromWorkspace(workspace);
+
+    if (!project) {
+      return;
+    }
+
+    setOfficeSettings((currentSettings) => rememberRecentProject(currentSettings, project));
+  }
+
+  function openRecentProject(project: GomiRecentProject) {
+    const openedProject = {
+      ...project,
+      lastOpenedAt: new Date().toISOString()
+    };
+
+    setOfficeSettings((currentSettings) => rememberRecentProject(currentSettings, openedProject));
+
+    if (workbenchBridge) {
+      workbenchBridge.postMessage({
+        type: 'gomi.openProject',
+        project: openedProject
+      });
+      return;
+    }
+
+    setRequest(`Open recent project: ${project.name}\nPath: ${project.path}`);
+  }
+
+  function removeRecentProjectEntry(projectId: string) {
+    setOfficeSettings((currentSettings) => removeRecentProject(currentSettings, projectId));
+  }
+
   function assignProvider(seatId: string, providerId: GomiAgentCliProviderId) {
     setOfficeSettings((currentSettings) => assignSeatProvider(currentSettings, seatId, providerId));
   }
@@ -750,7 +789,14 @@ export function GomiOfficeApp() {
 
       <div className={workbenchClassName}>
         <ActivityBar />
-        <ProjectSidebar workspace={workspace} memoryItems={memoryItems} />
+        <ProjectSidebar
+          workspace={workspace}
+          memoryItems={memoryItems}
+          recentProjects={officeSettings.recentProjects}
+          onRememberCurrentProject={rememberCurrentProject}
+          onOpenRecentProject={openRecentProject}
+          onRemoveRecentProject={removeRecentProjectEntry}
+        />
 
         <main className={mainClassName}>
           <div className="gomi-tabs">
@@ -860,6 +906,8 @@ export function GomiOfficeApp() {
           onSimulateStaffing={simulateOfficeStaffing}
           onFireEmployee={fireOfficeEmployee}
           onRestoreEmployee={restoreOfficeEmployee}
+          onExportSettings={handleExportSettings}
+          onImportSettings={handleImportSettings}
           onBroadcastThresholdChange={updateBroadcastThreshold}
           onSharedMemoryEnabledChange={updateSharedMemoryEnabled}
           onWorkspaceContextIndexingChange={updateWorkspaceContextIndexing}
@@ -928,10 +976,18 @@ function ActivityBar() {
 
 function ProjectSidebar({
   workspace,
-  memoryItems
+  memoryItems,
+  recentProjects,
+  onRememberCurrentProject,
+  onOpenRecentProject,
+  onRemoveRecentProject
 }: {
   workspace?: GomiWorkspaceSnapshot;
   memoryItems: GomiMemoryBoardItem[];
+  recentProjects: GomiRecentProject[];
+  onRememberCurrentProject: () => void;
+  onOpenRecentProject: (project: GomiRecentProject) => void;
+  onRemoveRecentProject: (projectId: string) => void;
 }) {
   const files = workspace?.files ?? [
     'product.json',
@@ -965,6 +1021,26 @@ function ProjectSidebar({
         </div>
 
         <div className="gomi-project-row">
+          <div className="gomi-project-row__head">
+            <div className="gomi-project-name">Recent Projects</div>
+            <button
+              className="gomi-icon-button"
+              onClick={onRememberCurrentProject}
+              disabled={!workspace?.rootPath}
+              title="Save current project"
+              aria-label="Save current project"
+            >
+              <Star size={15} />
+            </button>
+          </div>
+          <RecentProjectsLauncher
+            recentProjects={recentProjects}
+            onOpenRecentProject={onOpenRecentProject}
+            onRemoveRecentProject={onRemoveRecentProject}
+          />
+        </div>
+
+        <div className="gomi-project-row">
           <div className="gomi-project-name">Agent Runtime</div>
           <div className="gomi-project-detail">
             CEO planner, message bus, event stream, patch proposal, final report.
@@ -980,6 +1056,48 @@ function ProjectSidebar({
   );
 }
 
+function RecentProjectsLauncher({
+  recentProjects,
+  onOpenRecentProject,
+  onRemoveRecentProject
+}: {
+  recentProjects: GomiRecentProject[];
+  onOpenRecentProject: (project: GomiRecentProject) => void;
+  onRemoveRecentProject: (projectId: string) => void;
+}) {
+  if (recentProjects.length === 0) {
+    return <div className="gomi-project-detail">No recent projects.</div>;
+  }
+
+  return (
+    <div className="gomi-recent-projects" aria-label="Recent Projects Launcher">
+      {recentProjects.map((project) => (
+        <div className="gomi-recent-project" key={project.id}>
+          <button
+            className="gomi-recent-project__main"
+            onClick={() => onOpenRecentProject(project)}
+            title={`Open ${project.name}`}
+          >
+            <FolderOpen size={16} />
+            <span>
+              <strong>{project.name}</strong>
+              <small>{project.path}</small>
+            </span>
+          </button>
+          <button
+            className="gomi-icon-button"
+            onClick={() => onRemoveRecentProject(project.id)}
+            title={`Remove ${project.name}`}
+            aria-label={`Remove ${project.name}`}
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function RightPanel({
   agents,
   tasks,
@@ -989,6 +1107,8 @@ function RightPanel({
   memoryPruneReport,
   memoryPruneError,
   isPruningMemory,
+  onExportSettings,
+  onImportSettings,
   onProviderChange,
   onToggleSeatSleep,
   onClosePanel,
@@ -1031,6 +1151,8 @@ function RightPanel({
   onSimulateStaffing: () => void;
   onFireEmployee: (seatId: string) => void;
   onRestoreEmployee: (seatId: string) => void;
+  onExportSettings: () => void;
+  onImportSettings: (file: File) => void;
   onBroadcastThresholdChange: (broadcastThreshold: number) => void;
   onSharedMemoryEnabledChange: (sharedMemoryEnabled: boolean) => void;
   onWorkspaceContextIndexingChange: (indexWorkspaceContext: boolean) => void;
@@ -1094,8 +1216,8 @@ function RightPanel({
           memoryPruneReport={memoryPruneReport}
           memoryPruneError={memoryPruneError}
           isPruningMemory={isPruningMemory}
-          onExportSettings={handleExportSettings}
-          onImportSettings={handleImportSettings}
+          onExportSettings={onExportSettings}
+          onImportSettings={onImportSettings}
           onProviderChange={onProviderChange}
           onToggleSeatSleep={onToggleSeatSleep}
           onHireEmployee={onHireEmployee}
@@ -1218,6 +1340,8 @@ function OfficeSettingsPanel({
   memoryPruneReport,
   memoryPruneError,
   isPruningMemory,
+  onExportSettings,
+  onImportSettings,
   onProviderChange,
   onToggleSeatSleep,
   onHireEmployee,
@@ -1997,6 +2121,19 @@ function applyOfficeSettingsToAgents(
 
     return agent;
   });
+}
+
+function recentProjectFromWorkspace(
+  workspace: GomiWorkspaceSnapshot | undefined
+): Pick<GomiRecentProject, 'name' | 'path'> | undefined {
+  if (!workspace?.rootPath) {
+    return undefined;
+  }
+
+  return {
+    name: workspace.rootName,
+    path: workspace.rootPath
+  };
 }
 
 function iconForAgent(agentId: GomiAgentId) {

@@ -2,6 +2,7 @@ import type {
   GomiOfficeSettings,
   GomiPatchPreviewResult,
   GomiPatchProposal,
+  GomiRecentProject,
   GomiRuntimeEvent
 } from '../common/gomiTypes';
 import type { GomiRuntimeMemoryPruneReport } from '../node/agentRuntime';
@@ -26,6 +27,10 @@ export type GomiBridgeMessage = {
   | {
       type: 'gomi.pruneMemory';
       officeSettings?: GomiOfficeSettings;
+    }
+  | {
+      type: 'gomi.openProject';
+      project: GomiRecentProject;
     }
   | {
       type: 'gomi.pruneMemoryResult';

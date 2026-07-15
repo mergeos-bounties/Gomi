@@ -47,6 +47,15 @@ describe('Gomi webview bridge', () => {
       type: 'gomi.stop',
       reason: 'Stop bridge test'
     });
+    bridge?.postMessage({
+      type: 'gomi.openProject',
+      project: {
+        id: 'project-gomi',
+        name: 'Gomi IDE',
+        path: '/workspaces/gomi',
+        lastOpenedAt: '2026-07-15T10:00:00.000Z'
+      }
+    });
     target.emit({
       protocolVersion: 1,
       type: 'gomi.applyPatchResult',
@@ -76,6 +85,16 @@ describe('Gomi webview bridge', () => {
         protocolVersion: 1,
         type: 'gomi.stop',
         reason: 'Stop bridge test'
+      },
+      {
+        protocolVersion: 1,
+        type: 'gomi.openProject',
+        project: {
+          id: 'project-gomi',
+          name: 'Gomi IDE',
+          path: '/workspaces/gomi',
+          lastOpenedAt: '2026-07-15T10:00:00.000Z'
+        }
       }
     ]);
     expect(received).toHaveLength(1);
@@ -131,6 +150,29 @@ describe('Gomi webview bridge', () => {
     expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.danger' })).toBe(false);
     expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'workspace.event' })).toBe(false);
     expect(isGomiBridgeMessage(undefined)).toBe(false);
+  });
+
+  it('validates recent-project open messages at the webview boundary', () => {
+    expect(isGomiBridgeMessage({
+      protocolVersion: 1,
+      type: 'gomi.openProject',
+      project: {
+        id: 'project-gomi',
+        name: 'Gomi IDE',
+        path: '/workspaces/gomi',
+        lastOpenedAt: '2026-07-15T10:00:00.000Z'
+      }
+    })).toBe(true);
+    expect(isGomiBridgeMessage({
+      protocolVersion: 1,
+      type: 'gomi.openProject',
+      project: {
+        id: 'project-bad',
+        name: 'Bad Project',
+        path: 'bad\u0000path',
+        lastOpenedAt: '2026-07-15T10:00:00.000Z'
+      }
+    })).toBe(false);
   });
 
   it('rejects malformed or oversized privileged webview payloads', () => {

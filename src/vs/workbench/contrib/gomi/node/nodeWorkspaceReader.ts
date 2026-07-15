@@ -46,6 +46,7 @@ export async function readNodeWorkspaceSnapshot(
 
   return {
     rootName,
+    rootPath: path.resolve(workspaceRoot),
     files: [...importantFiles, ...files.filter((file) => !importantFiles.includes(file))].slice(0, maxFiles),
     openEditors: options.openEditors ?? importantFiles.slice(0, 4),
     gitSummary,

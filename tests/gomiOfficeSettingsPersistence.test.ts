@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GOMI_OFFICE_SETTINGS,
+  GOMI_MAX_RECENT_PROJECTS,
+  rememberRecentProject,
+  removeRecentProject,
   setAvatarStyle,
   setMemoryEmbeddingExecutionEnabled,
   setMemoryEmbeddingProvider,
@@ -39,7 +42,14 @@ describe('Gomi office settings persistence', () => {
   it('falls back to browser local storage for the standalone office demo', () => {
     const localStorage = new MemoryLocalStorage();
     const settings = setAvatarStyle(
-      setSeatWorkMode(DEFAULT_GOMI_OFFICE_SETTINGS, 'head-frontend', 'sleeping'),
+      rememberRecentProject(
+        setSeatWorkMode(DEFAULT_GOMI_OFFICE_SETTINGS, 'head-frontend', 'sleeping'),
+        {
+          name: 'Gomi IDE',
+          path: '/workspaces/gomi'
+        },
+        '2026-07-15T09:30:00.000Z'
+      ),
       'initials'
     );
 
@@ -49,6 +59,14 @@ describe('Gomi office settings persistence', () => {
 
     expect(restoredSettings.seats.find((seat) => seat.id === 'head-frontend')?.workMode).toBe('sleeping');
     expect(restoredSettings.avatarStyle).toBe('initials');
+    expect(restoredSettings.recentProjects).toEqual([
+      {
+        id: 'project-4a4cdx',
+        name: 'Gomi IDE',
+        path: '/workspaces/gomi',
+        lastOpenedAt: '2026-07-15T09:30:00.000Z'
+      }
+    ]);
   });
 
   it('normalizes corrupted persisted payloads back to safe defaults', () => {
@@ -57,6 +75,42 @@ describe('Gomi office settings persistence', () => {
     localStorage.setItem('gomi.office.settings.v1', '{not-json');
 
     expect(loadPersistedOfficeSettings({ localStorage })).toEqual(DEFAULT_GOMI_OFFICE_SETTINGS);
+  });
+
+  it('keeps recent projects deduplicated, bounded, and removable', () => {
+    let settings = DEFAULT_GOMI_OFFICE_SETTINGS;
+
+    for (let index = 0; index < GOMI_MAX_RECENT_PROJECTS + 2; index += 1) {
+      settings = rememberRecentProject(
+        settings,
+        {
+          name: `Project ${index}`,
+          path: `/workspace/project-${index}`
+        },
+        `2026-07-15T10:${String(index).padStart(2, '0')}:00.000Z`
+      );
+    }
+
+    settings = rememberRecentProject(
+      settings,
+      {
+        name: 'Project 3 renamed',
+        path: '/workspace/project-3'
+      },
+      '2026-07-15T11:00:00.000Z'
+    );
+
+    expect(settings.recentProjects).toHaveLength(GOMI_MAX_RECENT_PROJECTS);
+    expect(settings.recentProjects[0]).toMatchObject({
+      name: 'Project 3 renamed',
+      path: '/workspace/project-3',
+      lastOpenedAt: '2026-07-15T11:00:00.000Z'
+    });
+    expect(settings.recentProjects.filter((project) => project.path === '/workspace/project-3')).toHaveLength(1);
+
+    const withoutProject = removeRecentProject(settings, settings.recentProjects[0].id);
+
+    expect(withoutProject.recentProjects.some((project) => project.path === '/workspace/project-3')).toBe(false);
   });
 });
 

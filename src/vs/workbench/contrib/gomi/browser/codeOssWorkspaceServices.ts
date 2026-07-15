@@ -323,12 +323,21 @@ export async function readCodeOssWorkspaceSnapshot(
 
   return {
     rootName,
+    rootPath: folderPath(folders[0]),
     files: files.slice(0, resolvedOptions.maxFiles),
     openEditors,
     gitSummary: scmContext.summary,
     terminalSummary: `Indexed through Code - OSS workspace, editor, marker, terminal, SCM, file, and text-file services. ${selectionSnippets.length} selection snippet(s), ${diagnosticSnippets.length} diagnostic snippet(s), ${terminalSnippets.length} terminal snippet(s), ${scmContext.snippets.length} git diff snippet(s), ${errorLogSnippets.length} error-log snippet(s), ${contentSnippets.length} file snippet(s) loaded.`,
     contentSnippets: allContentSnippets
   };
+}
+
+function folderPath(folder: GomiCodeOssWorkspaceFolder | undefined): string | undefined {
+  if (!folder) {
+    return undefined;
+  }
+
+  return folder.uri.fsPath ?? folder.uri.path ?? folder.uri.toString(true);
 }
 
 export async function applyCodeOssPatchMessage(

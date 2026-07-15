@@ -168,6 +168,39 @@ describe('Gomi webview host controller', () => {
     });
   });
 
+  it('opens a recent project through the configured host opener', async () => {
+    const bridge = new MemoryBridge();
+    const openedProjects: string[] = [];
+    const controller = new GomiWebviewHostController({
+      bridge,
+      projectOpener: async (message) => {
+        openedProjects.push(message.project.path);
+      }
+    });
+
+    await controller.handleMessage({
+      type: 'gomi.openProject',
+      project: {
+        id: 'project-gomi',
+        name: 'Gomi IDE',
+        path: '/workspaces/gomi',
+        lastOpenedAt: '2026-07-15T10:00:00.000Z'
+      }
+    });
+
+    expect(openedProjects).toEqual(['/workspaces/gomi']);
+    expect(bridge.outbox[0]).toMatchObject({
+      type: 'gomi.event',
+      event: {
+        type: 'message',
+        message: {
+          senderName: 'Gomi System',
+          content: 'Opening recent project: Gomi IDE.'
+        }
+      }
+    });
+  });
+
   it('returns patch apply errors when no host patch applier is configured', async () => {
     const bridge = new MemoryBridge();
     const controller = new GomiWebviewHostController({ bridge });
