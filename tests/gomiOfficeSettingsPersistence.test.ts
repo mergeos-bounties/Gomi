@@ -4,6 +4,7 @@ import {
   GOMI_MAX_RECENT_PROJECTS,
   rememberRecentProject,
   removeRecentProject,
+  savePromptTemplate,
   setAvatarStyle,
   setMemoryEmbeddingExecutionEnabled,
   setMemoryEmbeddingProvider,
@@ -65,6 +66,29 @@ describe('Gomi office settings persistence', () => {
         name: 'Gomi IDE',
         path: '/workspaces/gomi',
         lastOpenedAt: '2026-07-15T09:30:00.000Z'
+      }
+    ]);
+  });
+
+  it('persists saved prompt templates across reloads', () => {
+    const localStorage = new MemoryLocalStorage();
+    const settings = savePromptTemplate(DEFAULT_GOMI_OFFICE_SETTINGS, {
+      id: 'template-release-review',
+      title: 'Release review',
+      body: 'Draft a release-risk review for this workspace.',
+      updatedAt: '2026-07-13T00:10:00.000Z'
+    });
+
+    persistOfficeSettings(settings, { localStorage });
+
+    const restoredSettings = loadPersistedOfficeSettings({ localStorage });
+
+    expect(restoredSettings.promptTemplates).toEqual([
+      {
+        id: 'template-release-review',
+        title: 'Release review',
+        body: 'Draft a release-risk review for this workspace.',
+        updatedAt: '2026-07-13T00:10:00.000Z'
       }
     ]);
   });

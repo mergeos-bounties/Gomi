@@ -364,7 +364,7 @@ button {
 
 .gomi-request {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 132px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
   gap: 10px;
   padding: 12px;
   border-bottom: 1px solid #1f2937;
@@ -386,6 +386,61 @@ button {
 .gomi-request textarea:focus {
   border-color: #2dd4bf;
   box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.16);
+}
+
+.gomi-request-sidebar,
+.gomi-template-tools {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gomi-request-sidebar {
+  grid-template-rows: auto minmax(42px, 1fr);
+}
+
+.gomi-template-tools {
+  grid-template-rows: auto auto 34px;
+  border: 1px solid #1f2937;
+  border-radius: 6px;
+  background: #111827;
+  padding: 8px;
+}
+
+.gomi-template-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.gomi-template-field select,
+.gomi-template-field input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  outline: none;
+  background: #101826;
+  color: #f9fafb;
+  padding: 7px 8px;
+  font-size: 12px;
+}
+
+.gomi-template-field select:focus,
+.gomi-template-field input:focus {
+  border-color: #2dd4bf;
+  box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.16);
+}
+
+.gomi-template-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 34px);
+  justify-content: space-between;
+  gap: 6px;
 }
 
 .gomi-send {

@@ -111,10 +111,18 @@ export interface GomiRecentProject {
   lastOpenedAt: string;
 }
 
+export interface GomiPromptTemplate {
+  id: string;
+  title: string;
+  body: string;
+  updatedAt: string;
+}
+
 export interface GomiOfficeSettings {
   avatarStyle: GomiAvatarStyle;
   recentProjects: GomiRecentProject[];
   seats: GomiAgentSeat[];
+  promptTemplates: GomiPromptTemplate[];
   memory: GomiOfficeMemorySettings;
   execution: GomiOfficeExecutionSettings;
 }
