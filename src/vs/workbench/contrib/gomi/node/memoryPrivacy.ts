@@ -15,6 +15,9 @@ export interface GomiMemoryPolicyResult {
   audit: GomiMemoryPrivacyAudit;
 }
 
+export const GOMI_MAX_INDEXED_TERMINAL_SNIPPETS = 3;
+export const GOMI_MAX_INDEXED_TERMINAL_SNIPPET_CHARS = 1200;
+
 const STRICT_ONLY_SOURCES = new Set<GomiWorkspaceContentSnippet['source']>([
   'terminal',
   'error_log'
@@ -42,17 +45,26 @@ export function applyWorkspaceMemoryPolicy(
   });
   const openEditors = workspace.openEditors.filter((filePath) => !isSensitivePath(filePath));
   const contentSnippets: GomiWorkspaceContentSnippet[] = [];
+  let indexedTerminalSnippetCount = 0;
 
   for (const snippet of workspace.contentSnippets ?? []) {
-    if (shouldDropSnippet(snippet, settings)) {
+    if (shouldDropSnippet(snippet, settings, indexedTerminalSnippetCount)) {
       audit.droppedSnippets.push(snippet.filePath);
       continue;
     }
 
-    const content = settings.redactSecrets ? redactSecrets(snippet.content) : snippet.content;
+    const redactedContent = settings.redactSecrets ? redactSecrets(snippet.content) : snippet.content;
+    const content =
+      snippet.source === 'terminal'
+        ? redactedContent.slice(0, GOMI_MAX_INDEXED_TERMINAL_SNIPPET_CHARS)
+        : redactedContent;
 
-    if (content !== snippet.content) {
+    if (redactedContent !== snippet.content) {
       audit.redactedSnippets.push(snippet.filePath);
+    }
+
+    if (snippet.source === 'terminal') {
+      indexedTerminalSnippetCount += 1;
     }
 
     contentSnippets.push({
@@ -110,10 +122,19 @@ export function redactSecrets(value: string): string {
 
 function shouldDropSnippet(
   snippet: GomiWorkspaceContentSnippet,
-  settings: GomiOfficeMemorySettings
+  settings: GomiOfficeMemorySettings,
+  indexedTerminalSnippetCount: number
 ): boolean {
   if (isSensitivePath(snippet.filePath)) {
     return true;
+  }
+
+  if (snippet.source === 'terminal') {
+    return (
+      !settings.indexTerminalSnippets ||
+      settings.privacyMode === 'strict' ||
+      indexedTerminalSnippetCount >= GOMI_MAX_INDEXED_TERMINAL_SNIPPETS
+    );
   }
 
   return settings.privacyMode === 'strict' && STRICT_ONLY_SOURCES.has(snippet.source);

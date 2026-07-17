@@ -74,6 +74,7 @@ import {
   savePromptTemplate,
   setSecretRedactionEnabled,
   setSharedMemoryEnabled,
+  setTerminalSnippetIndexing,
   simulateStaffingScenario,
   setWorkspaceTrustState,
   setWorkspaceContextIndexing
@@ -705,6 +706,12 @@ export function GomiOfficeApp() {
     );
   }
 
+  function updateTerminalSnippetIndexing(indexTerminalSnippets: boolean) {
+    setOfficeSettings((currentSettings) =>
+      setTerminalSnippetIndexing(currentSettings, indexTerminalSnippets)
+    );
+  }
+
   function updateMemoryEmbeddingProvider(embeddingProvider: GomiMemoryEmbeddingProviderId) {
     setOfficeSettings((currentSettings) =>
       setMemoryEmbeddingProvider(currentSettings, embeddingProvider)
@@ -1046,6 +1053,7 @@ export function GomiOfficeApp() {
           onBroadcastThresholdChange={updateBroadcastThreshold}
           onSharedMemoryEnabledChange={updateSharedMemoryEnabled}
           onWorkspaceContextIndexingChange={updateWorkspaceContextIndexing}
+          onTerminalSnippetIndexingChange={updateTerminalSnippetIndexing}
           onMemoryEmbeddingProviderChange={updateMemoryEmbeddingProvider}
           onMemoryEmbeddingExecutionEnabledChange={updateMemoryEmbeddingExecutionEnabled}
           onMemoryPrivacyModeChange={updateMemoryPrivacyMode}
@@ -1254,6 +1262,7 @@ function RightPanel({
   onBroadcastThresholdChange,
   onSharedMemoryEnabledChange,
   onWorkspaceContextIndexingChange,
+  onTerminalSnippetIndexingChange,
   onMemoryEmbeddingProviderChange,
   onMemoryEmbeddingExecutionEnabledChange,
   onMemoryPrivacyModeChange,
@@ -1291,6 +1300,7 @@ function RightPanel({
   onBroadcastThresholdChange: (broadcastThreshold: number) => void;
   onSharedMemoryEnabledChange: (sharedMemoryEnabled: boolean) => void;
   onWorkspaceContextIndexingChange: (indexWorkspaceContext: boolean) => void;
+  onTerminalSnippetIndexingChange: (indexTerminalSnippets: boolean) => void;
   onMemoryEmbeddingProviderChange: (embeddingProvider: GomiMemoryEmbeddingProviderId) => void;
   onMemoryEmbeddingExecutionEnabledChange: (embeddingExecutionEnabled: boolean) => void;
   onMemoryPrivacyModeChange: (privacyMode: GomiMemoryPrivacyMode) => void;
@@ -1362,6 +1372,7 @@ function RightPanel({
           onBroadcastThresholdChange={onBroadcastThresholdChange}
           onSharedMemoryEnabledChange={onSharedMemoryEnabledChange}
           onWorkspaceContextIndexingChange={onWorkspaceContextIndexingChange}
+          onTerminalSnippetIndexingChange={onTerminalSnippetIndexingChange}
           onMemoryEmbeddingProviderChange={onMemoryEmbeddingProviderChange}
           onMemoryEmbeddingExecutionEnabledChange={onMemoryEmbeddingExecutionEnabledChange}
           onMemoryPrivacyModeChange={onMemoryPrivacyModeChange}
@@ -1486,6 +1497,7 @@ function OfficeSettingsPanel({
   onBroadcastThresholdChange,
   onSharedMemoryEnabledChange,
   onWorkspaceContextIndexingChange,
+  onTerminalSnippetIndexingChange,
   onMemoryEmbeddingProviderChange,
   onMemoryEmbeddingExecutionEnabledChange,
   onMemoryPrivacyModeChange,
@@ -1519,6 +1531,7 @@ function OfficeSettingsPanel({
   onBroadcastThresholdChange: (broadcastThreshold: number) => void;
   onSharedMemoryEnabledChange: (sharedMemoryEnabled: boolean) => void;
   onWorkspaceContextIndexingChange: (indexWorkspaceContext: boolean) => void;
+  onTerminalSnippetIndexingChange: (indexTerminalSnippets: boolean) => void;
   onMemoryEmbeddingProviderChange: (embeddingProvider: GomiMemoryEmbeddingProviderId) => void;
   onMemoryEmbeddingExecutionEnabledChange: (embeddingExecutionEnabled: boolean) => void;
   onMemoryPrivacyModeChange: (privacyMode: GomiMemoryPrivacyMode) => void;
@@ -1717,6 +1730,7 @@ function OfficeSettingsPanel({
           <span>{getMemoryEmbeddingProviderLabel(officeSettings.memory.embeddingProvider)}</span>
           <span>{officeSettings.memory.embeddingExecutionEnabled ? 'embeddings on' : 'embeddings local'}</span>
           <span>{officeSettings.memory.sharedMemoryEnabled ? 'shared on' : 'shared off'}</span>
+          <span>{officeSettings.memory.indexTerminalSnippets ? 'terminal snippets on' : 'terminal snippets off'}</span>
           <span>{officeSettings.memory.privacyMode}</span>
           <span>{`broadcast >= ${Math.round(officeSettings.memory.broadcastThreshold * 100)}%`}</span>
           <span>{`${officeSettings.memory.retentionDays}d retention`}</span>
@@ -1751,6 +1765,15 @@ function OfficeSettingsPanel({
             disabled={!officeSettings.memory.sharedMemoryEnabled}
           />
           <span>Index workspace context</span>
+        </label>
+        <label className="gomi-toggle-field">
+          <input
+            type="checkbox"
+            checked={officeSettings.memory.indexTerminalSnippets}
+            onChange={(event) => onTerminalSnippetIndexingChange(event.target.checked)}
+            disabled={!officeSettings.memory.sharedMemoryEnabled || !officeSettings.memory.indexWorkspaceContext}
+          />
+          <span>Terminal snippets</span>
         </label>
         <label className="gomi-field">
           <span>Embedding Provider</span>

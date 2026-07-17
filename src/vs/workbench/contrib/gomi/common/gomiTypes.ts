@@ -86,6 +86,7 @@ export interface GomiOfficeMemorySettings {
   embeddingExecutionEnabled: boolean;
   sharedMemoryEnabled: boolean;
   indexWorkspaceContext: boolean;
+  indexTerminalSnippets: boolean;
   privacyMode: GomiMemoryPrivacyMode;
   redactSecrets: boolean;
   retentionDays: number;
