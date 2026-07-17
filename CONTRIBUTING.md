@@ -48,6 +48,13 @@ npm test            # Vitest suite (193+ tests)
 
 See [SECURITY.md](SECURITY.md) for reporting vulnerabilities. Never commit secrets — use environment variables or Electron `safeStorage`.
 
+## Documentation
+
+Contributions to documentation are welcome! See the `docs/` platform for platform-specific guides:
+- [macOS & Linux Packaging Guide](docs/macos-linux-packaging.md) - Instructions for cross-platform builds
+- [Windows First Run](docs/windows-first-run.md) - Initial setup guide
+- [Windows Release Notes](docs/windows-release.md) - Release-specific information
+
 ## Code of Conduct
 
 See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

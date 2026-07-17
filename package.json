@@ -19,7 +19,8 @@
     "electron:start": "electron .",
     "electron:dev": "node scripts/run-electron-dev.mjs",
     "desktop:dir": "npm run build && electron-builder --win --dir",
-    "desktop:build": "npm run build && electron-builder --win"
+    "desktop:build": "npm run build && electron-builder --win",
+    "notarize": "node scripts/notarize.js"
   },
   "dependencies": {
     "lucide-react": "^0.475.0",
@@ -58,6 +59,21 @@
       ],
       "icon": "resources/gomi-branding/win32/gomi.ico",
       "artifactName": "Gomi-IDE-Setup-${version}-${arch}.${ext}"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.developer-tools",
+      "icon": "resources/gomi-branding/macos/gomi.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "linux": {
+      "target": ["AppImage", "deb", "rpm"],
+      "category": "Development",
+      "icon": "resources/gomi-branding/linux",
+      "maintainer": "gomi@example.com"
     },
     "nsis": {
       "oneClick": false,
