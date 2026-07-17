@@ -129,6 +129,7 @@ import {
   enqueueStatusToast,
   type GomiStatusToast
 } from './gomiStatusToasts';
+import { HelpOverlay } from './HelpOverlay';
 
 const activityItems = [
   { id: 'explorer', label: 'Explorer', Icon: Files },
@@ -1096,6 +1097,8 @@ export function GomiOfficeApp() {
         <span>{workbenchBridge ? 'Gomi Workbench Bridge' : 'Gomi Demo Runtime'}</span>
         <span>{isRunning ? 'Agents working' : 'Ready'}</span>
       </footer>
+
+      <HelpOverlay />
     </div>
   );
 }
