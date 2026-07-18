@@ -125,6 +125,7 @@ import {
 import { resolveGomiWebviewBridgeContext } from './gomiWebviewBridge';
 import { PhaserOffice } from './PhaserOffice';
 import { formatGomiTaskStatusLabel } from './gomiTaskView';
+import { GomiKeyboardShortcuts } from './GomiKeyboardShortcuts';
 import {
   enqueueStatusToast,
   type GomiStatusToast
@@ -193,6 +194,7 @@ export function GomiOfficeApp() {
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => isCompactAgentPanelViewport());
   const [bottomCollapsed, setBottomCollapsed] = useState(false);
   const [officeViewMode, setOfficeViewMode] = useState<GomiOfficeViewMode>('standard');
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const sidePanelsAutoCollapsed = officeViewMode !== 'standard';
   const bottomAutoCollapsed = officeViewMode === 'full-office';
   const effectiveSidebarCollapsed = sidebarCollapsed || sidePanelsAutoCollapsed;
@@ -320,6 +322,23 @@ export function GomiOfficeApp() {
       stateStore: workbenchContext?.stateStore
     });
   }, [officeSettings, workbenchContext]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Toggle help overlay with ? key
+      if (e.key === '?' && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        setShowKeyboardShortcuts((prev) => !prev);
+      }
+
+      // Close help overlay with Escape key
+      if (e.key === 'Escape') {
+        setShowKeyboardShortcuts(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   async function runOfficeSession() {
     const trimmedRequest = request.trim();
@@ -1096,6 +1115,9 @@ export function GomiOfficeApp() {
         <span>{workbenchBridge ? 'Gomi Workbench Bridge' : 'Gomi Demo Runtime'}</span>
         <span>{isRunning ? 'Agents working' : 'Ready'}</span>
       </footer>
+      {showKeyboardShortcuts && (
+        <GomiKeyboardShortcuts onClose={() => setShowKeyboardShortcuts(false)} />
+      )}
     </div>
   );
 }

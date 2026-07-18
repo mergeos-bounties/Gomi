@@ -1329,3 +1329,153 @@ button {
     border-top: 1px solid #1f2937;
   }
 }
+
+/* Keyboard Shortcuts Help Overlay */
+.gomi-keyboard-shortcuts-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  padding: 24px;
+}
+
+.gomi-keyboard-shortcuts-content {
+  width: 100%;
+  max-width: 720px;
+  max-height: 85vh;
+  overflow-y: auto;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: #111827;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.48);
+  color: #f8fafc;
+}
+
+.gomi-keyboard-shortcuts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #1f2937;
+  padding: 16px 20px;
+  background: #1f2937;
+}
+
+.gomi-keyboard-shortcuts-header-icon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #d1d5db;
+}
+
+.gomi-keyboard-shortcuts-close-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+
+.gomi-keyboard-shortcuts-close-button:hover {
+  background: #374151;
+  color: #f8fafc;
+}
+
+.gomi-keyboard-shortcuts-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: #1f2937;
+  border-bottom: 1px solid #1f2937;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.gomi-keyboard-shortcuts-categories {
+  padding: 16px 20px;
+}
+
+.gomi-keyboard-shortcuts-category {
+  margin-bottom: 24px;
+}
+
+.gomi-keyboard-shortcuts-category:last-child {
+  margin-bottom: 0;
+}
+
+.gomi-keyboard-shortcuts-category h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #d1d5db;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.gomi-keyboard-shortcuts-category table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.gomi-keyboard-shortcuts-category tr {
+  border-bottom: 1px solid #1f2937;
+}
+
+.gomi-keyboard-shortcuts-category tr:last-child {
+  border-bottom: 0;
+}
+
+.gomi-keyboard-shortcuts-key-cell {
+  width: 1%;
+  white-space: nowrap;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.gomi-keyboard-shortcuts-key-cell kbd {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #374151;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: #f8fafc;
+  border: 1px solid #4b5563;
+}
+
+.gomi-keyboard-shortcuts-label-cell {
+  width: 1%;
+  white-space: nowrap;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #d1d5db;
+}
+
+.gomi-keyboard-shortcuts-description-cell {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.gomi-keyboard-shortcuts-footer {
+  border-top: 1px solid #1f2937;
+  padding: 16px 20px;
+  background: #1f2937;
+  font-size: 13px;
+  color: #6b7280;
+  text-align: center;
+}
