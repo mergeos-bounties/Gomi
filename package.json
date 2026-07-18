@@ -22,10 +22,12 @@
     "desktop:build": "npm run build && electron-builder --win"
   },
   "dependencies": {
+    "@types/three": "^0.185.1",
     "lucide-react": "^0.475.0",
     "phaser": "^3.87.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@types/node": "^22.13.1",
