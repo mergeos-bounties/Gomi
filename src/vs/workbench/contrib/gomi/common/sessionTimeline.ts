@@ -1,0 +1,3 @@
+/** Office session timeline persistence #16 */
+export interface TimelineEntry{id:string;type:'task'|'message'|'patch'|'report';content:string;agentId?:string;timestamp:number;sessionId:string}
+export class SessionTimeline{private entries:TimelineEntry[]=[];private idCounter=0;add(type:TimelineEntry['type'],content:string,agentId:string|undefined,sessionId:string):TimelineEntry{const e:TimelineEntry={id:(++this.idCounter).toString(),type,content,agentId,timestamp:Date.now(),sessionId};this.entries.push(e);return e}getBySession(id:string):TimelineEntry[]{return this.entries.filter(e=>e.sessionId===id)}clear():void{this.entries=[]}}
