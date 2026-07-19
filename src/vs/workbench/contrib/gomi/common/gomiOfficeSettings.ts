@@ -1098,3 +1098,59 @@ function isoDateSetting(value: unknown): string {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
+
+export function addCustomDepartment(settings: GomiOfficeSettings, department: Omit<CustomDepartment, 'id'>): GomiOfficeSettings {
+  // Generate a unique ID if not provided
+  const id = department.id || `custom-dept-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  const newDept: CustomDepartment = { ...department, id };
+  
+  // Cap at 10 custom departments
+  if (settings.customDepartments.length >= 10) {
+    return settings; // or throw new Error('Maximum number of custom departments reached');
+  }
+  
+  // Avoid duplicate IDs
+  if (settings.customDepartments.some(d => d.id === id)) {
+    return settings;
+  }
+  
+  return {
+    ...settings,
+    customDepartments: [...settings.customDepartments, newDept]
+  };
+}
+
+export function updateCustomDepartment(settings: GomiOfficeSettings, id: string, updates: Partial<Omit<CustomDescriptor, 'id'>>): GomiOfficeSettings {
+  const index = settings.customDepartments.findIndex(d => d.id === id);
+  if (index === -1) {
+    return settings;
+  }
+  
+  const updatedDept = { ...settings.customDepartments[index], ...updates };
+  const newDepartments = [...settings.customDepartments];
+  newDepartments[index] = updatedDept;
+  
+  return {
+    ...settings,
+    customDepartments: newDepartments
+  };
+}
+
+export function removeCustomDepartment(settings: GomiOfficeSettings, id: string): GomiOfficeSettings {
+  const index = settings.customDepartments.findIndex(d => d.id === id);
+  if (index === -1) {
+    return settings;
+  }
+  
+  const newDepartments = [...settings.customDepartments];
+  newDepartments.splice(index, 1);
+  
+  return {
+    ...settings,
+    customDepartments: newDepartments
+  };
+}
+
+export function getCustomDepartmentIds(settings: GomiOfficeSettings): string[] {
+  return settings.customDepartments.map(d => d.id);
+}

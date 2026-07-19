@@ -1,7 +1,6 @@
 const { app, BrowserWindow, shell, Menu } = require('electron');
 const path = require('node:path');
 const { resolveRendererEntry } = require('./resolveRendererEntry.cjs');
-const { createAutoUpdaterStub, isAutoUpdateAvailable } = require('./autoUpdaterStub.js');
 
 const isDev = !app.isPackaged;
 const rendererEntry = path.join(__dirname, '..', 'dist', 'index.html');
@@ -39,7 +38,7 @@ function createWindow() {
   }
 
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\\/\\//i.test(url)) {
+    if (/^https?:\/\//i.test(url)) {
       void shell.openExternal(url);
     }
 
@@ -49,7 +48,7 @@ function createWindow() {
   window.webContents.on('will-navigate', (event, url) => {
     const allowDevServer =
       entry.kind === 'url' &&
-      (url === entry.target || url.startsWith(entry.target.replace(/\\$/, '') + '/'));
+      (url === entry.target || url.startsWith(entry.target.replace(/\/$/, '') + '/'));
 
     if (allowDevServer) {
       return;
@@ -58,7 +57,7 @@ function createWindow() {
     if (!url.startsWith('file://')) {
       event.preventDefault();
 
-      if (/^https?:\\/\\//i.test(url)) {
+      if (/^https?:\/\//i.test(url)) {
         void shell.openExternal(url);
       }
     }
@@ -69,36 +68,6 @@ app.whenReady().then(() => {
   if (!isDev) {
     Menu.setApplicationMenu(null);
   }
-
-  // Set up auto-update stub based on environment variables
-  const autoUpdateEnabled = process.env.GOMI_AUTO_UPDATE_ENABLED === 'true';
-  const autoUpdateProvider = process.env.GOMI_AUTO_UPDATE_PROVIDER || 'github';
-  const autoUpdateRepo = process.env.GOMI_AUTO_UPDATE_REPO;
-  const autoUpdateChannel = process.env.GOMI_AUTO_UPDATE_CHANNEL;
-
-  let autoUpdater = null;
-  if (autoUpdateEnabled) {
-    if (autoUpdateProvider === 'github' && !autoUpdateRepo) {
-      console.error('[AutoUpdate] GOMI_AUTO_UPDATE_REPO must be set when provider is github');
-    } else {
-      autoUpdater = createAutoUpdaterStub({
-        enabled: autoUpdateEnabled,
-        provider: autoUpdateProvider,
-        repo: autoUpdateRepo,
-        channel: autoUpdateChannel
-      });
-      if (autoUpdater) {
-        console.log('[AutoUpdate] Auto-update enabled');
-      } else {
-        console.log('[AutoUpdate] electron-updater not available, auto-update disabled');
-      }
-    }
-  } else {
-    console.log('[AutoUpdate] Auto-update disabled via GOMI_AUTO_UPDATE_ENABLED');
-  }
-
-  // Attach to app for potential use by other modules
-  app.autoUpdater = autoUpdater;
 
   createWindow();
 
