@@ -1,9 +1,50 @@
 const { app, BrowserWindow, shell, Menu } = require('electron');
 const path = require('node:path');
 const { resolveRendererEntry } = require('./resolveRendererEntry.cjs');
+const { shouldCheckForUpdates } = require('./shouldCheckForUpdates.cjs');
 
 const isDev = !app.isPackaged;
 const rendererEntry = path.join(__dirname, '..', 'dist', 'index.html');
+
+/**
+ * Optional auto-update wiring. electron-updater is not a hard dependency;
+ * default packaged builds never touch the network for updates (see
+ * shouldCheckForUpdates). When enabled + HTTPS feed is set, we try a
+ * dynamic require and a single check with autoDownload=false.
+ *
+ * @returns {{ allowed: boolean, reason: string, feedUrl?: string, attempted?: boolean, error?: string }}
+ */
+function maybeInitAutoUpdate() {
+  const policy = shouldCheckForUpdates({
+    isPackaged: app.isPackaged,
+    env: process.env
+  });
+
+  if (!policy.allowed) {
+    return policy;
+  }
+
+  try {
+    // Optional peer: not listed in package.json so default installs stay offline.
+    // eslint-disable-next-line import/no-extraneous-dependencies, global-require
+    const { autoUpdater } = require('electron-updater');
+    autoUpdater.autoDownload = false;
+    autoUpdater.setFeedURL({
+      provider: 'generic',
+      url: policy.feedUrl
+    });
+    void autoUpdater.checkForUpdates().catch(() => {
+      // Network/feed errors are non-fatal; packaging must not crash on update fail.
+    });
+    return { ...policy, attempted: true };
+  } catch (err) {
+    return {
+      ...policy,
+      attempted: false,
+      error: err && err.message ? String(err.message) : 'electron-updater-unavailable'
+    };
+  }
+}
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -68,6 +109,9 @@ app.whenReady().then(() => {
   if (!isDev) {
     Menu.setApplicationMenu(null);
   }
+
+  // Policy runs before window create; default is no network call.
+  maybeInitAutoUpdate();
 
   createWindow();
 

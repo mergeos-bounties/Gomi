@@ -146,6 +146,33 @@ The product release artifact should be a Windows desktop package from the Code -
 
 VS Code's Windows setup path uses Inno Setup. MSI is not the primary upstream packaging format, so Gomi should target a setup `.exe` first and add MSI only if an enterprise installer pipeline is introduced later.
 
+## Optional Electron auto-update (off by default)
+
+The prototype Electron shell (`electron/main.cjs`) includes **optional** auto-update plumbing for packaged builds. It is intentionally inert unless operators opt in.
+
+Policy helper: `electron/shouldCheckForUpdates.cjs` (unit-tested via `tests/shouldCheckForUpdates.test.ts`).
+
+| Condition | Result |
+| --- | --- |
+| Unpackaged / dev (`app.isPackaged === false`) | No update check |
+| Packaged, default env | No update check — **no network** |
+| Packaged + `GOMI_AUTO_UPDATE=1` but no feed URL | No update check |
+| Packaged + flag + non-HTTPS feed | Rejected (`feed-url-not-https`) |
+| Packaged + `GOMI_AUTO_UPDATE=1` + `GOMI_UPDATE_FEED_URL=https://…` | May call `electron-updater` once with `autoDownload=false` |
+
+Env flags:
+
+- `GOMI_AUTO_UPDATE` — set to `1`, `true`, or `yes` to opt in. Anything else (including unset) keeps updates off.
+- `GOMI_UPDATE_FEED_URL` — HTTPS base URL for a generic update feed. Required when the flag is on.
+
+Security notes for packaging:
+
+- **Default packaged builds never call the network for updates.** CI and release artifacts must not set `GOMI_AUTO_UPDATE` unless a production feed is intentionally configured.
+- `electron-updater` is an **optional** runtime peer. It is not a hard dependency of this repository; if the module is missing, the main process skips the check instead of crashing.
+- Only **HTTPS** feeds are accepted so a mis-set env cannot force plaintext or local schemes.
+- When a check runs, `autoDownload` stays `false` so a compromised or unexpected feed cannot silently replace binaries without an explicit download path (future work).
+- Prefer code-signing the release artifacts and serving the feed from a controlled origin before enabling this in production.
+
 ## Current Limitation
 
 This repository is still a Gomi product foundation and module scaffold. A full release requires validating the native workbench contribution and patch diff preview inside a real Code - OSS fork, deepening terminal scrollback and workbench log/output-channel readers beyond the current adapter hooks, and replacing all final branding assets.
