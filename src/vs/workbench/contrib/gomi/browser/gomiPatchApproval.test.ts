@@ -1,3 +1,4 @@
+import { describe, it } from 'vitest';
 import * as assert from 'assert';
 import {
   createPatchReviewState,
@@ -33,71 +34,71 @@ const patches: GomiPatchReviewState[] = [
   review(makePatch('5', 'package.json', ['package.json'], 'high', 'applied')),
 ];
 
-suite('filterPatchesByFilePath', () => {
-  test('returns all patches for empty query', () => {
+describe('filterPatchesByFilePath', () => {
+  it('returns all patches for empty query', () => {
     assert.strictEqual(filterPatchesByFilePath(patches, '').length, 5);
     assert.strictEqual(filterPatchesByFilePath(patches, '  ').length, 5);
   });
 
-  test('filters by file path substring', () => {
+  it('filters by file path substring', () => {
     const result = filterPatchesByFilePath(patches, 'main.ts');
     assert.strictEqual(result.length, 1);
     assert.strictEqual(result[0].patch.id, '1');
   });
 
-  test('matches target files too', () => {
+  it('matches target files too', () => {
     const result = filterPatchesByFilePath(patches, 'types.ts');
     assert.strictEqual(result.length, 1);
     assert.strictEqual(result[0].patch.id, '2');
   });
 
-  test('case insensitive', () => {
+  it('case insensitive', () => {
     const result = filterPatchesByFilePath(patches, 'README.MD');
     assert.strictEqual(result.length, 1);
     assert.strictEqual(result[0].patch.id, '3');
   });
 
-  test('src/ matches multiple', () => {
+  it('src/ matches multiple', () => {
     const result = filterPatchesByFilePath(patches, 'src/');
     assert.strictEqual(result.length, 3);
   });
 });
 
-suite('filterPatchesByRiskLevel', () => {
-  test('all returns all patches', () => {
+describe('filterPatchesByRiskLevel', () => {
+  it('all returns all patches', () => {
     assert.strictEqual(filterPatchesByRiskLevel(patches, 'all').length, 5);
   });
 
-  test('filters by risk level', () => {
+  it('filters by risk level', () => {
     const result = filterPatchesByRiskLevel(patches, 'high');
     assert.strictEqual(result.length, 2);
   });
 
-  test('low returns low-risk patches', () => {
+  it('low returns low-risk patches', () => {
     const result = filterPatchesByRiskLevel(patches, 'low');
     assert.strictEqual(result.length, 2);
   });
 });
 
-suite('filterPendingPatches', () => {
-  test('only returns pending or idle patches', () => {
+describe('filterPendingPatches', () => {
+  it('only returns pending or idle patches', () => {
     const result = filterPendingPatches(patches);
     assert.strictEqual(result.length, 3);
     assert(result.every((p) => p.approvalStatus === 'pending'));
   });
 
-  test('filters pending by file path', () => {
+  it('filters pending by file path', () => {
     const result = filterPendingPatches(patches, { filePathQuery: 'src/' });
     assert.strictEqual(result.length, 2);
   });
 
-  test('filters pending by risk level', () => {
+  it('filters pending by risk level', () => {
     const result = filterPendingPatches(patches, { riskLevel: 'high' });
     assert.strictEqual(result.length, 1);
     assert.strictEqual(result[0].patch.id, '1');
   });
 
-  test('combined filter', () => {
+  it('combined filter', () => {
     const result = filterPendingPatches(patches, {
       filePathQuery: 'src/',
       riskLevel: 'low',
