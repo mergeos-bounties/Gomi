@@ -149,3 +149,55 @@ VS Code's Windows setup path uses Inno Setup. MSI is not the primary upstream pa
 ## Current Limitation
 
 This repository is still a Gomi product foundation and module scaffold. A full release requires validating the native workbench contribution and patch diff preview inside a real Code - OSS fork, deepening terminal scrollback and workbench log/output-channel readers beyond the current adapter hooks, and replacing all final branding assets.
+
+## Auto-Update Configuration
+
+The packaged application includes an optional auto-update mechanism that is **disabled by default** for security and user control.
+
+To enable auto-update in a packaged build, set the following environment variables when launching the application:
+
+- `GOMI_AUTO_UPDATE=true` - Master switch to enable auto-update checks.
+- `GOMI_AUTO_UPDATE_PROVIDER=github` - Update provider (currently only `github` is supported).
+- `GOMI_AUTO_UPDATE_REPO=Gomi/Gomi-IDE` - The GitHub repository in `owner/repo` format from which to fetch updates.
+- `GOMI_AUTO_UPDATE_URL=<full_url>` - For generic providers, the full URL to the update feed (optional if using GitHub).
+- `GOMI_AUTO_UPDATE_CHANNEL=latest` - The update channel to subscribe to (e.g., `latest`, `beta`, `stable`).
+
+### Example
+
+To enable auto-update checking against the official Gomi repository:
+
+```powershell
+$env:GOMI_AUTO_UPDATE = "true"
+$env:GOMI_AUTO_UPDATE_PROVIDER = "github"
+$env:GOMI_AUTO_UPDATE_REPO = "Gomi/Gomi-IDE"
+$env:GOMI_AUTO_UPDATE_CHANNEL = "latest"
+.\Gomi-IDE.exe
+```
+
+### Security Note
+
+Auto-update requires code signing certificates for production use. Without valid signatures, the update mechanism will not function for security reasons. This stub implementation safely handles the absence of `electron-updater` and defaults to no-op when the optional dependency is not installed.
+
+
+## Auto-Update Configuration (Optional)
+
+The packaged Gomi IDE can be configured to check for updates via environment variables. By default, auto-update is disabled for safety.
+
+To enable auto-update, set the following environment variables when launching the packaged executable:
+
+- `GOMI_AUTO_UPDATE=true` - Enables the auto-update check.
+- `GOMI_AUTO_UPDATE_PROVIDER` - Either `github` or `generic` (default: `github`).
+- `GOMI_AUTO_UPDATE_REPO` - For GitHub provider, the repository in `owner/repo` format (default: `Gomi/Gomi-IDE`).
+- `GOMI_AUTO_UPDATE_URL` - For generic provider, the base URL of the update feed.
+- `GOMI_AUTO_UPDATE_CHANNEL` - The channel to use (default: `latest`).
+
+Example (GitHub):
+```bash
+set GOMI_AUTO_UPDATE=true
+set GOMI_AUTO_UPDATE_PROVIDER=github
+set GOMI_AUTO_UPDATE_REPO=MyOrg/MyApp
+Gomi-IDE.exe
+```
+
+Note: Auto-update requires the application to be code-signed. Unsigned packages will not be able to use auto-update due to Electron security restrictions.
+
