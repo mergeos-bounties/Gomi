@@ -1,6 +1,7 @@
-const { app, BrowserWindow, shell, Menu } = require('electron');
+﻿const { app, BrowserWindow, shell, Menu } = require('electron');
 const path = require('node:path');
 const { resolveRendererEntry } = require('./resolveRendererEntry.cjs');
+const { shouldCheckForUpdates, setupAutoUpdater } = require('./autoUpdatePolicy.cjs');
 
 const isDev = !app.isPackaged;
 const rendererEntry = path.join(__dirname, '..', 'dist', 'index.html');
@@ -67,6 +68,14 @@ function createWindow() {
 app.whenReady().then(() => {
   if (!isDev) {
     Menu.setApplicationMenu(null);
+  }
+
+  // Auto-update plumbing: off by default. Only activates when
+  // GOMI_AUTO_UPDATE_ENABLED and GOMI_AUTO_UPDATE_FEED_URL are both set.
+  // See electron/autoUpdatePolicy.cjs and docs/windows-release.md.
+  if (shouldCheckForUpdates(process.env)) {
+    const { autoUpdater } = require('electron');
+    setupAutoUpdater(process.env, autoUpdater);
   }
 
   createWindow();
