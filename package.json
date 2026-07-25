@@ -20,6 +20,7 @@
     "electron:dev": "node scripts/run-electron-dev.mjs",
     "desktop:dir": "npm run build && electron-builder --win --dir",
     "desktop:build": "npm run build && electron-builder --win",
+    "check:desktop": "node scripts/check-desktop-readiness.mjs",
     "notarize": "node scripts/notarize.js"
   },
   "dependencies": {

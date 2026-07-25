@@ -14,6 +14,32 @@ Gomi repository
 -> Upload ZIP/EXE artifacts to GitHub Releases
 ```
 
+## Desktop Release Readiness Check
+
+Before tagging a desktop release or running the Windows packaging workflow,
+run the release-readiness checker to validate that branding, assets, and
+packaging configuration are in place:
+
+```bash
+npm run check:desktop
+```
+
+The script exits non-zero when any prerequisite is missing, so it can be
+used as a local quality gate before `v*` tags are pushed. It validates:
+
+- `product.json` still carries Gomi-branded values and points the
+  extension gallery to Open VSX.
+- Win32 icon, tile, installer bitmaps, Linux and macOS brand assets
+  exist under `resources/gomi-branding`.
+- `package.json → main` resolves to a reachable Electron entry point.
+- `electron-builder` config keys (`appId`, `productName`, `win.icon`,
+  `output`, `buildResources`) match the Gomi desktop release shape.
+- Code - OSS integration manifest and packaging scripts are present.
+
+A Vitest suite in `tests/desktopReadinessChecker.test.ts` covers the
+checker's pure functions so the quality gate stays in sync as the
+release shape evolves.
+
 ## GitHub Actions
 
 The repository includes `.github/workflows/build-release.yml`.
