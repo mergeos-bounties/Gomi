@@ -1,4 +1,8 @@
-import type { GomiBridgeMessage, GomiWorkbenchBridge } from '../electron-sandbox/gomiBridge';
+﻿import type { GomiBridgeMessage, GomiWorkbenchBridge } from '../electron-sandbox/gomiBridge';
+import {
+  validateHostBridgeMessage,
+  type SchemaValidationResult,
+} from '../electron-sandbox/gomiHostBridgeSchema';
 import {
   createGomiBridgeErrorMessage,
   isGomiBridgeMessage,
@@ -26,17 +30,29 @@ export class GomiWebviewHostBridge implements GomiWorkbenchBridge, GomiDisposabl
   constructor(private readonly webview: GomiNativeWebviewHost) {
     this.disposable = this.webview.onMessage((event) => {
       if (!isGomiBridgeMessage(event.message)) {
-        if (shouldReportInvalidGomiBridgeMessage(event.message)) {
-          void this.webview.postMessage(createGomiBridgeErrorMessage());
-        }
+        void this.reportInvalidMessage(event.message);
+        return;
+      }
 
+      const schemaResult = validateHostBridgeMessage(event.message);
+      if (!schemaResult.valid) {
+        void this.reportInvalidMessage(event.message, schemaResult);
         return;
       }
 
       for (const listener of this.listeners) {
-        listener(event.message);
+        listener(schemaResult.message!);
       }
     });
+  }
+
+  private reportInvalidMessage(raw: unknown, schemaResult?: SchemaValidationResult): void {
+    if (!shouldReportInvalidGomiBridgeMessage(raw)) {
+      return;
+    }
+    void this.webview.postMessage(
+      createGomiBridgeErrorMessage(schemaResult?.error)
+    );
   }
 
   postMessage(message: GomiBridgeMessage): void {

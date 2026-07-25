@@ -149,3 +149,37 @@ VS Code's Windows setup path uses Inno Setup. MSI is not the primary upstream pa
 ## Current Limitation
 
 This repository is still a Gomi product foundation and module scaffold. A full release requires validating the native workbench contribution and patch diff preview inside a real Code - OSS fork, deepening terminal scrollback and workbench log/output-channel readers beyond the current adapter hooks, and replacing all final branding assets.
+
+
+
+## Auto-Update
+
+Gomi IDE includes optional auto-update plumbing via Electron's built-in `autoUpdater` module. It is **disabled by default** in every packaged build for security.
+
+### Enabling auto-update
+
+Set both environment variables before launching Gomi:
+
+```powershell
+$env:GOMI_AUTO_UPDATE_ENABLED = "1"
+$env:GOMI_AUTO_UPDATE_FEED_URL  = "https://updates.your-org.com/gomi/win32"
+.\Gomi-IDE.exe
+```
+
+| Variable | Required | Description |
+|---|---|---|
+| `GOMI_AUTO_UPDATE_ENABLED` | Yes | Set to `"1"` or `"true"` |
+| `GOMI_AUTO_UPDATE_FEED_URL` | Yes | HTTPS URL pointing to an electron-builder update feed |
+
+### Security considerations
+
+- Without both variables set, the packaged build performs **zero network requests** for update checks.
+- The feed URL MUST use HTTPS. Plain HTTP URLs are rejected by the policy guard.
+- The auto-update machinery is loaded lazily: `electron/autoUpdatePolicy.cjs` is only required (and network-capable code is only imported) after the policy gate passes.
+- For air-gapped or enterprise deployments, simply omit both variables — Gomi runs fully offline with no update chatter.
+
+### Testing the policy
+
+```bash
+npm test -- tests/autoUpdatePolicy.test.ts
+```

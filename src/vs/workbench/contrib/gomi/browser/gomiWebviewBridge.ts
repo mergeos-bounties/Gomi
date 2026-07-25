@@ -251,12 +251,12 @@ export function withGomiBridgeProtocol(message: GomiBridgeMessage): GomiBridgeMe
   };
 }
 
-export function createGomiBridgeErrorMessage(): GomiBridgeMessage {
+export function createGomiBridgeErrorMessage(detail?: string): GomiBridgeMessage {
   return {
     protocolVersion: GOMI_BRIDGE_PROTOCOL_VERSION,
     type: 'gomi.bridgeError',
     code: 'invalid_message',
-    message: 'Rejected invalid Gomi bridge message.'
+    message: detail ?? 'Rejected invalid Gomi bridge message.',
   };
 }
 
