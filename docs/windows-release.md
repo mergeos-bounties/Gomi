@@ -149,3 +149,22 @@ VS Code's Windows setup path uses Inno Setup. MSI is not the primary upstream pa
 ## Current Limitation
 
 This repository is still a Gomi product foundation and module scaffold. A full release requires validating the native workbench contribution and patch diff preview inside a real Code - OSS fork, deepening terminal scrollback and workbench log/output-channel readers beyond the current adapter hooks, and replacing all final branding assets.
+
+## Auto-update considerations
+
+The packaged application includes optional auto-update plumbing via `electron-updater`.
+By default, auto-update is **disabled** and no network calls are made for updates.
+
+To enable auto-update in a packaged build, set the following environment variables:
+- `AUTO_UPDATE_ENABLED=true`
+- `UPDATE_FEED_URL=<URL_to_your_update_feed>`
+
+The application will then check for updates at the specified feed when started.
+The update check is performed only when the application is packaged (`app.isPackaged === true`).
+
+Security considerations:
+- Ensure the update feed URL uses HTTPS.
+- The update feed should be served from a trusted domain.
+- The application does not enforce code signing verification; rely on your update server's security.
+- Consider setting `AUTO_UPDATE_ENABLED=false` in environments where automatic updates are not desired.
+

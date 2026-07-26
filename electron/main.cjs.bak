@@ -1,7 +1,6 @@
-const { app, BrowserWindow, shell, Menu, autoUpdater } = require('electron');
+const { app, BrowserWindow, shell, Menu } = require('electron');
 const path = require('node:path');
 const { resolveRendererEntry } = require('./resolveRendererEntry.cjs');
-const { shouldCheckForUpdates } = require('./updatePolicy.cjs');
 
 const isDev = !app.isPackaged;
 const rendererEntry = path.join(__dirname, '..', 'dist', 'index.html');
@@ -49,7 +48,7 @@ function createWindow() {
   window.webContents.on('will-navigate', (event, url) => {
     const allowDevServer =
       entry.kind === 'url' &&
-      (url === entry.target || url.startsWith(entry.target.replace(/\/+$/, '') + '/'));
+      (url === entry.target || url.startsWith(entry.target.replace(/\/$/, '') + '/'));
 
     if (allowDevServer) {
       return;
@@ -71,33 +70,6 @@ app.whenReady().then(() => {
   }
 
   createWindow();
-
-  // Set up auto-updater only if policy allows
-  if (shouldCheckForUpdates(process.env)) {
-    // Configure auto-updater to check manually via IPC or environment trigger
-    // For now, we just ensure the module is initialized; actual check can be triggered via env or IPC
-    autoUpdater.on('error', (err) => {
-      console.error('Error in auto-updater:', err);
-    });
-    autoUpdater.on('checking-for-update', () => {
-      console.log('Checking for update...');
-    });
-    autoUpdater.on('update-available', (info) => {
-      console.log('Update available:', info);
-    });
-    autoUpdater.on('update-not-available', (info) => {
-      console.log('Update not available:', info);
-    });
-    autoUpdater.on('download-progress', (progressObj) => {
-      let log_message = "Download speed: " + progressObj.bytesPerSecond;
-      log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
-      log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
-      console.log(log_message);
-    });
-    autoUpdater.on('update-downloaded', (info) => {
-      console.log('Update downloaded:', info);
-    });
-  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
