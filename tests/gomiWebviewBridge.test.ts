@@ -225,6 +225,62 @@ describe('Gomi webview bridge', () => {
   });
 });
 
+
+describe('message schema validation (bounty #22)', () => {
+  it('rejects messages with missing protocol version', () => {
+    expect(isGomiBridgeMessage({ type: 'gomi.stop' })).toBe(false);
+  });
+  it('rejects messages with wrong protocol version', () => {
+    expect(isGomiBridgeMessage({ protocolVersion: 2, type: 'gomi.stop' })).toBe(false);
+  });
+  it('accepts gomi.run with valid request', () => {
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.run', request: 'Analyze code' })).toBe(true);
+  });
+  it('rejects gomi.run with empty request', () => {
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.run', request: '' })).toBe(false);
+  });
+  it('rejects gomi.run with oversized request (>16K)', () => {
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.run', request: 'x'.repeat(16_001) })).toBe(false);
+  });
+  it('rejects gomi.run with unknown keys', () => {
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.run', request: 'Test', extraKey: true })).toBe(false);
+  });
+  it('accepts gomi.stop without reason', () => {
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.stop' })).toBe(true);
+  });
+  it('rejects gomi.stop with oversized reason (>2K)', () => {
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.stop', reason: 'x'.repeat(2_001) })).toBe(false);
+  });
+  it('rejects gomi.stop with unknown keys', () => {
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.stop', unknownField: 'bad' })).toBe(false);
+  });
+  it('rejects gomi.openProject with null bytes', () => {
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.openProject', project: { id: 'p1', name: 'P', path: 'bad\u0000path', lastOpenedAt: '2026-01-01T00:00:00.000Z' } })).toBe(false);
+  });
+  it('rejects gomi.openProject with path traversal', () => {
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.openProject', project: { id: 'p1', name: 'P', path: '../../secret', lastOpenedAt: '2026-01-01T00:00:00.000Z' } })).toBe(false);
+  });
+  it('accepts gomi.applyPatch with valid patch', () => {
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.applyPatch', patch: { id: 'p1', filePath: 'src/main.ts', targetFiles: ['src/main.ts'], summary: 'Fix', diff: 'diff', approvalStatus: 'pending', riskLevel: 'low', createdByAgentId: 'ceo' } })).toBe(true);
+  });
+  it('rejects gomi.applyPatch with path traversal', () => {
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.applyPatch', patch: { id: 'p1', filePath: '../.env', targetFiles: ['.env'], summary: 'Bad', diff: 'diff', approvalStatus: 'pending', riskLevel: 'low', createdByAgentId: 'ceo' } })).toBe(false);
+  });
+  it('rejects oversized messages (>64KB)', () => {
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.run', request: 'x'.repeat(60_000) })).toBe(false);
+  });
+  it('rejects unknown message types', () => {
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.malicious' })).toBe(false);
+  });
+  it('rejects null/undefined/non-object', () => {
+    expect(isGomiBridgeMessage(null)).toBe(false);
+    expect(isGomiBridgeMessage(undefined)).toBe(false);
+    expect(isGomiBridgeMessage(42)).toBe(false);
+  });
+  it('rejects __proto__ pollution', () => {
+    expect(isGomiBridgeMessage({ protocolVersion: 1, type: 'gomi.stop', '__proto__': 'p' })).toBe(false);
+  });
+});
 class MemoryVsCodeApi implements GomiVsCodeWebviewApi {
   readonly outbox: GomiBridgeMessage[] = [];
   state: unknown;

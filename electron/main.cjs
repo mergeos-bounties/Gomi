@@ -64,6 +64,13 @@ function createWindow() {
   });
 }
 
+
+// Auto-update stub (optional, off by default)
+const { initAutoUpdate } = require('./auto-update.cjs');
+const autoUpdate = initAutoUpdate(app);
+if (autoUpdate.initialized) {
+  console.log('[auto-update] Initialized (feed: %s)', process.env.GOMI_UPDATE_FEED_URL || 'default');
+}
 app.whenReady().then(() => {
   if (!isDev) {
     Menu.setApplicationMenu(null);
@@ -83,3 +90,4 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+

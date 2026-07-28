@@ -123,6 +123,38 @@ describe('Gomi webview host bridge', () => {
   });
 });
 
+
+describe('host bridge validation (bounty #22)', () => {
+  it('rejects wrong protocol and sends error', () => {
+    const webview = new MemoryNativeWebview();
+    createGomiWebviewHostBridge(webview);
+    webview.emit({ protocolVersion: 2, type: 'gomi.stop' });
+    expect(webview.outbox).toHaveLength(1);
+    expect(webview.outbox[0]).toMatchObject({ type: 'gomi.bridgeError' });
+  });
+  it('rejects oversized payloads', () => {
+    const webview = new MemoryNativeWebview();
+    createGomiWebviewHostBridge(webview);
+    webview.emit({ protocolVersion: 1, type: 'gomi.run', request: 'x'.repeat(70_000) });
+    expect(webview.outbox).toHaveLength(1);
+    expect(webview.outbox[0]).toMatchObject({ type: 'gomi.bridgeError' });
+  });
+  it('passes valid messages through', () => {
+    const webview = new MemoryNativeWebview();
+    const bridge = createGomiWebviewHostBridge(webview);
+    const received: GomiBridgeMessage[] = [];
+    bridge.onMessage((msg) => received.push(msg));
+    webview.emit({ protocolVersion: 1, type: 'gomi.stop' });
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({ type: 'gomi.stop' });
+  });
+  it('ignores non-Gomi messages silently', () => {
+    const webview = new MemoryNativeWebview();
+    createGomiWebviewHostBridge(webview);
+    webview.emit({ type: 'random' });
+    expect(webview.outbox).toHaveLength(0);
+  });
+});
 class MemoryNativeWebview {
   readonly outbox: GomiBridgeMessage[] = [];
   private readonly listeners = new Set<(event: GomiNativeWebviewMessageEvent) => void>();
