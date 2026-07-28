@@ -1,3 +1,5 @@
+import { getGitStatusSummary, type GitStatusSummary } from './gitStatusIndexer';
+import { formatGitContext } from './gitContextFormatter';
 import type {
   GomiWorkspaceContentSnippet,
   GomiWorkspaceSnapshot
@@ -71,6 +73,41 @@ export class DefaultGomiProjectContextIndexer implements GomiProjectContextIndex
   }
 }
 
+export function buildGitContextChunks(
+  workspace: GomiWorkspaceSnapshot
+): GomiProjectContextChunk[] {
+  const chunks: GomiProjectContextChunk[] = [];
+  const git = getGitStatusSummary(workspace.rootPath);
+  const formatted = formatGitContext(git);
+
+  chunks.push({
+    id: 'context:workspace:git-summary',
+    title: 'Git summary',
+    content: formatted.summaryText || workspace.gitSummary,
+    tags: ['workspace', 'git', 'status'],
+    sourceType: 'manifest',
+    importance: 0.62
+  });
+
+  if (formatted.changesDetail) {
+    chunks.push({
+      id: 'context:workspace:git-changes',
+      title: 'Git file changes',
+      content: formatted.changesDetail,
+      tags: ['workspace', 'git', 'changes'],
+      sourceType: 'manifest',
+      importance: 0.58,
+      metadata: {
+        changedFiles: git?.changedFiles,
+        stagedFiles: git?.stagedFiles,
+        untrackedFiles: git?.untrackedFiles
+      }
+    });
+  }
+
+  return chunks;
+}
+
 export function createWorkspaceContextChunks(
   workspace: GomiWorkspaceSnapshot
 ): GomiProjectContextChunk[] {
@@ -87,14 +124,7 @@ export function createWorkspaceContextChunks(
         fileCount: workspace.files.length
       }
     },
-    {
-      id: 'context:workspace:git-summary',
-      title: 'Git summary',
-      content: workspace.gitSummary,
-      tags: ['workspace', 'git', 'status'],
-      sourceType: 'manifest',
-      importance: 0.62
-    },
+    ...buildGitContextChunks(workspace),
     {
       id: 'context:workspace:runtime-summary',
       title: 'Runtime summary',
@@ -172,3 +202,7 @@ function languageFromPath(filePath: string): string {
 
   return languageMap[extension] ?? extension;
 }
+
+
+
+
