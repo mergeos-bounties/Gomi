@@ -1494,7 +1494,7 @@ function ProviderStatusBar({ officeSettings }: { officeSettings: GomiOfficeSetti
           className={`gomi-provider-badge${badge.active ? ' is-active' : ''}`}
           title={badge.title}
         >
-          {badge.active ? '●' : '○'} {badge.label}
+          {badge.active ? '鈼? : '鈼?} {badge.label}
         </span>
       ))}
       <span className="gomi-provider-badge-count" title="Active providers">{activeCount} active</span>
@@ -2096,7 +2096,7 @@ function UsageEstimatePanel({ usageEstimate }: { usageEstimate?: GomiUsageSummar
         <div>
           <div className="gomi-project-name">Usage Estimate</div>
           <div className="gomi-project-detail">
-            {usageEstimate.runCount} provider run{usageEstimate.runCount === 1 ? '' : 's'} · {usageEstimate.pricing.label}
+            {usageEstimate.runCount} provider run{usageEstimate.runCount === 1 ? '' : 's'} 路 {usageEstimate.pricing.label}
           </div>
         </div>
         <span className="gomi-status" data-status={usageEstimate.hasEstimatedTokens ? 'pending' : 'done'}>
@@ -2120,7 +2120,7 @@ function UsageEstimatePanel({ usageEstimate }: { usageEstimate?: GomiUsageSummar
         </span>
         {usageEstimate.items.slice(0, 3).map((item, index) => (
           <span className="gomi-chip" key={`${item.providerId ?? 'provider'}-${item.model ?? 'model'}-${index}`}>
-            {item.providerId ?? 'provider'}{item.model ? ` · ${item.model}` : ''}
+            {item.providerId ?? 'provider'}{item.model ? ` 路 ${item.model}` : ''}
           </span>
         ))}
       </div>
@@ -2353,3 +2353,4 @@ function iconForAgent(agentId: GomiAgentId) {
 
   return Bot;
 }
+
