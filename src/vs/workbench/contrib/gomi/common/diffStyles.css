@@ -1,0 +1,31 @@
+/* Diff syntax highlighting for Office panel patch review */
+.gomi-diff-stats {
+  padding: 6px 12px;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-size: 12px;
+  color: #888;
+  background: rgba(0,0,0,0.05);
+  border-radius: 4px 4px 0 0;
+  margin-bottom: 4px;
+}
+.gomi-diff-header {
+  color: #569cd6;
+  background: rgba(86,156,214,0.07);
+}
+.gomi-diff-added {
+  color: #4ec9b0;
+  background: rgba(78,201,176,0.08);
+}
+.gomi-diff-removed {
+  color: #f14c4c;
+  background: rgba(241,76,76,0.08);
+}
+.gomi-diff-context {
+  color: #ccc;
+}
+.gomi-diff-marker {
+  display: inline-block;
+  width: 18px;
+  user-select: none;
+  opacity: 0.6;
+}
