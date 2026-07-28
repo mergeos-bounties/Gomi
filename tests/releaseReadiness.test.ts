@@ -275,5 +275,8 @@ describe('release readiness', () => {
     expect(packageJson.scripts?.['verify:release']).toBe(
       'vitest run tests/releaseReadiness.test.ts tests/codeOssIntegrationManifest.test.ts tests/codeOssIntegrationDryRun.test.ts'
     );
+    expect(packageJson.scripts?.['verify:local']).toBe(
+      'npm run verify:release'
+    );
   });
 });
