@@ -386,6 +386,7 @@ Gomi/
 | `npm run build:webview` | Bundle for Code - OSS webview pane |
 | `npm run generate:brand-assets` | Desktop branding assets |
 | `npm test` | Vitest |
+| `npm run verify:local` | Local release-readiness gate |
 | `npm run verify:release` | Release-readiness checks |
 | `npm run electron:start` | Prototype Electron window |
 | `npm run desktop:build` | Electron-builder Windows installer |
