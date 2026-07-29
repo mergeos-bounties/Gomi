@@ -119,7 +119,10 @@ export interface GomiPromptTemplate {
   updatedAt: string;
 }
 
+export type GomiLocale = 'en' | 'vi';
+
 export interface GomiOfficeSettings {
+  locale: GomiLocale;
   avatarStyle: GomiAvatarStyle;
   recentProjects: GomiRecentProject[];
   seats: GomiAgentSeat[];
