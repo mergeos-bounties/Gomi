@@ -6,6 +6,7 @@ import type {
   GomiAgentWorkMode,
   GomiAvatarStyle,
   GomiLiveProviderMode,
+  GomiLocale,
   GomiMemoryEmbeddingProviderId,
   GomiMemoryPrivacyMode,
   GomiOfficeSettings,
@@ -184,6 +185,7 @@ export const GOMI_AGENT_CLI_PROVIDERS: GomiAgentCliProvider[] = [
 ];
 
 export const DEFAULT_GOMI_OFFICE_SETTINGS: GomiOfficeSettings = {
+  locale: 'en',
   avatarStyle: 'emoji',
   recentProjects: [],
   seats: [
@@ -424,6 +426,16 @@ export function setAvatarStyle(
   return {
     ...settings,
     avatarStyle
+  };
+}
+
+export function setLocale(
+  settings: GomiOfficeSettings,
+  locale: GomiLocale
+): GomiOfficeSettings {
+  return {
+    ...settings,
+    locale
   };
 }
 

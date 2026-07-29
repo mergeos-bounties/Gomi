@@ -69,6 +69,7 @@ import {
   setMemoryPrivacyMode,
   setMemoryRetentionDays,
   setAvatarStyle,
+  setLocale,
   setPatchApprovalRequired,
   setSeatWorkMode,
   savePromptTemplate,
@@ -130,6 +131,10 @@ import {
   enqueueStatusToast,
   type GomiStatusToast
 } from './gomiStatusToasts';
+import {
+  GOMI_LOCALE_PACKS
+} from '../common/gomiI18n';
+import type { GomiLocale } from '../common/gomiTypes';
 
 const activityItems = [
   { id: 'explorer', label: 'Explorer', Icon: Files },
@@ -771,6 +776,10 @@ export function GomiOfficeApp() {
     setOfficeSettings((currentSettings) => setAvatarStyle(currentSettings, avatarStyle));
   }
 
+  function updateLocale(locale: GomiLocale) {
+    setOfficeSettings((currentSettings) => setLocale(currentSettings, locale));
+  }
+
   function updatePatchApprovalRequired(requirePatchApproval: boolean) {
     setOfficeSettings((currentSettings) =>
       setPatchApprovalRequired(currentSettings, requirePatchApproval)
@@ -1080,6 +1089,7 @@ export function GomiOfficeApp() {
           onMemoryRetentionDaysChange={updateMemoryRetentionDays}
           onMaxProjectMemoryItemsChange={updateMaxProjectMemoryItems}
           onAvatarStyleChange={updateAvatarStyle}
+          onLocaleChange={updateLocale}
           onPatchApprovalRequiredChange={updatePatchApprovalRequired}
           onWorkspaceTrustChange={updateWorkspaceTrust}
           onLiveProviderModeChange={updateLiveProviderMode}
@@ -1292,6 +1302,7 @@ function RightPanel({
   onMemoryRetentionDaysChange,
   onMaxProjectMemoryItemsChange,
   onAvatarStyleChange,
+  onLocaleChange,
   onPatchApprovalRequiredChange,
   onWorkspaceTrustChange,
   onLiveProviderModeChange,
@@ -1330,6 +1341,7 @@ function RightPanel({
   onMemoryRetentionDaysChange: (retentionDays: number) => void;
   onMaxProjectMemoryItemsChange: (maxProjectMemoryItems: number) => void;
   onAvatarStyleChange: (avatarStyle: GomiAvatarStyle) => void;
+  onLocaleChange: (locale: GomiLocale) => void;
   onPatchApprovalRequiredChange: (requirePatchApproval: boolean) => void;
   onWorkspaceTrustChange: (workspaceTrust: GomiWorkspaceTrustState) => void;
   onLiveProviderModeChange: (liveProviderMode: GomiLiveProviderMode) => void;
@@ -1402,6 +1414,7 @@ function RightPanel({
           onMemoryRetentionDaysChange={onMemoryRetentionDaysChange}
           onMaxProjectMemoryItemsChange={onMaxProjectMemoryItemsChange}
           onAvatarStyleChange={onAvatarStyleChange}
+          onLocaleChange={onLocaleChange}
           onPatchApprovalRequiredChange={onPatchApprovalRequiredChange}
           onWorkspaceTrustChange={onWorkspaceTrustChange}
           onLiveProviderModeChange={onLiveProviderModeChange}
@@ -1527,6 +1540,7 @@ function OfficeSettingsPanel({
   onMemoryRetentionDaysChange,
   onMaxProjectMemoryItemsChange,
   onAvatarStyleChange,
+  onLocaleChange,
   onPatchApprovalRequiredChange,
   onWorkspaceTrustChange,
   onLiveProviderModeChange,
@@ -1561,6 +1575,7 @@ function OfficeSettingsPanel({
   onMemoryRetentionDaysChange: (retentionDays: number) => void;
   onMaxProjectMemoryItemsChange: (maxProjectMemoryItems: number) => void;
   onAvatarStyleChange: (avatarStyle: GomiAvatarStyle) => void;
+  onLocaleChange: (locale: GomiLocale) => void;
   onPatchApprovalRequiredChange: (requirePatchApproval: boolean) => void;
   onWorkspaceTrustChange: (workspaceTrust: GomiWorkspaceTrustState) => void;
   onLiveProviderModeChange: (liveProviderMode: GomiLiveProviderMode) => void;
@@ -1634,6 +1649,20 @@ function OfficeSettingsPanel({
             </button>
           ))}
         </div>
+        <label className="gomi-field">
+          <span>UI Language</span>
+          <select
+            value={officeSettings.locale}
+            onChange={(event) => onLocaleChange(event.target.value as GomiLocale)}
+            aria-label="UI Language"
+          >
+            {GOMI_LOCALE_PACKS.map((pack) => (
+              <option value={pack.locale} key={pack.locale}>
+                {pack.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div className="gomi-settings-group">
