@@ -892,6 +892,64 @@ button {
   cursor: pointer;
 }
 
+.gomi-settings-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid #253247;
+  border-radius: 8px;
+  background: #020617;
+  color: #94a3b8;
+}
+
+.gomi-settings-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #e2e8f0;
+  font: inherit;
+}
+
+.gomi-settings-search input::placeholder {
+  color: #64748b;
+}
+
+.gomi-settings-search:focus-within {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 1px rgba(20, 184, 166, 0.18);
+}
+
+.gomi-settings-search-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.gomi-settings-search-chip {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid #315547;
+  border-radius: 4px;
+  background: #12251f;
+  color: #99f6e4;
+}
+
+.gomi-settings-empty {
+  border: 1px dashed #334155;
+  border-radius: 8px;
+  padding: 12px;
+  color: #94a3b8;
+  text-align: center;
+}
+
 .gomi-provider-status-bar {
   display: flex;
   flex-wrap: wrap;

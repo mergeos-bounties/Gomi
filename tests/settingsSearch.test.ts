@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { searchSettings, buildSettingsSearchIndex } from '../src/vs/workbench/contrib/gomi/common/settingsSearch';
+import {
+  buildSettingsSearchIndex,
+  matchesSettingsSearch,
+  searchSettings
+} from '../src/vs/workbench/contrib/gomi/common/settingsSearch';
 
 describe('settingsSearch', () => {
   const fields = [
@@ -28,5 +32,10 @@ describe('settingsSearch', () => {
     });
     expect(idx.length).toBeGreaterThan(0);
     expect(idx.find((f) => f.key === 'memory.retentionDays')).toBeTruthy();
+  });
+
+  it('matches multi-term section metadata', () => {
+    expect(matchesSettingsSearch(['Shared Memory', { retentionDays: 30 }], 'memory retention')).toBe(true);
+    expect(matchesSettingsSearch(['Execution Policy', { allowHttpProviders: true }], 'memory retention')).toBe(false);
   });
 });

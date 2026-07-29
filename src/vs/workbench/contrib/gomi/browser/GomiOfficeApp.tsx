@@ -122,6 +122,11 @@ import {
   exportSettingsToJson,
   importSettingsFromJson
 } from '../common/gomiOfficeSettingsExport';
+import {
+  buildSettingsSearchIndex,
+  matchesSettingsSearch,
+  searchSettings
+} from '../common/settingsSearch';
 import { resolveGomiWebviewBridgeContext } from './gomiWebviewBridge';
 import { PhaserOffice } from './PhaserOffice';
 import { formatGomiTaskStatusLabel } from './gomiTaskView';
@@ -1571,6 +1576,7 @@ function OfficeSettingsPanel({
   onHttpProviderMaxRetriesChange: (httpMaxRetries: number) => void;
   onPruneMemory: () => void;
 }) {
+  const [settingsSearchQuery, setSettingsSearchQuery] = useState('');
   const leaders = officeSettings.seats.filter((seat) => seat.seatKind !== 'employee');
   const employees = officeSettings.seats.filter((seat) => seat.seatKind === 'employee');
   const employeeDepartments = GOMI_HIRABLE_DEPARTMENT_IDS.map((departmentId) => ({
@@ -1587,6 +1593,54 @@ function OfficeSettingsPanel({
     selectedEmbeddingProvider.modelEnv,
     selectedEmbeddingProvider.apiKeyEnv
   ].filter(Boolean);
+  const settingsSearchIndex = useMemo(
+    () => buildSettingsSearchIndex(officeSettings as unknown as Record<string, unknown>),
+    [officeSettings]
+  );
+  const settingsSearchResults = useMemo(
+    () => searchSettings(settingsSearchIndex, settingsSearchQuery),
+    [settingsSearchIndex, settingsSearchQuery]
+  );
+  const settingsSearchTerms = useMemo(
+    () => settingsSearchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean),
+    [settingsSearchQuery]
+  );
+  const showAppearanceSettings = matchesSettingsSearch(
+    ['Office Appearance', 'agent avatar style', officeSettings.avatarStyle, GOMI_AVATAR_STYLE_OPTIONS],
+    settingsSearchQuery
+  );
+  const showLeaderSettings = matchesSettingsSearch(
+    ['CEO And Department Heads', 'leader provider sleep wake', leaders],
+    settingsSearchQuery
+  );
+  const showEmployeeSettings = matchesSettingsSearch(
+    ['Employees', 'staffing hire fire restore department active total', employeeDepartments],
+    settingsSearchQuery
+  );
+  const showMemorySettings = matchesSettingsSearch(
+    [
+      'Shared Memory',
+      'embedding provider privacy retention broadcast threshold terminal snippets workspace context patch approval prune',
+      officeSettings.memory,
+      selectedEmbeddingProvider,
+      embeddingEnvNames,
+      memoryItems,
+      memoryPruneReport
+    ],
+    settingsSearchQuery
+  );
+  const showExecutionSettings = matchesSettingsSearch(
+    ['Execution Policy', 'workspace trust live provider CLI HTTP retries concurrent approval', officeSettings.execution],
+    settingsSearchQuery
+  );
+  const visibleSettingsGroupCount = [
+    showAppearanceSettings,
+    showLeaderSettings,
+    showEmployeeSettings,
+    showMemorySettings,
+    showExecutionSettings
+  ].filter(Boolean).length;
+  const searchPreviewResults = settingsSearchResults.slice(0, 5);
 
   return (
     <section className="gomi-settings-panel" aria-label="Office Settings">
@@ -1616,8 +1670,32 @@ function OfficeSettingsPanel({
         </label>
       </div>
 
+      <label className="gomi-settings-search" htmlFor="gomi-settings-search-input">
+        <Search size={14} />
+        <input
+          id="gomi-settings-search-input"
+          type="search"
+          value={settingsSearchQuery}
+          onChange={(event) => setSettingsSearchQuery(event.target.value)}
+          placeholder="Search settings"
+          aria-label="Search settings"
+        />
+      </label>
+
+      {settingsSearchTerms.length > 0 ? (
+        <div className="gomi-settings-search-summary" aria-live="polite">
+          <span>{visibleSettingsGroupCount} section{visibleSettingsGroupCount === 1 ? '' : 's'} matched</span>
+          {searchPreviewResults.map((result) => (
+            <mark className="gomi-settings-search-chip" key={`${result.section}-${result.key}`}>
+              {result.section}: {result.label}
+            </mark>
+          ))}
+        </div>
+      ) : undefined}
+
       <ProviderStatusBar officeSettings={officeSettings} />
 
+      {showAppearanceSettings ? (
       <div className="gomi-settings-group">
         <div className="gomi-settings-title">Office Appearance</div>
         <div className="gomi-avatar-style-controls" role="radiogroup" aria-label="Agent avatar style">
@@ -1635,7 +1713,9 @@ function OfficeSettingsPanel({
           ))}
         </div>
       </div>
+      ) : undefined}
 
+      {showLeaderSettings ? (
       <div className="gomi-settings-group">
         <div className="gomi-settings-title">CEO And Department Heads</div>
         {leaders.map((seat) => (
@@ -1679,7 +1759,9 @@ function OfficeSettingsPanel({
           </div>
         ))}
       </div>
+      ) : undefined}
 
+      {showEmployeeSettings ? (
       <div className="gomi-settings-group">
         <div className="gomi-settings-title-row">
           <div className="gomi-settings-title">Employees</div>
@@ -1734,7 +1816,9 @@ function OfficeSettingsPanel({
           </div>
         ))}
       </div>
+      ) : undefined}
 
+      {showMemorySettings ? (
       <div className="gomi-settings-group">
         <div className="gomi-settings-title-row">
           <div className="gomi-settings-title">Shared Memory</div>
@@ -1889,7 +1973,9 @@ function OfficeSettingsPanel({
         </label>
         <MemoryBoardPanel memoryItems={memoryItems} />
       </div>
+      ) : undefined}
 
+      {showExecutionSettings ? (
       <div className="gomi-settings-group">
         <div className="gomi-settings-title">Execution Policy</div>
         <div className="gomi-memory-summary">
@@ -1966,6 +2052,13 @@ function OfficeSettingsPanel({
           />
         </label>
       </div>
+      ) : undefined}
+
+      {settingsSearchTerms.length > 0 && visibleSettingsGroupCount === 0 ? (
+        <div className="gomi-settings-empty" role="status">
+          No settings match "{settingsSearchQuery}".
+        </div>
+      ) : undefined}
     </section>
   );
 }
