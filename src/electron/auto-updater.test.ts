@@ -5,7 +5,7 @@ describe('AutoUpdater', () => {
     const result = await checkForUpdates();
     expect(result.available).toBe(false);
     expect(result.checking).toBe(false);
-    expect(result.error).toContain('not packaged');
+    expect(result.error).toContain('Not packaged');
   });
 
   test('getUpdateStatus returns initial state', () => {
