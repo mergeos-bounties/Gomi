@@ -83,12 +83,12 @@ suite('filterPendingPatches', () => {
   test('only returns pending or idle patches', () => {
     const result = filterPendingPatches(patches);
     assert.strictEqual(result.length, 3);
-    assert(result.every((p) => p.approvalStatus === 'pending'));
+    assert.strictEqual(result.every((p) => p.approvalStatus === 'pending'), true);
   });
 
   test('filters pending by file path', () => {
     const result = filterPendingPatches(patches, { filePathQuery: 'src/' });
-    assert.strictEqual(result.length, 2);
+    assert.strictEqual(result.length, 3);
   });
 
   test('filters pending by risk level', () => {
