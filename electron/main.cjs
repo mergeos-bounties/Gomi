@@ -1,6 +1,7 @@
 const { app, BrowserWindow, shell, Menu } = require('electron');
 const path = require('node:path');
 const { resolveRendererEntry } = require('./resolveRendererEntry.cjs');
+const { initAutoUpdater } = require('./auto-update.cjs');
 
 const isDev = !app.isPackaged;
 const rendererEntry = path.join(__dirname, '..', 'dist', 'index.html');
@@ -70,6 +71,12 @@ app.whenReady().then(() => {
   }
 
   createWindow();
+
+  // Initialise auto-updater (no-op unless GOMI_AUTO_UPDATE_ENABLED=1)
+  const windows = BrowserWindow.getAllWindows();
+  if (windows.length > 0) {
+    initAutoUpdater(windows[0]);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
