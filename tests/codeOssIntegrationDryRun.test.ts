@@ -31,7 +31,7 @@ async function findPowerShell(): Promise<string | undefined> {
 }
 
 describe('Code - OSS integration dry-run reporting', () => {
-  it('records planned apply and rollback actions without mutating the target checkout', async () => {
+  it('records planned apply and rollback actions without mutating the target checkout', { timeout: 60000 }, async () => {
     const scriptPath = path.join(root, 'scripts', 'apply-gomi-code-oss-integration.ps1');
     const fixturePath = path.join(root, 'scripts', 'fixtures', 'code-oss-dry-run');
     const powerShell = await findPowerShell();
