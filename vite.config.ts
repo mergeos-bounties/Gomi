@@ -18,6 +18,8 @@ export default defineConfig({
     strictPort: false
   },
   test: {
+    globals: true,
+    environment: 'jsdom',
     testTimeout: 15000,
     hookTimeout: 15000
   }
