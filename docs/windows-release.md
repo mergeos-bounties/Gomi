@@ -149,3 +149,35 @@ VS Code's Windows setup path uses Inno Setup. MSI is not the primary upstream pa
 ## Current Limitation
 
 This repository is still a Gomi product foundation and module scaffold. A full release requires validating the native workbench contribution and patch diff preview inside a real Code - OSS fork, deepening terminal scrollback and workbench log/output-channel readers beyond the current adapter hooks, and replacing all final branding assets.
+
+## Auto-Update (optional, off by default)
+
+Packaged builds ship with auto-update plumbing that is **disabled unless explicitly
+configured**. `shouldCheckForUpdates()` in
+`src/vs/workbench/contrib/gomi/node/autoUpdaterStub.ts` gates every update check and
+fails closed: a default packaged build makes no network call because the feature flag
+is absent.
+
+An update check requires **all** of the following:
+
+| Condition | Reason |
+|---|---|
+| `enabled === true` | Opt-in only; absent or `false` keeps updates off |
+| `isPackaged === true` | Dev and test runs must never reach a real feed |
+| A valid feed (`owner/repo`, or an `https://` URL for `generic`) | Enabled-but-unconfigured is a misconfiguration, not a reason to guess |
+| `electron-updater` resolvable | Optional dependency; absent means no updater |
+
+Each rejection returns a machine-readable `reason` (`disabled`, `not-packaged`,
+`no-feed`, `updater-unavailable`) so callers can log the decision without re-deriving it.
+
+### Security considerations
+
+- **No silent downloads.** `autoDownload` is `false`; an update is only fetched after
+  an explicit check, and installs are deferred to app quit.
+- **HTTPS is required for generic feeds.** A plain `http://` URL is rejected, since an
+  update feed over cleartext is trivially spoofable and would allow an attacker to
+  serve an arbitrary binary.
+- **No implicit feed.** Nothing is inferred from the environment; an unconfigured build
+  contacts nothing.
+- **Signing is still outstanding.** The updater is wired but unsigned packages must not
+  be distributed — verify the Windows signing chain before enabling this in production.
