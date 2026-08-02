@@ -63,3 +63,57 @@ export function isAutoUpdateAvailable(): boolean {
     return false;
   }
 }
+
+/** Inputs the update policy is allowed to consider. */
+export interface UpdatePolicyInput {
+  /** Feature flag. Absent or false means updates stay off. */
+  enabled?: boolean;
+  /** Feed target: `owner/repo` for github, or an absolute URL for generic. */
+  repo?: string;
+  url?: string;
+  provider?: AutoUpdateConfig["provider"];
+  /** Only packaged builds should ever reach the network. */
+  isPackaged?: boolean;
+}
+
+export interface UpdatePolicyDecision {
+  shouldCheck: boolean;
+  /** Machine-readable reason, so callers can log without re-deriving intent. */
+  reason:
+    | "ok"
+    | "disabled"
+    | "not-packaged"
+    | "no-feed"
+    | "updater-unavailable";
+}
+
+/**
+ * Decide whether a build may contact the update feed.
+ *
+ * Deliberately fail-closed: every unknown or partially configured state
+ * returns false. A default packaged build performs no network call because
+ * `enabled` is absent, which is the property the acceptance criteria pin down.
+ *
+ * Separated from createAutoUpdaterStub so the policy is testable without
+ * electron-updater installed and without touching the network.
+ */
+export function shouldCheckForUpdates(
+  input: UpdatePolicyInput = {},
+  updaterAvailable: () => boolean = isAutoUpdateAvailable,
+): UpdatePolicyDecision {
+  if (input.enabled !== true) return { shouldCheck: false, reason: "disabled" };
+
+  // Dev and test runs must never hit a real feed.
+  if (input.isPackaged !== true) return { shouldCheck: false, reason: "not-packaged" };
+
+  // Enabled but unconfigured is a misconfiguration, not an invitation to guess.
+  const provider = input.provider ?? "github";
+  const hasFeed = provider === "github"
+    ? typeof input.repo === "string" && input.repo.includes("/")
+    : typeof input.url === "string" && /^https:\/\//.test(input.url);
+  if (!hasFeed) return { shouldCheck: false, reason: "no-feed" };
+
+  if (!updaterAvailable()) return { shouldCheck: false, reason: "updater-unavailable" };
+
+  return { shouldCheck: true, reason: "ok" };
+}
