@@ -207,21 +207,121 @@ describe('Gomi webview bridge', () => {
     })).toBe(false);
   });
 
-  it('can be constructed directly with an injected api and target', () => {
-    const api = new MemoryVsCodeApi();
-    const target = new MemoryMessageTarget();
-    const bridge = createGomiWebviewBridge(api, target);
+  it('rejects non-integer values where integers are required', () => {
+    const baseSettings = {
+      seats: [],
+      memory: {
+        retrievalMode: 'hybrid-vector' as const,
+        embeddingProvider: 'local-hashing' as const,
+        embeddingExecutionEnabled: true,
+        sharedMemoryEnabled: true,
+        indexWorkspaceContext: true,
+        indexTerminalSnippets: true,
+        privacyMode: 'standard' as const,
+        redactSecrets: true,
+        retentionDays: 90,
+        maxProjectMemoryItems: 100,
+        broadcastThreshold: 0.5,
+        requirePatchApproval: true
+      },
+      execution: {
+        workspaceTrust: 'trusted' as const,
+        liveProviderMode: 'demo-only' as const,
+        allowCliProviders: true,
+        allowHttpProviders: false,
+        requirePatchApprovalForLiveProviders: true,
+        maxConcurrentAgentRuns: 4,
+        httpMaxRetries: 3
+      }
+    };
 
-    bridge.postMessage({
-      type: 'gomi.run',
-      request: 'Direct bridge'
-    });
-
-    expect(api.outbox[0]).toMatchObject({
+    expect(isGomiBridgeMessage({
       protocolVersion: 1,
       type: 'gomi.run',
-      request: 'Direct bridge'
-    });
+      request: 'Test',
+      officeSettings: {
+        ...baseSettings,
+        memory: { ...baseSettings.memory, retentionDays: 90.5 }
+      }
+    })).toBe(false);
+
+    expect(isGomiBridgeMessage({
+      protocolVersion: 1,
+      type: 'gomi.run',
+      request: 'Test',
+      officeSettings: {
+        ...baseSettings,
+        memory: { ...baseSettings.memory, maxProjectMemoryItems: 100.1 }
+      }
+    })).toBe(false);
+
+    expect(isGomiBridgeMessage({
+      protocolVersion: 1,
+      type: 'gomi.run',
+      request: 'Test',
+      officeSettings: {
+        ...baseSettings,
+        execution: { ...baseSettings.execution, maxConcurrentAgentRuns: 2.5 }
+      }
+    })).toBe(false);
+
+    expect(isGomiBridgeMessage({
+      protocolVersion: 1,
+      type: 'gomi.run',
+      request: 'Test',
+      officeSettings: {
+        ...baseSettings,
+        execution: { ...baseSettings.execution, httpMaxRetries: 1.5 }
+      }
+    })).toBe(false);
+  });
+
+  it('rejects gomi.event payloads exceeding max message size', () => {
+    expect(isGomiBridgeMessage({
+      protocolVersion: 1,
+      type: 'gomi.event',
+      event: { huge: 'x'.repeat(70_000) }
+    })).toBe(false);
+  });
+
+  it('rejects project paths containing directory traversal', () => {
+    expect(isGomiBridgeMessage({
+      protocolVersion: 1,
+      type: 'gomi.openProject',
+      project: {
+        id: 'project-traversal',
+        name: 'Traversal',
+        path: '../../etc/passwd',
+        lastOpenedAt: '2026-07-15T10:00:00.000Z'
+      }
+    })).toBe(false);
+
+    expect(isGomiBridgeMessage({
+      protocolVersion: 1,
+      type: 'gomi.openProject',
+      project: {
+        id: 'project-traversal',
+        name: 'Traversal',
+        path: '/workspaces/../etc',
+        lastOpenedAt: '2026-07-15T10:00:00.000Z'
+      }
+    })).toBe(false);
+  });
+
+  it('rejects messages with __proto__ or constructor key injection', () => {
+    expect(isGomiBridgeMessage({
+      protocolVersion: 1,
+      type: 'gomi.stop',
+      ['__proto__']: { type: 'gomi.run' }
+    })).toBe(false);
+
+    const msg = {
+      protocolVersion: 1,
+      type: 'gomi.stop' as const,
+    };
+    (msg as Record<string, unknown>)['constructor'] = { type: 'gomi.run' };
+
+    expect(isGomiBridgeMessage(msg)).toBe(false);
   });
 });
 

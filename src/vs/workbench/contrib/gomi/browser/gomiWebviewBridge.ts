@@ -114,6 +114,16 @@ const trustedGomiOriginPrefixes = ['vscode-webview://', 'vscode-file://'];
 
 // Bridge messages cross the webview/host privilege boundary; every new type must
 // be added here with an explicit protocol and payload schema before dispatch.
+//
+// ## Protocol
+// - Every message carries a `protocolVersion` (currently 1) and a `type` prefixed `gomi.`
+// - Max serialized message size: `GOMI_BRIDGE_MAX_MESSAGE_BYTES` (64 000 bytes)
+// - Unknown types are rejected silently; messages that claim `gomi.` but fail
+//   validation return a `gomi.bridgeError` response on the host bridge
+// - Supported types and their validators: `gomi.run`, `gomi.stop`, `gomi.pruneMemory`,
+//   `gomi.openProject`, `gomi.applyPatch`, `gomi.previewPatch`,
+//   `gomi.applyPatchResult`, `gomi.previewPatchResult`, `gomi.pruneMemoryResult`,
+//   `gomi.event`, `gomi.bridgeError`
 export const GOMI_BRIDGE_MAX_MESSAGE_BYTES = 64_000;
 
 const GOMI_BRIDGE_MAX_TEXT_LENGTH = 16_000;
@@ -232,7 +242,11 @@ export function isGomiBridgeMessage(value: unknown): value is GomiBridgeMessage 
         isOptionalSafeString(value.error, GOMI_BRIDGE_MAX_ERROR_LENGTH)
       );
     case 'gomi.event':
-      return hasOnlyKeys(value, ['protocolVersion', 'type', 'event']) && isRecord(value.event);
+      return (
+        hasOnlyKeys(value, ['protocolVersion', 'type', 'event']) &&
+        isRecord(value.event) &&
+        getSerializedMessageSize(value.event) <= GOMI_BRIDGE_MAX_MESSAGE_BYTES
+      );
     case 'gomi.bridgeError':
       return (
         hasOnlyKeys(value, ['protocolVersion', 'type', 'code', 'message']) &&
@@ -410,8 +424,8 @@ function isMemorySettings(value: unknown): boolean {
     typeof value.indexTerminalSnippets === 'boolean' &&
     isOneOf(value.privacyMode, GOMI_MEMORY_PRIVACY_MODES) &&
     typeof value.redactSecrets === 'boolean' &&
-    isNumberInRange(value.retentionDays, 1, 3650) &&
-    isNumberInRange(value.maxProjectMemoryItems, 1, 10_000) &&
+    isIntegerInRange(value.retentionDays, 1, 3650) &&
+    isIntegerInRange(value.maxProjectMemoryItems, 1, 10_000) &&
     isNumberInRange(value.broadcastThreshold, 0, 1) &&
     typeof value.requirePatchApproval === 'boolean'
   );
@@ -439,8 +453,8 @@ function isExecutionSettings(value: unknown): boolean {
     typeof value.allowCliProviders === 'boolean' &&
     typeof value.allowHttpProviders === 'boolean' &&
     typeof value.requirePatchApprovalForLiveProviders === 'boolean' &&
-    isNumberInRange(value.maxConcurrentAgentRuns, 1, 16) &&
-    (value.httpMaxRetries === undefined || isNumberInRange(value.httpMaxRetries, 0, 10))
+    isIntegerInRange(value.maxConcurrentAgentRuns, 1, 16) &&
+    (value.httpMaxRetries === undefined || isIntegerInRange(value.httpMaxRetries, 0, 10))
   );
 }
 
@@ -475,7 +489,20 @@ function isSafeRelativePath(value: unknown): value is string {
 }
 
 function isSafeProjectPath(value: unknown): value is string {
-  return isSafeString(value, 500) && !value.includes('\0');
+  if (!isSafeString(value, 500) || value.includes('\0')) {
+    return false;
+  }
+
+  const normalized = value.replace(/\\/g, '/');
+  if (normalized.includes('/../') || normalized.startsWith('../') || normalized.endsWith('/..')) {
+    return false;
+  }
+
+  return true;
+}
+
+function isIntegerInRange(value: unknown, min: number, max: number): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
 }
 
 function isNumberInRange(value: unknown, min: number, max: number): value is number {
