@@ -121,6 +121,57 @@ describe('Gomi webview host bridge', () => {
     ]);
     expect(JSON.stringify(webview.outbox)).not.toContain('../secret');
   });
+
+  it('rejects oversize gomi.event payloads on the host side', () => {
+    const webview = new MemoryNativeWebview();
+    const bridge = createGomiWebviewHostBridge(webview);
+    const received: GomiBridgeMessage[] = [];
+    bridge.onMessage((message) => received.push(message));
+
+    webview.emit({
+      protocolVersion: 1,
+      type: 'gomi.event',
+      event: { huge: 'x'.repeat(70_000) }
+    });
+
+    expect(received).toEqual([]);
+    expect(webview.outbox).toEqual([
+      {
+        protocolVersion: 1,
+        type: 'gomi.bridgeError',
+        code: 'invalid_message',
+        message: 'Rejected invalid Gomi bridge message.'
+      }
+    ]);
+  });
+
+  it('rejects project paths with directory traversal on the host side', () => {
+    const webview = new MemoryNativeWebview();
+    const bridge = createGomiWebviewHostBridge(webview);
+    const received: GomiBridgeMessage[] = [];
+    bridge.onMessage((message) => received.push(message));
+
+    webview.emit({
+      protocolVersion: 1,
+      type: 'gomi.openProject',
+      project: {
+        id: 'project-traversal',
+        name: 'Traversal',
+        path: '../../etc/passwd',
+        lastOpenedAt: '2026-07-15T10:00:00.000Z'
+      }
+    });
+
+    expect(received).toEqual([]);
+    expect(webview.outbox).toEqual([
+      {
+        protocolVersion: 1,
+        type: 'gomi.bridgeError',
+        code: 'invalid_message',
+        message: 'Rejected invalid Gomi bridge message.'
+      }
+    ]);
+  });
 });
 
 class MemoryNativeWebview {
