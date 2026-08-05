@@ -5,6 +5,10 @@ import {
   shouldReportInvalidGomiBridgeMessage,
   withGomiBridgeProtocol
 } from './gomiWebviewBridge';
+import {
+  createDetailedGomiBridgeError,
+  validateGomiBridgeMessage
+} from './gomiWebviewHostValidation';
 
 export interface GomiDisposable {
   dispose(): void;
@@ -25,16 +29,24 @@ export class GomiWebviewHostBridge implements GomiWorkbenchBridge, GomiDisposabl
 
   constructor(private readonly webview: GomiNativeWebviewHost) {
     this.disposable = this.webview.onMessage((event) => {
-      if (!isGomiBridgeMessage(event.message)) {
-        if (shouldReportInvalidGomiBridgeMessage(event.message)) {
-          void this.webview.postMessage(createGomiBridgeErrorMessage());
-        }
+      // --- Enhanced validation with detailed diagnostics ---
+      const validation = validateGomiBridgeMessage(event.message);
 
+      if (!validation.valid) {
+        if (shouldReportInvalidGomiBridgeMessage(event.message)) {
+          void this.webview.postMessage(
+            createDetailedGomiBridgeError(validation.reason ?? 'Invalid message.')
+          );
+        }
         return;
       }
 
+      // `validateGomiBridgeMessage` already confirmed the payload is a
+      // valid GomiBridgeMessage — safe to cast.
+      const message = event.message as GomiBridgeMessage;
+
       for (const listener of this.listeners) {
-        listener(event.message);
+        listener(message);
       }
     });
   }
