@@ -1,6 +1,7 @@
 const { app, BrowserWindow, shell, Menu } = require('electron');
 const path = require('node:path');
 const { resolveRendererEntry } = require('./resolveRendererEntry.cjs');
+const { initAutoUpdater } = require('./autoUpdater.cjs');
 
 const isDev = !app.isPackaged;
 const rendererEntry = path.join(__dirname, '..', 'dist', 'index.html');
@@ -70,6 +71,9 @@ app.whenReady().then(() => {
   }
 
   createWindow();
+
+  // Wire auto-update AFTER the window is ready (non-blocking).
+  initAutoUpdater();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
