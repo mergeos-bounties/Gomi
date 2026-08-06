@@ -20,7 +20,8 @@
     "electron:dev": "node scripts/run-electron-dev.mjs",
     "desktop:dir": "npm run build && electron-builder --win --dir",
     "desktop:build": "npm run build && electron-builder --win",
-    "notarize": "node scripts/notarize.js"
+    "notarize": "node scripts/notarize.js",
+    "check:desktop": "node scripts/check-desktop-release.mjs"
   },
   "dependencies": {
     "@types/three": "^0.185.1",
@@ -63,7 +64,10 @@
       "artifactName": "Gomi-IDE-Setup-${version}-${arch}.${ext}"
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "category": "public.app-category.developer-tools",
       "icon": "resources/gomi-branding/macos/gomi.icns",
       "hardenedRuntime": true,
@@ -72,7 +76,11 @@
       "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "linux": {
-      "target": ["AppImage", "deb", "rpm"],
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
       "category": "Development",
       "icon": "resources/gomi-branding/linux",
       "maintainer": "gomi@example.com"
