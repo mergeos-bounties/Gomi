@@ -418,3 +418,14 @@ MergeOS bounties: **follow** [mergeos-bounties](https://github.com/mergeos-bount
 [MIT](LICENSE) · MergeOS / Gomi
 
 Before commercial distribution, review Code - OSS license obligations, third-party licenses, marketplace terms, branding rules, and generated asset rights.
+
+
+## CI/CD
+
+This project uses GitHub Actions for continuous integration. 
+See [.github/workflows/ci.yml](.github/workflows/ci.yml) for the CI pipeline.
+
+## Documentation
+
+- [Contributing Guide](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)

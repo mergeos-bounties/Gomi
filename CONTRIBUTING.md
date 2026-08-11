@@ -1,60 +1,48 @@
-# Contributing to Gomi IDE
+# Contributing to Gomi
 
-Thanks for contributing! Gomi IDE is a MergeOS-funded project — many issues carry **MRG token bounties**.
+Thank you for your interest in contributing to Gomi!
 
-## Bounty workflow
+## Getting Started
 
-1. **Star** [mergeos-bounties/mergeos](https://github.com/mergeos-bounties/mergeos)
-2. **Claim** on both:
-   - [mergeos#1 — Claim MRG Tokens](https://github.com/mergeos-bounties/mergeos/issues/1)
-   - [mergeos#244 — Gomi IDE job tracker](https://github.com/mergeos-bounties/mergeos/issues/244)
-3. **Fork** this repo, create a feature branch, implement the fix
-4. **Open a PR** targeting `master`, linking the issue number and `mergeos#244`
-5. **Pass the quality gate** (see below)
-6. After merge, MRG is credited to `github:<PR author>` on the MergeOS admin ledger
+1. **Fork** the repository
+2. **Clone** your fork locally
+3. **Install dependencies**: Run `npm install`
+4. **Make changes**: Create a new branch for your feature/fix
+5. **Test**: Run `npm test` to verify changes
+6. **Submit a PR**: Open a pull request with a clear description
 
-## Local verify script
+## Development Setup
 
 ```bash
-npm ci && npm run typecheck && npm test
+git clone https://github.com/YOUR_USERNAME/Gomi.git
+cd Gomi
+npm install
 ```
 
-One command to verify everything is green before pushing.
+## Code Style
 
-## Quality gate
+- Follow existing code patterns
+- Use meaningful variable names
+- Add comments for complex logic
+- Write tests for new features
 
-CI runs these checks on every PR. Make sure they pass locally:
+## Pull Request Guidelines
+
+- One feature/fix per PR
+- Link related issues in the PR description
+- Keep PRs focused and reasonably sized
+- Update documentation if applicable
+
+## Testing
+
+Run the test suite before submitting:
 
 ```bash
-npm run typecheck   # TypeScript compilation
-npm test            # Vitest suite (193+ tests)
+npm test
 ```
 
-## Code style
+## Questions?
 
-- TypeScript strict mode
-- Prefer explicit types over `any`
-- New message types MUST be registered in the bridge validator (see `src/vs/workbench/contrib/gomi/common/gomiMessageValidator.ts`)
-- Keep public APIs backward-compatible unless the issue explicitly allows breaking changes
+Open an issue or reach out to the maintainers.
 
-## Pull request guidelines
-
-- One focused change per PR
-- Link the issue with `Closes #NN`
-- Include evidence: test output, screenshots (for UI changes), or logs
-- No secrets, keys, or credentials in commits or PR descriptions
-
-## Security
-
-See [SECURITY.md](SECURITY.md) for reporting vulnerabilities. Never commit secrets — use environment variables or Electron `safeStorage`.
-
-## Documentation
-
-Contributions to documentation are welcome! See the `docs/` platform for platform-specific guides:
-- [macOS & Linux Packaging Guide](docs/macos-linux-packaging.md) - Instructions for cross-platform builds
-- [Windows First Run](docs/windows-first-run.md) - Initial setup guide
-- [Windows Release Notes](docs/windows-release.md) - Release-specific information
-
-## Code of Conduct
-
-See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+Thank you for contributing!
