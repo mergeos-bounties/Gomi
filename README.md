@@ -206,6 +206,10 @@ src/vs/workbench/contrib/gomi/
   node/        # Runtime, providers, memory, planner, patch applier
 ```
 
+The **webview ↔ host bridge** (message protocol, versioning, validation and
+error flow) is documented in
+[docs/webview-host-bridge.md](docs/webview-host-bridge.md).
+
 Supporting release paths:
 
 ```text
