@@ -7,7 +7,7 @@ export class SessionCancellationManager {
     this.sessions.set(sessionId, controller);
     return controller.signal;
   }
-  cancel(sessionId: string, reason?: string): boolean {
+  cancel(sessionId: string, _reason?: string): boolean {
     const controller = this.sessions.get(sessionId);
     if (!controller) return false;
     controller.abort();

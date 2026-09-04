@@ -2,7 +2,7 @@ import type {
   GomiAgentResult,
   GomiAgentResultSchemaVersion
 } from '../common/gomiTypes';
-import { validateAgentResult, type AgentResultValidationResult } from '../common/gomiAgentResultSchema';
+import { validateAgentResult } from '../common/gomiAgentResultSchema';
 
 export const GOMI_AGENT_RESULT_SCHEMA_VERSION = 1 satisfies GomiAgentResultSchemaVersion;
 
@@ -103,31 +103,6 @@ function tryParseObject(text: string): { value?: AgentResultRecord; error?: stri
       error: error instanceof Error ? error.message : 'Agent result JSON could not be parsed.'
     };
   }
-}
-
-function normalizeAgentResultObject(value: AgentResultRecord): GomiAgentResultParseResult {
-  const rawSchemaVersion = value.schemaVersion ?? value.schema_version;
-
-  if (rawSchemaVersion === undefined) {
-    return {
-      value: value as Partial<GomiAgentResult>,
-      diagnostics: []
-    };
-  }
-
-  if (rawSchemaVersion === GOMI_AGENT_RESULT_SCHEMA_VERSION) {
-    return {
-      value: {
-        ...value,
-        schemaVersion: GOMI_AGENT_RESULT_SCHEMA_VERSION
-      } as Partial<GomiAgentResult>,
-      diagnostics: []
-    };
-  }
-
-  return {
-    diagnostics: [`Unsupported agent result schemaVersion ${String(rawSchemaVersion)}.`]
-  };
 }
 
 function isAgentResultRecord(value: unknown): value is AgentResultRecord {

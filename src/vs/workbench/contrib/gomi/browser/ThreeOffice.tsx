@@ -7,7 +7,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { GomiAgent, GomiAgentSeat, GomiOfficeSettings, GomiTask } from '../common/gomiTypes';
+import type { GomiAgent, GomiOfficeSettings, GomiTask } from '../common/gomiTypes';
 
 interface ThreeOfficeProps {
   agents: GomiAgent[];

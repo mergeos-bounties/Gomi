@@ -1,4 +1,5 @@
 /** Playwright smoke e2e for Gomi Office (#13) */
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 describe('Gomi Office smoke e2e', () => {
   it('GomiOfficeApp renders without crashing', async () => {
