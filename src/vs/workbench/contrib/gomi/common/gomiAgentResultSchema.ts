@@ -25,7 +25,6 @@
  */
 
 import { z } from 'zod';
-import type { GomiAgentId } from '../common/gomiTypes';
 
 // ────────────────────────────────────────────────
 //  Constants
@@ -39,10 +38,10 @@ const MAX_RECOMMENDATIONS = 20;
 const MAX_PROPOSED_FILES = 100;
 const MAX_FILE_PATH = 500;
 
-const agentIdValues: readonly GomiAgentId[] = [
+const agentIdValues = [
   'ceo', 'system-analyst', 'backend', 'frontend',
   'designer', 'database', 'qa', 'devops',
-];
+] as const;
 
 const agentIdSchema = z.enum(agentIdValues);
 

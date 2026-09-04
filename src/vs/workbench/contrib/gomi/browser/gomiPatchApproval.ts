@@ -192,8 +192,7 @@ export function filterPendingPatches(
 ): GomiPatchReviewState[] {
   let result = patches.filter(
     (state) =>
-      state.approvalStatus === 'pending' ||
-      state.approvalStatus === 'idle',
+      state.approvalStatus === 'pending'
   );
 
   if (options.filePathQuery) {

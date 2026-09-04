@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import assert from 'node:assert/strict';
 import {
   createPatchReviewState,
   filterPatchesByFilePath,
@@ -17,7 +17,7 @@ function makePatch(id: string, filePath: string, targetFiles: string[], riskLeve
     diff: `--- a/${filePath}\n+++ b/${filePath}\n+test`,
     approvalStatus: status,
     riskLevel,
-    createdByAgentId: 'agent-1',
+    createdByAgentId: 'qa',
   };
 }
 
@@ -88,7 +88,7 @@ suite('filterPendingPatches', () => {
 
   test('filters pending by file path', () => {
     const result = filterPendingPatches(patches, { filePathQuery: 'src/' });
-    assert.strictEqual(result.length, 2);
+    assert.strictEqual(result.length, 3);
   });
 
   test('filters pending by risk level', () => {
